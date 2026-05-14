@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+ARG VITE_API_URL=https://shisha-guid-api.api-api-api.com/api/v1
+ENV VITE_API_URL=$VITE_API_URL
 RUN npx vite build
 
 FROM nginx:alpine
