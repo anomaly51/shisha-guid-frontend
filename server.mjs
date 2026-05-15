@@ -33,6 +33,7 @@ const mimeTypes = {
 let vite
 let template
 let render
+let entryAssetPath
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -76,6 +77,7 @@ const server = http.createServer(async (req, res) => {
 
 if (isProduction) {
   template = await fs.readFile(path.join(clientRoot, 'index.html'), 'utf-8')
+  entryAssetPath = await findEntryAsset()
   const serverEntry = pathToFileURL(path.resolve(__dirname, 'dist/server/entry-server.js')).href
   render = (await import(serverEntry)).render
 } else {
@@ -103,13 +105,39 @@ const isNavigationRequest = (req, pathname) => {
   return accept.includes('text/html') || accept.includes('*/*') || accept === ''
 }
 
+async function findEntryAsset() {
+  const assetsRoot = path.join(clientRoot, 'assets')
+  const files = await fs.readdir(assetsRoot)
+  const entryFile = files.find((file) => /^index-[\w-]+\.js$/.test(file))
+  return entryFile ? path.join(assetsRoot, entryFile) : null
+}
+
+const shouldServeEntryAssetFallback = (pathname) => (
+  pathname.startsWith('/assets/index-') && pathname.endsWith('.js') && entryAssetPath
+)
+
+const serveEntryAssetFallback = (res) => {
+  res.writeHead(200, {
+    'Content-Type': mimeTypes['.js'],
+    'Cache-Control': 'no-store',
+  })
+  createReadStream(entryAssetPath).pipe(res)
+}
+
 const serveStatic = async (req, res) => {
   if (!isProduction || !req.url) return false
 
   const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname)
   const filePath = path.join(clientRoot, pathname)
 
-  if (!filePath.startsWith(clientRoot) || !existsSync(filePath)) return false
+  if (!filePath.startsWith(clientRoot)) return false
+  if (!existsSync(filePath)) {
+    if (shouldServeEntryAssetFallback(pathname)) {
+      serveEntryAssetFallback(res)
+      return true
+    }
+    return false
+  }
 
   const stat = await fs.stat(filePath)
   if (!stat.isFile()) return false
