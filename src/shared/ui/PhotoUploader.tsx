@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import tw from 'twin.macro'
-import { useGetUploadPolicyMutation } from '../api'
+import { useUploadMediaMutation } from '../api'
 
 interface PhotoUploaderProps {
   label?: string
@@ -39,7 +39,7 @@ export const getPublicUrl = (uploadUrl: string, key: string) => {
 }
 
 export const PhotoUploader = ({ label = 'Photos', value, onChange, max = 10 }: PhotoUploaderProps) => {
-  const [getUploadPolicy] = useGetUploadPolicyMutation()
+  const [uploadMedia] = useUploadMediaMutation()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const { t } = useTranslation()
@@ -62,23 +62,8 @@ export const PhotoUploader = ({ label = 'Photos', value, onChange, max = 10 }: P
       }
 
       const uploaded = await Promise.all(selected.map(async (file) => {
-        const policy = await getUploadPolicy(file.type).unwrap()
-        const formData = new FormData()
-        Object.entries(policy.form_data || {}).forEach(([key, fieldValue]) => {
-          formData.append(key, String(fieldValue))
-        })
-        if (!policy.form_data?.['Content-Type']) {
-          formData.append('Content-Type', file.type)
-        }
-        formData.append('file', file)
-
-        const uploadUrl = getBrowserUploadUrl(policy.url)
-        const response = await fetch(uploadUrl, { method: 'POST', body: formData })
-        if (!response.ok) {
-          throw new Error('Upload failed')
-        }
-
-        return getPublicUrl(uploadUrl, policy.form_data.key)
+        const response = await uploadMedia(file).unwrap()
+        return response.url
       }))
 
       onChange([...value, ...uploaded])

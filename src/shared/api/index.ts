@@ -15,4 +15,4 @@ export {
   useGetSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
   useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation,
 } from './setups'
-export { useGetUploadPolicyMutation } from './upload'
+export { useGetUploadPolicyMutation, useUploadMediaMutation } from './upload'

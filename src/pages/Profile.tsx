@@ -10,15 +10,13 @@ import {
   type BadgeEffect,
   useGetAdminUsersQuery,
   useGetProfileQuery,
-  useGetUploadPolicyMutation,
   useUpdateAdminUserMutation,
   useUpdateProfileMutation,
   useLogoutMutation,
+  useUploadMediaMutation,
 } from '../shared/api'
 import {
   ACCEPTED_MEDIA_INPUT,
-  getBrowserUploadUrl,
-  getPublicUrl,
   isAcceptedMediaFile,
 } from '../shared/ui/PhotoUploader'
 import { CatalogIcon, LockIcon, LogoutIcon } from '../shared/ui/Icons'
@@ -240,7 +238,7 @@ const AdminPanel = () => {
 export const Profile = () => {
   const { data: profile, isLoading } = useGetProfileQuery()
   const [updateProfile, { isLoading: saving }] = useUpdateProfileMutation()
-  const [getUploadPolicy] = useGetUploadPolicyMutation()
+  const [uploadMedia] = useUploadMediaMutation()
   const [logout] = useLogoutMutation()
   const [nickname, setNickname] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -300,21 +298,8 @@ export const Profile = () => {
 
     setUploading(true)
     try {
-      const policy = await getUploadPolicy(file.type).unwrap()
-      const formData = new FormData()
-      Object.entries(policy.form_data || {}).forEach(([key, fieldValue]) => {
-        formData.append(key, String(fieldValue))
-      })
-      if (!policy.form_data?.['Content-Type']) {
-        formData.append('Content-Type', file.type)
-      }
-      formData.append('file', file)
-
-      const uploadUrl = getBrowserUploadUrl(policy.url)
-      const response = await fetch(uploadUrl, { method: 'POST', body: formData })
-      if (!response.ok) throw new Error('Upload failed')
-
-      setAvatarUrl(getPublicUrl(uploadUrl, policy.form_data.key))
+      const response = await uploadMedia(file).unwrap()
+      setAvatarUrl(response.url)
     } catch {
       setError(t('profile.uploadFailed'))
     } finally {

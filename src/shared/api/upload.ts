@@ -1,5 +1,9 @@
 import { api } from './base'
 
+export interface UploadFileResponse {
+  url: string
+}
+
 export const uploadApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getUploadPolicy: builder.mutation<any, string>({
@@ -8,7 +12,19 @@ export const uploadApi = api.injectEndpoints({
         method: 'POST',
       }),
     }),
+    uploadMedia: builder.mutation<UploadFileResponse, File>({
+      query: (file) => {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        return {
+          url: '/upload/file',
+          method: 'POST',
+          body: formData,
+        }
+      },
+    }),
   }),
 })
 
-export const { useGetUploadPolicyMutation } = uploadApi
+export const { useGetUploadPolicyMutation, useUploadMediaMutation } = uploadApi
