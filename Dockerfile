@@ -4,9 +4,11 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 ARG VITE_API_URL=https://shisha-guid-api.api-api-api.com/api/v1
+ARG VITE_SSR_API_URL=http://backend.shisha-guid.svc.cluster.local/api/v1
 ARG VITE_UPLOAD_PUBLIC_URL
 ARG VITE_GOOGLE_CLIENT_ID=838081828286-6hn0jphbj636tf7p3q83c37dg9ltnfms.apps.googleusercontent.com
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_SSR_API_URL=$VITE_SSR_API_URL
 ENV VITE_UPLOAD_PUBLIC_URL=$VITE_UPLOAD_PUBLIC_URL
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 RUN npm run build
