@@ -1,85 +1,54 @@
+import compression from 'compression'
+import express from 'express'
 import fs from 'node:fs/promises'
-import { createReadStream, existsSync } from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import sirv from 'sirv'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isProduction = process.env.NODE_ENV === 'production'
 const port = Number(process.env.PORT || 5173)
-const base = process.env.BASE || '/'
+const base = normalizeBase(process.env.BASE || '/')
 const clientRoot = path.resolve(__dirname, 'dist/client')
+const serverEntryPath = path.resolve(__dirname, 'dist/server/entry-server.js')
 const htmlHeaders = {
-  'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-store, max-age=0',
 }
 
-const mimeTypes = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.ico': 'image/x-icon',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-}
+const app = express()
+const server = http.createServer(app)
 
 let vite
 let template
 let render
-let entryAssetPath
 
-const server = http.createServer(async (req, res) => {
-  try {
-    if (!req.url) {
-      send(res, 400, 'Bad Request')
-      return
-    }
+app.disable('x-powered-by')
+app.use(compression())
 
-    const pathname = new URL(req.url, 'http://localhost').pathname
-    if (pathname.startsWith('/.well-known/appspecific/')) {
-      send(res, 204, '')
-      return
-    }
-
-    if (await serveStatic(req, res)) return
-
-    if (!isProduction) {
-      const handled = await new Promise((resolve, reject) => {
-        vite.middlewares(req, res, (error) => (error ? reject(error) : resolve(false)))
-      })
-      if (handled || res.headersSent) return
-    }
-
-    const url = req.url.replace(base, '/')
-    if (isProduction && !isNavigationRequest(req, pathname)) {
-      send(res, 404, 'Not Found', { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' })
-      return
-    }
-
-    const html = await createHtml(url)
-    send(res, 200, html, htmlHeaders)
-  } catch (error) {
-    if (!isProduction && vite) {
-      vite.ssrFixStacktrace(error)
-    }
-
-    console.error(error)
-    send(res, 500, isProduction ? 'Internal Server Error' : String(error?.stack || error))
-  }
+app.use('/.well-known/appspecific', (_req, res) => {
+  res.status(204).end()
 })
 
 if (isProduction) {
   template = await fs.readFile(path.join(clientRoot, 'index.html'), 'utf-8')
-  entryAssetPath = await findEntryAsset()
-  const serverEntry = pathToFileURL(path.resolve(__dirname, 'dist/server/entry-server.js')).href
-  render = (await import(serverEntry)).render
+  render = (await import(pathToFileURL(serverEntryPath).href)).render
+
+  app.use(
+    base,
+    sirv(clientRoot, {
+      dev: false,
+      etag: true,
+      extensions: [],
+      immutable: true,
+      maxAge: 31536000,
+      setHeaders(res, pathname) {
+        if (!pathname.startsWith('/assets/')) {
+          res.setHeader('Cache-Control', 'no-cache')
+        }
+      },
+    }),
+  )
 } else {
   const { createServer } = await import('vite')
   vite = await createServer({
@@ -90,87 +59,80 @@ if (isProduction) {
     appType: 'custom',
     base,
   })
+  app.use(vite.middlewares)
 }
 
-const send = (res, statusCode, body, headers = {}) => {
-  res.writeHead(statusCode, headers)
-  res.end(body)
+app.use(async (req, res, next) => {
+  try {
+    const pathname = getPathname(req.originalUrl)
+
+    if (isProduction && !isNavigationRequest(req, pathname)) {
+      res.status(404).type('text/plain').set('Cache-Control', 'no-store').send('Not Found')
+      return
+    }
+
+    const html = await createHtml(stripBase(req.originalUrl))
+    res.status(200).set(htmlHeaders).type('html').send(html)
+  } catch (error) {
+    if (!isProduction && vite) {
+      vite.ssrFixStacktrace(error)
+    }
+
+    next(error)
+  }
+})
+
+app.use((error, _req, res, _next) => {
+  console.error(error)
+  const body = isProduction ? 'Internal Server Error' : String(error?.stack || error)
+  res.status(500).type('text/plain').send(body)
+})
+
+server.listen(port, () => {
+  console.log(`SSR server running at http://localhost:${port}`)
+})
+
+function normalizeBase(value) {
+  if (!value || value === '/') return '/'
+  const withLeadingSlash = value.startsWith('/') ? value : `/${value}`
+  return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`
 }
 
-const isNavigationRequest = (req, pathname) => {
+function getPathname(url) {
+  return new URL(url, 'http://localhost').pathname
+}
+
+function stripBase(url) {
+  if (base === '/') return url
+  const pathname = getPathname(url)
+
+  if (!pathname.startsWith(base)) return url
+  return `/${url.slice(base.length)}`
+}
+
+function isNavigationRequest(req, pathname) {
   if (req.method && req.method !== 'GET' && req.method !== 'HEAD') return false
-  if (pathname.startsWith('/assets/')) return false
-  if (path.extname(pathname)) return false
+  if (pathname.startsWith('/assets/') || path.extname(pathname)) return false
+
   const accept = req.headers.accept || ''
   return accept.includes('text/html') || accept.includes('*/*') || accept === ''
 }
 
-async function findEntryAsset() {
-  const assetsRoot = path.join(clientRoot, 'assets')
-  const files = await fs.readdir(assetsRoot)
-  const entryFile = files.find((file) => /^index-[\w-]+\.js$/.test(file))
-  return entryFile ? path.join(assetsRoot, entryFile) : null
-}
-
-const shouldServeEntryAssetFallback = (pathname) => (
-  pathname.startsWith('/assets/index-') && pathname.endsWith('.js') && entryAssetPath
-)
-
-const serveEntryAssetFallback = (res) => {
-  res.writeHead(200, {
-    'Content-Type': mimeTypes['.js'],
-    'Cache-Control': 'no-store',
-  })
-  createReadStream(entryAssetPath).pipe(res)
-}
-
-const serveStatic = async (req, res) => {
-  if (!isProduction || !req.url) return false
-
-  const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname)
-  const filePath = path.join(clientRoot, pathname)
-
-  if (!filePath.startsWith(clientRoot)) return false
-  if (!existsSync(filePath)) {
-    if (shouldServeEntryAssetFallback(pathname)) {
-      serveEntryAssetFallback(res)
-      return true
-    }
-    return false
-  }
-
-  const stat = await fs.stat(filePath)
-  if (!stat.isFile()) return false
-
-  const ext = path.extname(filePath)
-  res.writeHead(200, {
-    'Content-Type': mimeTypes[ext] || 'application/octet-stream',
-    'Cache-Control': pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
-  })
-  createReadStream(filePath).pipe(res)
-  return true
-}
-
-const createHtml = async (url) => {
+async function createHtml(url) {
   if (isProduction) {
-    const rendered = await render(url)
-    return template
-      .replace('<!--ssr-styles-->', rendered.styles)
-      .replace('<!--ssr-outlet-->', rendered.html)
-      .replace('<!--ssr-state-->', rendered.stateScript)
+    return injectRenderedHtml(template, await render(url))
   }
 
   const rawTemplate = await fs.readFile(path.resolve(__dirname, 'index.html'), 'utf-8')
   const transformedTemplate = await vite.transformIndexHtml(url, rawTemplate)
   const devRender = (await vite.ssrLoadModule('/src/entry-server.tsx')).render
-  const rendered = await devRender(url)
 
-  return transformedTemplate
+  return injectRenderedHtml(transformedTemplate, await devRender(url))
+}
+
+function injectRenderedHtml(html, rendered) {
+  return html
     .replace('<!--ssr-styles-->', rendered.styles)
     .replace('<!--ssr-outlet-->', rendered.html)
     .replace('<!--ssr-state-->', rendered.stateScript)
 }
-
-server.listen(port, () => {
-  console.log(`SSR server running at http://localhost:${port}`)
-})
