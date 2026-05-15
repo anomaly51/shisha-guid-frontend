@@ -1,27 +1,19 @@
 import compression from 'compression'
 import express from 'express'
-import fs from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import sirv from 'sirv'
+import { createDevMiddleware, renderPage } from 'vike/server'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isProduction = process.env.NODE_ENV === 'production'
 const port = Number(process.env.PORT || 5173)
 const base = normalizeBase(process.env.BASE || '/')
 const clientRoot = path.resolve(__dirname, 'dist/client')
-const serverEntryPath = path.resolve(__dirname, 'dist/server/entry-server.js')
-const htmlHeaders = {
-  'Cache-Control': 'no-store, max-age=0',
-}
 
 const app = express()
 const server = http.createServer(app)
-
-let vite
-let template
-let render
 
 app.disable('x-powered-by')
 app.use(compression())
@@ -31,9 +23,6 @@ app.use('/.well-known/appspecific', (_req, res) => {
 })
 
 if (isProduction) {
-  template = await fs.readFile(path.join(clientRoot, 'index.html'), 'utf-8')
-  render = (await import(pathToFileURL(serverEntryPath).href)).render
-
   app.use(
     base,
     sirv(clientRoot, {
@@ -50,34 +39,41 @@ if (isProduction) {
     }),
   )
 } else {
-  const { createServer } = await import('vite')
-  vite = await createServer({
-    server: {
-      middlewareMode: true,
-      hmr: { server },
+  const { devMiddleware } = await createDevMiddleware({
+    root: __dirname,
+    viteConfig: {
+      base,
+      server: {
+        hmr: { server },
+      },
     },
-    appType: 'custom',
-    base,
   })
-  app.use(vite.middlewares)
+
+  app.use(devMiddleware)
 }
 
 app.use(async (req, res, next) => {
-  try {
-    const pathname = getPathname(req.originalUrl)
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    next()
+    return
+  }
 
-    if (isProduction && !isNavigationRequest(req, pathname)) {
+  try {
+    const pageContext = await renderPage({
+      urlOriginal: stripBase(req.originalUrl),
+      headersOriginal: req.headers,
+    })
+
+    if (!pageContext.httpResponse) {
       res.status(404).type('text/plain').set('Cache-Control', 'no-store').send('Not Found')
       return
     }
 
-    const html = await createHtml(stripBase(req.originalUrl))
-    res.status(200).set(htmlHeaders).type('html').send(html)
+    const { body, statusCode, headers } = pageContext.httpResponse
+    headers.forEach(([name, value]) => res.setHeader(name, value))
+    res.setHeader('Cache-Control', 'no-store, max-age=0')
+    res.status(statusCode).send(body)
   } catch (error) {
-    if (!isProduction && vite) {
-      vite.ssrFixStacktrace(error)
-    }
-
     next(error)
   }
 })
@@ -108,35 +104,4 @@ function stripBase(url) {
 
   if (!pathname.startsWith(base)) return url
   return `/${url.slice(base.length)}`
-}
-
-function isNavigationRequest(req, pathname) {
-  if (req.method && req.method !== 'GET' && req.method !== 'HEAD') return false
-  if (pathname.startsWith('/assets/') || path.extname(pathname)) return false
-
-  const fetchMode = req.headers['sec-fetch-mode']
-  const fetchDest = req.headers['sec-fetch-dest']
-  if (fetchMode === 'navigate' || fetchDest === 'document') return true
-
-  const accept = req.headers.accept || ''
-  return accept.includes('text/html') || accept.includes('*/*') || accept === ''
-}
-
-async function createHtml(url) {
-  if (isProduction) {
-    return injectRenderedHtml(template, await render(url))
-  }
-
-  const rawTemplate = await fs.readFile(path.resolve(__dirname, 'index.html'), 'utf-8')
-  const transformedTemplate = await vite.transformIndexHtml(url, rawTemplate)
-  const devRender = (await vite.ssrLoadModule('/src/entry-server.tsx')).render
-
-  return injectRenderedHtml(transformedTemplate, await devRender(url))
-}
-
-function injectRenderedHtml(html, rendered) {
-  return html
-    .replace('<!--ssr-styles-->', rendered.styles)
-    .replace('<!--ssr-outlet-->', rendered.html)
-    .replace('<!--ssr-state-->', rendered.stateScript)
 }

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node server.mjs",
-    "build": "tsc && vite build --outDir dist/client && vite build --ssr src/entry-server.tsx --outDir dist/server",
+    "build": "tsc && vike build",
     "preview": "NODE_ENV=production node server.mjs"
   },
   "dependencies": {
@@ -21,7 +21,8 @@
     "react-router-dom": "^7.15.0",
     "sirv": "^3.0.2",
     "styled-components": "^6.1.8",
-    "three": "0.182.0"
+    "three": "0.182.0",
+    "vike": "^0.4.259"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
