@@ -7,7 +7,10 @@ import { Input, Textarea } from '../shared/ui/Input'
 import { Button } from '../shared/ui/Button'
 import { useGetProfileQuery } from '../shared/api'
 import { PhotoUploader } from '../shared/ui/PhotoUploader'
+import { PackageGramsSlider, normalizePackageGrams } from '../shared/ui/PackageGramsSlider'
+import { StrengthSlider } from '../shared/ui/StrengthSlider'
 import { BackIcon, CatalogIcon, type CatalogIconName, LockIcon } from '../shared/ui/Icons'
+import { getTobaccoStrength } from '../shared/setupMetrics'
 
 interface FormProps {
   title: string
@@ -19,6 +22,10 @@ interface FormProps {
     package_grams?: number | null
     coals_per_package?: number | null
     coal_count?: number | null
+    strength?: number | null
+    heaviness?: number | null
+    nicotine_strength?: number | null
+    nicotine?: number | null
     description?: string
     photo_urls?: string[]
   }
@@ -30,6 +37,7 @@ interface FormProps {
     package_grams?: number | null
     coals_per_package?: number | null
     coal_count?: number | null
+    strength?: number
     description: string | null
     photo_urls: string[]
   }) => Promise<unknown>
@@ -46,6 +54,7 @@ type ItemFormCopy = {
   hasPrice?: boolean
   hasBowlCapacity?: boolean
   hasTobaccoPackage?: boolean
+  hasTobaccoStrength?: boolean
   hasCoalPackage?: boolean
   hasCoalPlacementCount?: boolean
 }
@@ -76,6 +85,7 @@ const getCopyByTitle = (t: (key: string) => string): Record<string, ItemFormCopy
     descriptionPlaceholder: t('itemForm.placeholders.tobaccoDescription'),
     hasPrice: true,
     hasTobaccoPackage: true,
+    hasTobaccoStrength: true,
   },
   coal: {
     icon: 'coal',
@@ -134,8 +144,13 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
     initialValues?.capacity_grams == null ? '' : String(initialValues.capacity_grams)
   )
   const [packageGrams, setPackageGrams] = useState(
-    initialValues?.package_grams == null ? '' : String(initialValues.package_grams)
+    initialValues?.package_grams == null
+      ? copy.hasTobaccoPackage ? '100' : ''
+      : String(normalizePackageGrams(Number(initialValues.package_grams)))
   )
+  const [strength, setStrength] = useState(() => (
+    initialValues ? getTobaccoStrength(initialValues) : 5
+  ))
   const [coalsPerPackage, setCoalsPerPackage] = useState(
     initialValues?.coals_per_package == null ? '' : String(initialValues.coals_per_package)
   )
@@ -205,9 +220,15 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
       ? parseOptionalPositiveInt(capacityGrams, 'itemForm.capacityGramsInvalid')
       : undefined
     if (copy.hasBowlCapacity && capacityGramsPayload === undefined) return
-    const packageGramsPayload = copy.hasTobaccoPackage
-      ? parseOptionalPositiveInt(packageGrams, 'itemForm.packageGramsInvalid')
-      : undefined
+    let packageGramsPayload: number | undefined
+    if (copy.hasTobaccoPackage) {
+      const parsedPackageGrams = Number(packageGrams)
+      if (!Number.isFinite(parsedPackageGrams) || parsedPackageGrams < 50 || parsedPackageGrams > 500 || parsedPackageGrams % 50 !== 0) {
+        setError(t('itemForm.packageGramsInvalid'))
+        return
+      }
+      packageGramsPayload = parsedPackageGrams
+    }
     if (copy.hasTobaccoPackage && packageGramsPayload === undefined) return
     const coalCountPayload = copy.hasCoalPlacementCount
       ? parseOptionalPositiveInt(coalCount, 'itemForm.coalCountInvalid')
@@ -220,6 +241,7 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
         ...(copy.hasPrice ? { price: pricePayload, price_currency: 'UAH' as const } : {}),
         ...(copy.hasBowlCapacity ? { capacity_grams: capacityGramsPayload } : {}),
         ...(copy.hasTobaccoPackage ? { package_grams: packageGramsPayload } : {}),
+        ...(copy.hasTobaccoStrength ? { strength } : {}),
         ...(copy.hasCoalPackage ? {
           coals_per_package: coalsPerPackagePayload,
         } : {}),
@@ -336,16 +358,22 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
               )}
 
               {copy.hasTobaccoPackage && (
-                <Input
-                  label={t('itemForm.packageGrams')}
-                  value={packageGrams}
-                  onChange={(e) => setPackageGrams(e.target.value)}
-                  type="number"
-                  min={1}
-                  step={1}
-                  inputMode="numeric"
-                  placeholder={t('itemForm.packageGramsPlaceholder')}
-                />
+                <div tw="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <PackageGramsSlider
+                    label={t('itemForm.packageGrams')}
+                    hint={t('itemForm.packageGramsHint')}
+                    value={Number(packageGrams)}
+                    onChange={(value) => setPackageGrams(String(value))}
+                    disabled={saving}
+                  />
+                  <StrengthSlider
+                    label={t('itemForm.strength')}
+                    hint={t('itemForm.strengthHint')}
+                    value={strength}
+                    onChange={setStrength}
+                    disabled={saving}
+                  />
+                </div>
               )}
 
               {copy.hasCoalPlacementCount && (

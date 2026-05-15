@@ -336,8 +336,8 @@ export const Profile = () => {
 
       <div tw="grid lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] gap-4 items-start">
         <Card>
-          <div tw="p-4 sm:p-5">
-            <div tw="aspect-square rounded-xl bg-[rgb(var(--color-surface-inverse))] overflow-hidden flex items-center justify-center text-white text-6xl font-semibold">
+          <div tw="p-4 sm:flex sm:items-start sm:gap-4 sm:p-5 lg:block">
+            <div tw="mx-auto aspect-square w-[min(100%,180px)] overflow-hidden rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-inverse))] shadow-[0_18px_42px_-30px_rgba(0,0,0,0.65)] flex items-center justify-center text-4xl font-semibold text-white sm:mx-0 sm:w-32 sm:text-5xl md:w-36 lg:w-full lg:text-6xl">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="" tw="w-full h-full object-cover" />
               ) : (
@@ -345,7 +345,14 @@ export const Profile = () => {
               )}
             </div>
 
-            <div tw="mt-4 flex flex-col gap-2">
+            <div tw="mt-4 flex flex-col gap-2 sm:mt-0 sm:min-w-0 sm:flex-1 lg:mt-4">
+              <div tw="hidden min-w-0 sm:block lg:hidden">
+                <div tw="truncate text-[13px] font-bold text-[rgb(var(--color-text))]">{displayName}</div>
+                <div tw="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                  <RoleBadge role={profile.role} size="xs" />
+                  <UserBadges badges={profile.badges} maxVisible={2} />
+                </div>
+              </div>
               <label tw="h-10 px-3 rounded-lg bg-[rgb(var(--color-accent))] text-white flex items-center justify-center text-[13px] font-semibold cursor-pointer hover:bg-[rgb(var(--color-accent-hover))] transition-colors">
                 {uploading ? t('common.uploading') : t('profile.uploadAvatar')}
                 <input
@@ -359,7 +366,7 @@ export const Profile = () => {
                   tw="hidden"
                 />
               </label>
-              <p tw="text-xs text-[rgb(var(--color-text-subtle))] text-center">{t('common.mediaRules')}</p>
+              <p tw="text-xs text-[rgb(var(--color-text-subtle))] text-center sm:text-left lg:text-center">{t('common.mediaRules')}</p>
 
               {avatarUrl && (
                 <Button

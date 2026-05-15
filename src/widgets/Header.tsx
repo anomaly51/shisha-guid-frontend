@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import styled from 'styled-components'
 import tw from 'twin.macro'
 import { Button } from '../shared/ui/Button'
 import { useGetProfileQuery, useLogoutMutation } from '../shared/api'
@@ -10,7 +11,34 @@ import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
 
 const HeaderBar = tw.header`bg-[rgb(var(--color-surface-inverse))]/95 backdrop-blur-xl border-b border-[rgb(var(--color-border))]`
-const Inner = tw.div`w-full max-w-[1160px] mx-auto px-5 h-14 flex items-center justify-between gap-4 min-w-0`
+const Inner = tw.div`w-full max-w-[1160px] mx-auto px-4 h-14 flex items-center justify-between gap-3 min-w-0 sm:px-5 sm:gap-4`
+const NewSetupLink = styled(Link)`
+  ${tw`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[12px] font-black text-white transition-all duration-150 sm:h-9 sm:px-3.5 sm:text-[13px]`}
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 42%),
+    rgb(var(--color-accent));
+  box-shadow:
+    0 0 0 1px rgba(255, 248, 241, 0.22),
+    0 12px 26px -14px rgba(222, 139, 87, 0.95);
+
+  &:hover {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 42%),
+      rgb(var(--color-accent-hover));
+    box-shadow:
+      0 0 0 1px rgba(255, 248, 241, 0.28),
+      0 16px 30px -16px rgba(222, 139, 87, 1);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  & > svg[aria-hidden="true"] {
+    width: 13px;
+    height: 13px;
+  }
+`
 
 export const Header = () => {
   const { data: profile } = useGetProfileQuery()
@@ -35,12 +63,10 @@ export const Header = () => {
               <span tw="hidden sm:inline">ShishaGuid</span>
             </Link>
             {profile && (
-              <Link to="/setups/create" tw="hidden sm:flex">
-                <Button variant="primary" size="sm">
-                  <PlusIcon />
-                  {t('feed.newSetup')}
-                </Button>
-              </Link>
+              <NewSetupLink to="/setups/create">
+                <PlusIcon />
+                <span>{t('feed.newSetup')}</span>
+              </NewSetupLink>
             )}
           </div>
 

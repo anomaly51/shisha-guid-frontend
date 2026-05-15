@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import tw from 'twin.macro'
 import { Card } from '../shared/ui/Card'
@@ -243,9 +243,10 @@ const equalized = (items: TobaccoMixRow[]) => {
 
 const BowlScene = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: SetupKind; items: MixPreviewItem[] }) => {
   const groupRef = useRef<THREE.Group>(null)
-  const userRotationRef = useRef(0)
+  const userRotationRef = useRef(0.18)
   const userTiltRef = useRef(-0.12)
-  const dragRef = useRef({ active: false, x: 0, y: 0, rotation: 0, tilt: -0.12 })
+  const dragRef = useRef({ active: false, x: 0, y: 0, rotation: 0.18, tilt: -0.12 })
+  const invalidate = useThree((state) => state.invalidate)
   const isPhunnel = bowlModel === 'phunnel'
   const bowlProfile = useMemo(() => (
     isPhunnel
@@ -290,12 +291,18 @@ const BowlScene = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: Set
       ]
   ), [isPhunnel])
 
-  useFrame(({ clock }) => {
+  const applyRotation = () => {
     if (!groupRef.current) return
-    const idleRotation = Math.sin(clock.elapsedTime * 0.35) * 0.16
-    const idleTilt = Math.sin(clock.elapsedTime * 0.28) * 0.035
-    groupRef.current.rotation.y = userRotationRef.current + idleRotation
-    groupRef.current.rotation.x = userTiltRef.current + idleTilt
+    groupRef.current.rotation.y = userRotationRef.current
+    groupRef.current.rotation.x = userTiltRef.current
+    invalidate()
+  }
+
+  useFrame((_, delta) => {
+    if (dragRef.current.active || !groupRef.current) return
+    userRotationRef.current += delta * 0.12
+    groupRef.current.rotation.y = userRotationRef.current
+    groupRef.current.rotation.x = userTiltRef.current
   })
 
   return (
@@ -314,19 +321,23 @@ const BowlScene = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: Set
           tilt: userTiltRef.current,
         }
         event.target.setPointerCapture?.(event.pointerId)
+        applyRotation()
       }}
       onPointerMove={(event: any) => {
         if (!dragRef.current.active) return
         userRotationRef.current = dragRef.current.rotation + (event.clientX - dragRef.current.x) * 0.012
         const nextTilt = dragRef.current.tilt + (event.clientY - dragRef.current.y) * 0.009
         userTiltRef.current = Math.max(-0.82, Math.min(0.48, nextTilt))
+        applyRotation()
       }}
       onPointerUp={(event: any) => {
         dragRef.current.active = false
         event.target.releasePointerCapture?.(event.pointerId)
+        applyRotation()
       }}
       onPointerLeave={() => {
         dragRef.current.active = false
+        applyRotation()
       }}
     >
       <mesh castShadow receiveShadow>
@@ -515,17 +526,18 @@ const MixPreview = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: Se
           {mounted && (
             <Canvas
               camera={{ position: [0, 2.2, 4.35], fov: 34 }}
-              dpr={[1, 2]}
+              dpr={[1, 1.5]}
+              frameloop="always"
               gl={{ antialias: true, alpha: true }}
               onCreated={() => {
                 requestAnimationFrame(() => setSceneReady(true))
               }}
-              shadows
+              shadows={{ enabled: true, type: THREE.PCFShadowMap }}
               style={{ background: 'transparent', cursor: 'grab', inset: 0, position: 'absolute' }}
             >
               <ambientLight intensity={0.72} />
               <hemisphereLight args={['#FFF8EF', '#7A5948', 1.25]} />
-              <directionalLight position={[3.5, 5, 4]} intensity={2.55} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+              <directionalLight position={[3.5, 5, 4]} intensity={2.55} castShadow shadow-mapSize-width={512} shadow-mapSize-height={512} />
               <directionalLight position={[-4, 2, -3]} intensity={0.65} />
               <BowlScene bowlModel={bowlModel} kind={kind} items={normalizedItems} />
             </Canvas>
@@ -962,7 +974,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                           type="button"
                           onClick={() => setActiveEquipmentIndex(index)}
                           css={[
-                            tw`flex min-w-0 items-center gap-2 rounded-lg border px-2 py-2 text-left transition-all duration-150`,
+                            tw`flex h-full min-h-[58px] min-w-0 items-start gap-2 rounded-lg border px-2 py-2 text-left transition-all duration-150`,
                             active
                               ? tw`border-[rgb(var(--color-accent))] bg-[rgb(var(--color-surface))] shadow-[0_10px_24px_-22px_rgba(83,48,31,0.75)]`
                               : selectedName
@@ -978,8 +990,8 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                           >
                             <CatalogIcon name={item.icon} size={15} />
                           </span>
-                          <span tw="min-w-0">
-                            <span tw="block text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">{item.label}</span>
+                          <span tw="flex min-w-0 flex-1 flex-col justify-center self-stretch">
+                            <span tw="block text-[10px] font-semibold uppercase leading-tight tracking-wide text-[rgb(var(--color-text-subtle))] line-clamp-2">{item.label}</span>
                             <span tw="block truncate text-[11px] font-semibold text-[rgb(var(--color-text))]">{selectedName || t('common.choose')}</span>
                           </span>
                         </button>

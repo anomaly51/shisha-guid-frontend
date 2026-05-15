@@ -13,12 +13,14 @@ import {
   useGetSetupReviewsQuery,
   useGetSetupQuery,
   useGetTobaccosQuery,
+  useDeleteSetupMutation,
   useRecordSetupViewMutation,
   useUpdateSetupReviewMutation,
 } from '../shared/api'
 import { Button } from '../shared/ui/Button'
 import { Card } from '../shared/ui/Card'
 import { Textarea } from '../shared/ui/Input'
+import { Modal } from '../shared/ui/Modal'
 import { Skeleton } from '../shared/ui/Skeleton'
 import { AlertIcon, BackIcon, CatalogIcon, EyeIcon, type CatalogIconName } from '../shared/ui/Icons'
 import { MIX_COLORS, MixBowlPreview, detectBowlModel, detectSetupKind, type MixBowlItem } from '../shared/ui/MixBowlPreview'
@@ -59,6 +61,16 @@ const isReviewAuthor = (review: SetupReview, profile: any) => {
   if (!profile?.id) return false
   const profileId = String(profile.id)
   return String(review.creator_id) === profileId || String(review.creator?.id) === profileId
+}
+
+const isSetupAuthor = (setup: any, profile: any) => {
+  if (!setup || !profile?.id) return false
+  const profileId = String(profile.id)
+  return (
+    String(setup.creator_id) === profileId ||
+    String(setup.creator?.id) === profileId ||
+    String(setup.user_id) === profileId
+  )
 }
 
 const Visual = ({ item, icon }: { item: any; icon: CatalogIconName }) => {
@@ -444,7 +456,12 @@ export const SetupDetail = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: item, isLoading } = useGetSetupQuery(id!)
+  const hasToken = typeof window !== 'undefined' && Boolean(window.localStorage.getItem('token'))
+  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
+  const [deleteSetup, { isLoading: deleting }] = useDeleteSetupMutation()
   const [recordSetupView] = useRecordSetupViewMutation()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const { data: bowls } = useGetBowlsQuery()
   const { data: tobaccos } = useGetTobaccosQuery()
   const { data: coals } = useGetCoalsQuery()
@@ -469,11 +486,25 @@ export const SetupDetail = () => {
     placement,
     tobaccos,
   }), [bowl, coal, item?.tobaccos, placement, tobaccos])
+  const isAdmin = profile?.role === 'admin'
+  const canManageSetup = isAdmin || isSetupAuthor(item, profile)
 
   useEffect(() => {
     if (!id) return
     recordSetupView(id).catch(() => undefined)
   }, [id, recordSetupView])
+
+  const handleDelete = async () => {
+    if (!item?.id) return
+    setDeleteError('')
+
+    try {
+      await deleteSetup(item.id).unwrap()
+      navigate('/')
+    } catch {
+      setDeleteError(t('setupDetail.deleteFailed'))
+    }
+  }
 
   if (isLoading) {
     return (
@@ -542,11 +573,24 @@ export const SetupDetail = () => {
               <CompactSetupSummary kind={kind} typeName={typeName} heaviness={heaviness} />
             </div>
 
-            <div tw="mt-auto pt-4">
-              <Link to={`/setups/${item.id}/edit`}>
-                <Button variant="secondary" size="sm">{t('setupDetail.editSetup')}</Button>
-              </Link>
-            </div>
+            {canManageSetup && (
+              <div tw="mt-auto flex flex-wrap gap-2 pt-4">
+                <Link to={`/setups/${item.id}/edit`}>
+                  <Button variant="secondary" size="sm">{t('setupDetail.editSetup')}</Button>
+                </Link>
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    setDeleteError('')
+                    setDeleteOpen(true)
+                  }}
+                >
+                  {t('setupDetail.deleteSetup')}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </Card>
@@ -628,6 +672,28 @@ export const SetupDetail = () => {
       </section>
 
       <SetupReviews setupId={item.id} />
+
+      <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title={t('setupDetail.deleteTitle')}>
+        <div tw="grid gap-4">
+          <div>
+            <p tw="text-sm font-semibold text-[rgb(var(--color-text))]">{item.name}</p>
+            <p tw="mt-1 text-sm text-[rgb(var(--color-text-muted))]">{t('setupDetail.deleteWarning')}</p>
+          </div>
+          {deleteError && (
+            <p tw="rounded-lg border border-[rgb(var(--color-danger-border))] bg-[rgb(var(--color-danger-surface))] px-3 py-2 text-[13px] font-medium text-[rgb(var(--color-danger))]">
+              {deleteError}
+            </p>
+          )}
+          <div tw="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" variant="danger" onClick={handleDelete} disabled={deleting}>
+              {deleting ? t('common.saving') : t('common.delete')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

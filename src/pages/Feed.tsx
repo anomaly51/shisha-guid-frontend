@@ -81,10 +81,12 @@ const SetupCard = memo(({
       <div tw="flex h-full flex-col bg-[rgb(var(--color-surface))]">
         <div tw="relative border-b border-[rgb(var(--color-border))]">
           <MixBowlPreview
+            autoRotate={false}
             bowlModel={bowlModel}
             interactive={false}
             kind={kind}
             items={mixItems}
+            renderMode="snapshot"
             sceneScale={1.02}
           />
           <div tw="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur">

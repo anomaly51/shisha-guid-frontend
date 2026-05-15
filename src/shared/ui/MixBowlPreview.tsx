@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import 'twin.macro'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
 export type SetupKind = 'sectors' | 'layers' | 'compot'
@@ -217,12 +217,14 @@ const CompotTobacco = ({ bowlModel, items }: { bowlModel: BowlModel; items: MixB
 }
 
 const BowlScene = ({
+  autoRotate = true,
   bowlModel,
   interactive = true,
   kind,
   items,
   sceneScale = 0.98,
 }: {
+  autoRotate?: boolean
   bowlModel: BowlModel
   interactive?: boolean
   kind: SetupKind
@@ -233,6 +235,7 @@ const BowlScene = ({
   const userRotationRef = useRef(0.2)
   const userTiltRef = useRef(0.04)
   const dragRef = useRef({ active: false, x: 0, y: 0, rotation: 0.2, tilt: 0.04 })
+  const invalidate = useThree((state) => state.invalidate)
   const isPhunnel = bowlModel === 'phunnel'
   const bowlProfile = useMemo(() => (
     isPhunnel
@@ -277,12 +280,18 @@ const BowlScene = ({
       ]
   ), [isPhunnel])
 
-  useFrame(({ clock }) => {
+  const applyRotation = () => {
     if (!groupRef.current) return
-    const idleRotation = dragRef.current.active ? 0 : Math.sin(clock.elapsedTime * 0.34) * 0.11
-    const idleTilt = dragRef.current.active ? 0 : Math.sin(clock.elapsedTime * 0.28) * 0.024
-    groupRef.current.rotation.y = userRotationRef.current + idleRotation
-    groupRef.current.rotation.x = userTiltRef.current + idleTilt
+    groupRef.current.rotation.y = userRotationRef.current
+    groupRef.current.rotation.x = userTiltRef.current
+    invalidate()
+  }
+
+  useFrame((_, delta) => {
+    if (!autoRotate || dragRef.current.active || !groupRef.current) return
+    userRotationRef.current += delta * 0.12
+    groupRef.current.rotation.y = userRotationRef.current
+    groupRef.current.rotation.x = userTiltRef.current
   })
 
   return (
@@ -308,6 +317,7 @@ const BowlScene = ({
           tilt: userTiltRef.current,
         }
         event.target.setPointerCapture?.(event.pointerId)
+        applyRotation()
       }}
       onPointerMove={(event: any) => {
         if (!interactive || !dragRef.current.active) return
@@ -315,15 +325,18 @@ const BowlScene = ({
         userRotationRef.current = dragRef.current.rotation + (event.clientX - dragRef.current.x) * 0.012
         const nextTilt = dragRef.current.tilt + (event.clientY - dragRef.current.y) * 0.008
         userTiltRef.current = Math.max(-0.72, Math.min(0.58, nextTilt))
+        applyRotation()
       }}
       onPointerUp={(event: any) => {
         if (!interactive) return
         event.stopPropagation()
         dragRef.current.active = false
         event.target.releasePointerCapture?.(event.pointerId)
+        applyRotation()
       }}
       onPointerLeave={() => {
         dragRef.current.active = false
+        applyRotation()
       }}
     >
       <mesh castShadow receiveShadow>
@@ -385,6 +398,7 @@ const BowlScene = ({
 }
 
 export const MixBowlPreview = ({
+  autoRotate = true,
   bowlModel = 'traditional',
   cameraPosition = [0, 2.28, 4.7],
   className,
@@ -392,9 +406,11 @@ export const MixBowlPreview = ({
   interactive = true,
   kind,
   items,
+  renderMode = 'live',
   sceneScale = 0.98,
   style,
 }: {
+  autoRotate?: boolean
   bowlModel?: BowlModel
   cameraPosition?: [number, number, number]
   className?: string
@@ -402,19 +418,40 @@ export const MixBowlPreview = ({
   interactive?: boolean
   kind: SetupKind
   items: MixBowlItem[]
+  renderMode?: 'live' | 'snapshot'
   sceneScale?: number
   style?: CSSProperties
 }) => {
   const [mounted, setMounted] = useState(false)
   const [sceneReady, setSceneReady] = useState(false)
+  const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null)
   const total = items.reduce((sum, item) => sum + item.percentage, 0)
-  const normalizedItems = total > 0
-    ? items.map((item) => ({ ...item, percentage: item.percentage / total * 100 }))
-    : []
+  const normalizedItems = useMemo(() => (
+    total > 0
+      ? items.map((item) => ({ ...item, percentage: item.percentage / total * 100 }))
+      : []
+  ), [items, total])
+  const sceneKey = useMemo(() => JSON.stringify({
+    bowlModel,
+    cameraPosition,
+    fov,
+    kind,
+    items: normalizedItems.map((item) => [item.id, item.percentage, item.color]),
+    renderMode,
+    sceneScale,
+  }), [bowlModel, cameraPosition, fov, kind, normalizedItems, renderMode, sceneScale])
 
   useIsomorphicLayoutEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    setSceneReady(false)
+    setSnapshotUrl(null)
+  }, [sceneKey])
+
+  const showCanvas = mounted && (renderMode === 'live' || !snapshotUrl)
+  const isSnapshot = renderMode === 'snapshot'
 
   return (
     <div
@@ -427,16 +464,33 @@ export const MixBowlPreview = ({
     >
       <div tw="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(255,255,255,0.82),transparent_38%),linear-gradient(180deg,rgba(255,248,241,0.72),rgba(229,218,207,0.42))]" />
       <div tw="pointer-events-none absolute bottom-7 left-1/2 h-10 w-2/3 -translate-x-1/2 rounded-full bg-[#4A3830]/20 blur-xl" />
+      {snapshotUrl && (
+        <img
+          src={snapshotUrl}
+          alt=""
+          tw="absolute inset-0 h-full w-full object-cover"
+          draggable={false}
+        />
+      )}
       <BowlPreviewFallback hidden={sceneReady} />
-      {mounted && (
+      {showCanvas && (
         <Canvas
           camera={{ position: cameraPosition, fov }}
-          dpr={[1, 1.75]}
-          gl={{ antialias: true, alpha: true }}
-          onCreated={() => {
-            requestAnimationFrame(() => setSceneReady(true))
+          dpr={[1, 1.5]}
+          frameloop={isSnapshot || !autoRotate ? 'demand' : 'always'}
+          gl={{ antialias: true, alpha: true, preserveDrawingBuffer: isSnapshot }}
+          onCreated={({ gl, invalidate }) => {
+            requestAnimationFrame(() => {
+              invalidate()
+              requestAnimationFrame(() => {
+                if (isSnapshot) {
+                  setSnapshotUrl(gl.domElement.toDataURL('image/webp', 0.88))
+                }
+                setSceneReady(true)
+              })
+            })
           }}
-          shadows
+          shadows={{ enabled: true, type: THREE.PCFShadowMap }}
           style={{
             background: 'transparent',
             cursor: interactive ? 'grab' : 'pointer',
@@ -448,11 +502,11 @@ export const MixBowlPreview = ({
         >
           <ambientLight intensity={0.86} />
           <hemisphereLight args={['#FFF5E8', '#8B6554', 1.34]} />
-          <directionalLight position={[3.5, 5.2, 4.4]} intensity={2.62} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+          <directionalLight position={[3.5, 5.2, 4.4]} intensity={2.62} castShadow shadow-mapSize-width={512} shadow-mapSize-height={512} />
           <directionalLight position={[-4, 2.4, -3]} intensity={0.78} color="#F1D5BC" />
           <pointLight position={[0, 1.7, 1.8]} intensity={1.15} color="#FFD6A8" distance={5.8} />
           <pointLight position={[0, 0.9, -1.7]} intensity={0.38} color="#EBA268" distance={4.5} />
-          <BowlScene bowlModel={bowlModel} interactive={interactive} kind={kind} items={normalizedItems} sceneScale={sceneScale} />
+          <BowlScene autoRotate={autoRotate && !isSnapshot} bowlModel={bowlModel} interactive={interactive} kind={kind} items={normalizedItems} sceneScale={sceneScale} />
         </Canvas>
       )}
     </div>

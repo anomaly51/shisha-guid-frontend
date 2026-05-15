@@ -3,7 +3,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 const explicitStrength = (tobacco: any) => {
   const value = tobacco?.strength ?? tobacco?.heaviness ?? tobacco?.nicotine_strength ?? tobacco?.nicotine
   const numeric = Number(value)
-  return Number.isFinite(numeric) && numeric > 0 ? clamp(numeric, 1, 10) : undefined
+  return Number.isFinite(numeric) && numeric >= 0 ? clamp(numeric, 0, 10) : undefined
 }
 
 export const getTobaccoStrength = (tobacco: any) => {
@@ -19,7 +19,7 @@ export const getTobaccoStrength = (tobacco: any) => {
   if (text.includes('duft') || text.includes('mango') || text.includes('слив') || text.includes('мягк')) score -= 1
   if (text.includes('element') || text.includes('banana') || text.includes('milk') || text.includes('легк')) score -= 2
 
-  return clamp(score, 1, 10)
+  return clamp(score, 0, 10)
 }
 
 export const getSetupHeaviness = (setup: any, tobaccos: any[] | undefined) => {
@@ -30,7 +30,7 @@ export const getSetupHeaviness = (setup: any, tobaccos: any[] | undefined) => {
     return sum + getTobaccoStrength(tobacco) * (Number(item.percentage || 0) / total)
   }, 0)
 
-  return clamp(value || 5, 1, 10)
+  return clamp(value || 5, 0, 10)
 }
 
 export const getHeavinessToneKey = (value: number) => {

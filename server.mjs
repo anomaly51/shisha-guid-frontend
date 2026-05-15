@@ -30,6 +30,41 @@ let vite
 let template
 let render
 
+const server = http.createServer(async (req, res) => {
+  try {
+    if (!req.url) {
+      send(res, 400, 'Bad Request')
+      return
+    }
+
+    const pathname = new URL(req.url, 'http://localhost').pathname
+    if (pathname.startsWith('/.well-known/appspecific/')) {
+      send(res, 204, '')
+      return
+    }
+
+    if (await serveStatic(req, res)) return
+
+    if (!isProduction) {
+      const handled = await new Promise((resolve, reject) => {
+        vite.middlewares(req, res, (error) => (error ? reject(error) : resolve(false)))
+      })
+      if (handled || res.headersSent) return
+    }
+
+    const url = req.url.replace(base, '/')
+    const html = await createHtml(url)
+    send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8' })
+  } catch (error) {
+    if (!isProduction && vite) {
+      vite.ssrFixStacktrace(error)
+    }
+
+    console.error(error)
+    send(res, 500, isProduction ? 'Internal Server Error' : String(error?.stack || error))
+  }
+})
+
 if (isProduction) {
   template = await fs.readFile(path.join(clientRoot, 'index.html'), 'utf-8')
   const serverEntry = pathToFileURL(path.resolve(__dirname, 'dist/server/entry-server.js')).href
@@ -37,7 +72,10 @@ if (isProduction) {
 } else {
   const { createServer } = await import('vite')
   vite = await createServer({
-    server: { middlewareMode: true },
+    server: {
+      middlewareMode: true,
+      hmr: { server },
+    },
     appType: 'custom',
     base,
   })
@@ -87,41 +125,6 @@ const createHtml = async (url) => {
     .replace('<!--ssr-outlet-->', rendered.html)
     .replace('<!--ssr-state-->', rendered.stateScript)
 }
-
-const server = http.createServer(async (req, res) => {
-  try {
-    if (!req.url) {
-      send(res, 400, 'Bad Request')
-      return
-    }
-
-    const pathname = new URL(req.url, 'http://localhost').pathname
-    if (pathname.startsWith('/.well-known/appspecific/')) {
-      send(res, 204, '')
-      return
-    }
-
-    if (await serveStatic(req, res)) return
-
-    if (!isProduction) {
-      const handled = await new Promise((resolve, reject) => {
-        vite.middlewares(req, res, (error) => (error ? reject(error) : resolve(false)))
-      })
-      if (handled || res.headersSent) return
-    }
-
-    const url = req.url.replace(base, '/')
-    const html = await createHtml(url)
-    send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8' })
-  } catch (error) {
-    if (!isProduction && vite) {
-      vite.ssrFixStacktrace(error)
-    }
-
-    console.error(error)
-    send(res, 500, isProduction ? 'Internal Server Error' : String(error?.stack || error))
-  }
-})
 
 server.listen(port, () => {
   console.log(`SSR server running at http://localhost:${port}`)

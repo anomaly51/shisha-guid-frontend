@@ -31,7 +31,7 @@ const toneStyles = {
 
 export const StrengthIndicator = ({ value, compact = false, label, showScore = false }: StrengthIndicatorProps) => {
   const { t } = useTranslation()
-  const normalized = Math.min(10, Math.max(1, Number.isFinite(value) ? value : 5))
+  const normalized = Math.min(10, Math.max(0, Number.isFinite(value) ? value : 5))
   const tone = getHeavinessToneKey(normalized)
   const styles = toneStyles[tone]
   const filled = Math.round(normalized)

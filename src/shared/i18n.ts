@@ -10,15 +10,13 @@ export const LANGUAGES = [
 export type LanguageCode = typeof LANGUAGES[number]['code']
 
 const storageKey = 'shisha-guid-language'
+const defaultLanguage: LanguageCode = 'ru'
 
 const getInitialLanguage = (): LanguageCode => {
-  if (typeof window === 'undefined') return 'ru'
+  if (typeof window === 'undefined') return defaultLanguage
   const saved = window.localStorage.getItem(storageKey)
   if (saved === 'ru' || saved === 'uk' || saved === 'en') return saved
-  const browser = window.navigator.language.toLowerCase()
-  if (browser.startsWith('uk')) return 'uk'
-  if (browser.startsWith('en')) return 'en'
-  return 'ru'
+  return defaultLanguage
 }
 
 const common = {
@@ -245,7 +243,10 @@ export const resources = {
         capacityGramsInvalid: 'Вместимость чаши должна быть целым числом больше нуля.',
         packageGrams: 'Грамм в пачке',
         packageGramsPlaceholder: 'Например: 100',
-        packageGramsInvalid: 'Граммовка пачки должна быть целым числом больше нуля.',
+        packageGramsHint: 'Пачка выбирается с шагом 50 г: от 50 до 500.',
+        packageGramsInvalid: 'Граммовка пачки должна быть кратна 50 и быть в диапазоне от 50 до 500 г.',
+        strength: 'Крепость табака',
+        strengthHint: 'Выбери значение от 0 до 10. Оно будет видно в каталоге и учитываться в крепости забивки.',
         coalCount: 'Углей в раскладке',
         coalCountPlaceholder: 'Например: 3',
         coalCountInvalid: 'Количество углей в раскладке должно быть целым числом больше нуля.',
@@ -336,6 +337,10 @@ export const resources = {
       setupDetail: {
         setup: 'Забивка',
         editSetup: 'Редактировать забивку',
+        deleteSetup: 'Удалить забивку',
+        deleteTitle: 'Удалить забивку?',
+        deleteWarning: 'Это действие нельзя отменить. Забивка будет удалена для всех пользователей.',
+        deleteFailed: 'Не удалось удалить забивку. Попробуй еще раз.',
         views: 'просмотров',
         notFoundHint: 'Эта забивка не существует или была удалена.',
         summary: 'Коротко',
@@ -663,7 +668,10 @@ export const resources = {
         capacityGramsInvalid: 'Місткість чаші має бути цілим числом більше нуля.',
         packageGrams: 'Грамів у пачці',
         packageGramsPlaceholder: 'Наприклад: 100',
-        packageGramsInvalid: 'Грамовка пачки має бути цілим числом більше нуля.',
+        packageGramsHint: 'Пачка вибирається з кроком 50 г: від 50 до 500.',
+        packageGramsInvalid: 'Грамовка пачки має бути кратна 50 і бути в діапазоні від 50 до 500 г.',
+        strength: 'Міцність тютюну',
+        strengthHint: 'Вибери значення від 0 до 10. Воно буде видно в каталозі та враховуватиметься в міцності забивки.',
         coalCount: 'Вуглин у розкладці',
         coalCountPlaceholder: 'Наприклад: 3',
         coalCountInvalid: 'Кількість вуглин у розкладці має бути цілим числом більше нуля.',
@@ -754,6 +762,10 @@ export const resources = {
       setupDetail: {
         setup: 'Забивка',
         editSetup: 'Редагувати забивку',
+        deleteSetup: 'Видалити забивку',
+        deleteTitle: 'Видалити забивку?',
+        deleteWarning: 'Цю дію не можна скасувати. Забивку буде видалено для всіх користувачів.',
+        deleteFailed: 'Не вдалося видалити забивку. Спробуй ще раз.',
         views: 'переглядів',
         notFoundHint: 'Ця забивка не існує або була видалена.',
         summary: 'Коротко',
@@ -1080,7 +1092,10 @@ export const resources = {
         capacityGramsInvalid: 'Bowl capacity must be a whole number greater than zero.',
         packageGrams: 'Grams per package',
         packageGramsPlaceholder: 'Example: 100',
-        packageGramsInvalid: 'Package grams must be a whole number greater than zero.',
+        packageGramsHint: 'Choose package size in 50 g steps, from 50 to 500.',
+        packageGramsInvalid: 'Package grams must be a multiple of 50 between 50 and 500 g.',
+        strength: 'Tobacco strength',
+        strengthHint: 'Choose a value from 0 to 10. It appears in the catalog and affects setup strength.',
         coalCount: 'Coals in placement',
         coalCountPlaceholder: 'Example: 3',
         coalCountInvalid: 'Coal count must be a whole number greater than zero.',
@@ -1171,6 +1186,10 @@ export const resources = {
       setupDetail: {
         setup: 'Setup',
         editSetup: 'Edit setup',
+        deleteSetup: 'Delete setup',
+        deleteTitle: 'Delete setup?',
+        deleteWarning: 'This action cannot be undone. The setup will be removed for all users.',
+        deleteFailed: 'Failed to delete setup. Please try again.',
         views: 'views',
         notFoundHint: "This setup doesn't exist or was removed.",
         summary: 'Summary',
