@@ -13,9 +13,35 @@ const escapeJson = (value: unknown) =>
 
 const StaticRouter = ReactRouter.StaticRouter
 
+const isEmptySetupsQuery = (query: { endpointName?: string; originalArgs?: unknown; data?: unknown }) => {
+  if (query.endpointName !== 'getSetups') return false
+
+  const data = query.data
+  const items = Array.isArray(data)
+    ? data
+    : data && typeof data === 'object' && 'items' in data && Array.isArray(data.items)
+      ? data.items
+      : null
+
+  if (!items || items.length) return false
+
+  const args = query.originalArgs
+  if (!args || typeof args !== 'object') return true
+
+  const { tobacco_ids: tobaccoIds, strength, sort } = args as {
+    tobacco_ids?: unknown[]
+    strength?: string
+    sort?: string
+  }
+
+  return !tobaccoIds?.length && (!strength || strength === 'all') && (!sort || sort === 'newest')
+}
+
 const getSerializableState = (state: ReturnType<ReturnType<typeof createAppStore>['getState']>) => {
   const queries = Object.fromEntries(
-    Object.entries(state.api.queries).filter(([, query]) => query?.status === 'fulfilled'),
+    Object.entries(state.api.queries).filter(([, query]) => (
+      query?.status === 'fulfilled' && !isEmptySetupsQuery(query)
+    )),
   )
   const queryKeys = new Set(Object.keys(queries))
 
