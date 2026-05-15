@@ -16,6 +16,7 @@ type SortValue = 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' 
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
 
 const SETUP_PAGE_SIZE = 12
+const isServerRender = typeof window === 'undefined'
 
 const getName = (items: any[] | undefined, id: string | undefined, fallback = 'Tobacco') => (
   items?.find((item) => item.id === id)?.name || fallback
@@ -305,6 +306,14 @@ export const Feed = () => {
   const strengthLabel = strength === 'all' ? '' : t(`metrics.heaviness.${strength}`)
 
   if (isLoading || (isSetupsError && !loadedSetups.length)) {
+    return (
+      <div tw="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3, 4, 5, 6].map((n) => <CardSkeleton key={n} />)}
+      </div>
+    )
+  }
+
+  if (!loadedSetups.length && !isFetching && !hasActiveFilters && isServerRender) {
     return (
       <div tw="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {[1, 2, 3, 4, 5, 6].map((n) => <CardSkeleton key={n} />)}
