@@ -13,6 +13,39 @@ const escapeJson = (value: unknown) =>
 
 const StaticRouter = ReactRouter.StaticRouter
 
+const getSerializableState = (state: ReturnType<ReturnType<typeof createAppStore>['getState']>) => {
+  const queries = Object.fromEntries(
+    Object.entries(state.api.queries).filter(([, query]) => query?.status === 'fulfilled'),
+  )
+  const queryKeys = new Set(Object.keys(queries))
+
+  return {
+    ...state,
+    api: {
+      ...state.api,
+      queries,
+      mutations: {},
+      provided: {
+        tags: Object.fromEntries(
+          Object.entries(state.api.provided.tags).map(([tag, ids]) => [
+            tag,
+            Object.fromEntries(
+              Object.entries(ids).map(([id, keys]) => [
+                id,
+                keys.filter((key) => queryKeys.has(key)),
+              ]).filter(([, keys]) => keys.length),
+            ),
+          ]).filter(([, ids]) => Object.keys(ids).length),
+        ),
+        keys: Object.fromEntries(
+          Object.entries(state.api.provided.keys).filter(([key]) => queryKeys.has(key)),
+        ),
+      },
+      subscriptions: {},
+    },
+  }
+}
+
 export const render = async (url: string) => {
   const store = createAppStore()
 
@@ -38,7 +71,7 @@ export const render = async (url: string) => {
 
     const html = renderToString(app)
     const styles = sheet.getStyleTags()
-    const preloadedState = store.getState()
+    const preloadedState = getSerializableState(store.getState())
     const stateScript = `<script>window.__PRELOADED_STATE__=${escapeJson(preloadedState)}</script>`
 
     return { html, styles, stateScript }

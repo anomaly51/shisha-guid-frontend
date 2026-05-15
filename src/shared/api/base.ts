@@ -6,6 +6,7 @@ const apiBaseUrl = import.meta.env.SSR
 
 export const api = createApi({
   reducerPath: 'api',
+  refetchOnMountOrArgChange: 30,
   baseQuery: fetchBaseQuery({
     baseUrl: apiBaseUrl,
     prepareHeaders: (headers) => {

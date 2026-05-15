@@ -167,7 +167,13 @@ export const Feed = () => {
     strength,
     sort,
   }), [pageOffset, selectedTobaccoKey, selectedTobaccos, sort, strength])
-  const { data: setupsPage, isFetching, isLoading } = useGetSetupsQuery(setupQueryParams)
+  const {
+    data: setupsPage,
+    isError: isSetupsError,
+    isFetching,
+    isLoading,
+    refetch: refetchSetups,
+  } = useGetSetupsQuery(setupQueryParams)
   const { data: tobaccos } = useGetTobaccosQuery()
   const tobaccoPickerQueryParams = useMemo(() => ({
     search: tobaccoSearch.trim() || undefined,
@@ -266,6 +272,16 @@ export const Feed = () => {
   }, [setupsPage])
 
   useEffect(() => {
+    if (!isSetupsError || loadedSetups.length) return undefined
+
+    const timeout = window.setTimeout(() => {
+      refetchSetups()
+    }, 900)
+
+    return () => window.clearTimeout(timeout)
+  }, [isSetupsError, loadedSetups.length, refetchSetups])
+
+  useEffect(() => {
     if (!canLoadMore) return undefined
     if (isFetching) return undefined
     const node = loadMoreRef.current
@@ -288,7 +304,7 @@ export const Feed = () => {
   const hasActiveFilters = activeFilterCount > 0
   const strengthLabel = strength === 'all' ? '' : t(`metrics.heaviness.${strength}`)
 
-  if (isLoading) {
+  if (isLoading || (isSetupsError && !loadedSetups.length)) {
     return (
       <div tw="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {[1, 2, 3, 4, 5, 6].map((n) => <CardSkeleton key={n} />)}

@@ -43,6 +43,8 @@ const setupDetailPrefetch: PrefetchRequest[] = [
   { endpoint: 'getBowlSetupTypes' },
 ]
 
+const feedPageSize = 12
+
 export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
   const { pathname, searchParams } = new URL(url, 'http://localhost')
   const segments = pathname.split('/').filter(Boolean)
@@ -58,7 +60,19 @@ export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
   }
 
   if (segments.length === 0) {
-    return [{ endpoint: 'getSetups', arg: setupFilters }, { endpoint: 'getTobaccos' }]
+    return [
+      {
+        endpoint: 'getSetups',
+        arg: {
+          ...setupFilters,
+          limit: feedPageSize,
+          offset: 0,
+          strength: setupFilters.strength || 'all',
+          sort: setupFilters.sort || 'newest',
+        },
+      },
+      { endpoint: 'getTobaccos' },
+    ]
   }
 
   if (segments[0] === 'setups' && segments[1] === 'create') {

@@ -114,6 +114,10 @@ function isNavigationRequest(req, pathname) {
   if (req.method && req.method !== 'GET' && req.method !== 'HEAD') return false
   if (pathname.startsWith('/assets/') || path.extname(pathname)) return false
 
+  const fetchMode = req.headers['sec-fetch-mode']
+  const fetchDest = req.headers['sec-fetch-dest']
+  if (fetchMode === 'navigate' || fetchDest === 'document') return true
+
   const accept = req.headers.accept || ''
   return accept.includes('text/html') || accept.includes('*/*') || accept === ''
 }
