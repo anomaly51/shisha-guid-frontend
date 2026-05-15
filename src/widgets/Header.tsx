@@ -9,6 +9,7 @@ import { AuthModal } from './AuthModal'
 import { LogoutIcon, PlusIcon, ShishaGuidLogo } from '../shared/ui/Icons'
 import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
+import { hasAuthToken } from '../shared/authToken'
 
 const HeaderBar = tw.header`bg-[rgb(var(--color-surface-inverse))]/95 backdrop-blur-xl border-b border-[rgb(var(--color-border))]`
 const Inner = tw.div`w-full max-w-[1160px] mx-auto px-4 h-14 flex items-center justify-between gap-3 min-w-0 sm:px-5 sm:gap-4`
@@ -41,7 +42,7 @@ const NewSetupLink = styled(Link)`
 `
 
 export const Header = () => {
-  const { data: profile } = useGetProfileQuery()
+  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
   const [logout] = useLogoutMutation()
   const [authOpen, setAuthOpen] = useState(false)
   const navigate = useNavigate()

@@ -9,6 +9,7 @@ import { useGetProfileQuery } from '../shared/api'
 import { AlertIcon, BackIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
+import { hasAuthToken } from '../shared/authToken'
 
 interface DetailProps {
   title: string
@@ -40,7 +41,7 @@ const formatIntegerValue = (value: unknown, t: (key: string, options?: any) => s
 export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, itemKind = 'default' }: DetailProps) => {
   const { id } = useParams<{ id: string }>()
   const { data: item, isLoading } = detailHook(id!)
-  const { data: profile } = useGetProfileQuery()
+  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
   const navigate = useNavigate()
   const { t } = useTranslation()
   const isAdmin = profile?.role === 'admin'

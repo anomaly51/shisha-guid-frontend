@@ -17,6 +17,7 @@ import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { BowlPreviewFallback, detectBowlModel, useIsomorphicLayoutEffect, type BowlModel } from '../shared/ui/MixBowlPreview'
 import { calculateSetupCost, formatMoney } from '../shared/setupCost'
+import { hasAuthToken } from '../shared/authToken'
 
 const Label = tw.label`text-[10px] font-semibold text-[rgb(var(--color-text-muted))] uppercase tracking-wide`
 const Muted = tw.span`text-[11px] font-medium text-[rgb(var(--color-text-subtle))]`
@@ -698,7 +699,7 @@ const Choice = ({ label, value, onChange, options, icon }: ChoiceProps) => {
 export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const { data: profile } = useGetProfileQuery()
+  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
   const { data: bowls } = useGetBowlsQuery()
   const { data: tobaccos } = useGetTobaccosQuery()
   const { data: coals } = useGetCoalsQuery()

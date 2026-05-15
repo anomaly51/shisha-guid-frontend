@@ -20,11 +20,13 @@ import {
   useGetBowlSetupTypesQuery, useCreateBowlSetupTypeMutation, useGetBowlSetupTypeQuery, useUpdateBowlSetupTypeMutation, useDeleteBowlSetupTypeMutation,
   useGetProfileQuery,
 } from '../shared/api'
+import { hasAuthToken } from '../shared/authToken'
 
 const AdminOnly = ({ children }: { children: ReactElement }) => {
-  const { data: profile, isLoading } = useGetProfileQuery()
+  const hasToken = hasAuthToken()
+  const { data: profile, isLoading } = useGetProfileQuery(undefined, { skip: !hasToken })
 
-  if (isLoading) return null
+  if (hasToken && isLoading) return null
   if (profile?.role !== 'admin') return <Navigate to="/profile" replace />
 
   return children

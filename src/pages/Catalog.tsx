@@ -10,6 +10,7 @@ import { useGetProfileQuery } from '../shared/api'
 import { CatalogIcon, type CatalogIconName, EditIcon, EmptyIcon, PlusIcon, TrashIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
+import { hasAuthToken } from '../shared/authToken'
 
 type CatalogItemKind = 'default' | 'bowl' | 'tobacco' | 'coal' | 'kaloud' | 'placement' | 'setupType'
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
@@ -128,7 +129,7 @@ export const Catalog = ({
     strength,
   } : undefined
   const { data, isLoading } = listHook(tobaccoQueryParams)
-  const { data: profile } = useGetProfileQuery()
+  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
   const [deleteItem, { isLoading: deleting }] = deleteHook()
   const navigate = useNavigate()
   const { t } = useTranslation()

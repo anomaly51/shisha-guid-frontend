@@ -11,6 +11,7 @@ import { PackageGramsSlider, normalizePackageGrams } from '../shared/ui/PackageG
 import { StrengthSlider } from '../shared/ui/StrengthSlider'
 import { BackIcon, CatalogIcon, type CatalogIconName, LockIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
+import { hasAuthToken } from '../shared/authToken'
 
 interface FormProps {
   title: string
@@ -136,7 +137,7 @@ const getCopy = (title: string, t: (key: string) => string) => {
 export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: FormProps) => {
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const { data: profile } = useGetProfileQuery()
+  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
   const copy = getCopy(title, t)
   const [name, setName] = useState(initialValues?.name || '')
   const [price, setPrice] = useState(initialValues?.price == null ? '' : String(initialValues.price))

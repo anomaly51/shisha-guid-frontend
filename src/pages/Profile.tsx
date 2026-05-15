@@ -24,6 +24,7 @@ import { LANGUAGES, type LanguageCode } from '../shared/i18n'
 import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
 import { useTheme, type ThemePreference } from '../app/theme'
+import { hasAuthToken } from '../shared/authToken'
 
 const badgeEffectOptions: BadgeEffect[] = ['none', 'frost', 'fire', 'chemical', 'electric', 'cosmic', 'shimmer']
 
@@ -236,7 +237,8 @@ const AdminPanel = () => {
 }
 
 export const Profile = () => {
-  const { data: profile, isLoading } = useGetProfileQuery()
+  const hasToken = hasAuthToken()
+  const { data: profile, isLoading } = useGetProfileQuery(undefined, { skip: !hasToken })
   const [updateProfile, { isLoading: saving }] = useUpdateProfileMutation()
   const [uploadMedia] = useUploadMediaMutation()
   const [logout] = useLogoutMutation()
@@ -266,7 +268,7 @@ export const Profile = () => {
 
   const isAdmin = profile?.role === 'admin'
 
-  if (isLoading) {
+  if (hasToken && isLoading) {
     return (
       <div tw="max-w-5xl">
         <div tw="h-56 bg-[rgb(var(--color-surface))]/80 border border-[rgb(var(--color-border))] rounded-2xl animate-pulse" />

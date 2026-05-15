@@ -29,6 +29,7 @@ import { getReviewAverage, type SetupReview } from '../shared/reviews'
 import { getSetupHeaviness } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { calculateSetupCost, formatMoney } from '../shared/setupCost'
+import { hasAuthToken } from '../shared/authToken'
 
 const Label = tw.p`text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]`
 const SectionTitle = tw.h2`text-[18px] font-semibold leading-tight text-[rgb(var(--color-text))]`
@@ -294,7 +295,7 @@ const RatingPicker = ({
 
 const SetupReviews = ({ setupId }: { setupId: string }) => {
   const { i18n, t } = useTranslation()
-  const hasToken = typeof window !== 'undefined' && Boolean(window.localStorage.getItem('token'))
+  const hasToken = hasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
   const { data: reviews = [], isLoading } = useGetSetupReviewsQuery(setupId)
   const [createReview, { isLoading: saving }] = useCreateSetupReviewMutation()
@@ -456,7 +457,7 @@ export const SetupDetail = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: item, isLoading } = useGetSetupQuery(id!)
-  const hasToken = typeof window !== 'undefined' && Boolean(window.localStorage.getItem('token'))
+  const hasToken = hasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
   const [deleteSetup, { isLoading: deleting }] = useDeleteSetupMutation()
   const [recordSetupView] = useRecordSetupViewMutation()
