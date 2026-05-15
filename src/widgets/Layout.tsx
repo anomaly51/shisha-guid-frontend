@@ -1,21 +1,27 @@
-import React from 'react'
 import { Outlet } from 'react-router-dom'
-import tw from 'twin.macro'
+import styled from 'styled-components'
+import 'twin.macro'
 import { Header } from './Header'
-import { Sidebar } from './Sidebar'
+import { TopNav } from './TopNav'
+
+const Main = styled.main`
+  animation: fadeIn 0.3s ease-out;
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+`
 
 export const Layout = () => (
-  <div tw="min-h-screen bg-[#DAE0E6]">
+  <div tw="min-h-screen w-full flex flex-col" style={{ overflowX: 'clip' }}>
     <Header />
-    <div tw="max-w-[1000px] mx-auto flex gap-6 pt-6 px-4">
-      <aside tw="hidden md:block w-[270px] shrink-0">
-        <div tw="sticky top-[64px]">
-          <Sidebar />
-        </div>
-      </aside>
-      <main tw="flex-1 min-w-0 pb-12">
-        <Outlet />
-      </main>
+    <TopNav />
+    <div tw="flex-1 w-full min-w-0">
+      <div tw="w-full max-w-[1040px] mx-auto px-4 py-7 min-w-0 sm:px-5 sm:py-8">
+        <Main>
+          <Outlet />
+        </Main>
+      </div>
     </div>
   </div>
 )

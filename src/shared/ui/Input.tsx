@@ -1,20 +1,24 @@
 import React from 'react'
-import tw, { styled } from 'twin.macro'
+import styled from 'styled-components'
+import tw from 'twin.macro'
 
 const Wrapper = tw.div`flex flex-col gap-1`
 
-const Label = tw.label`text-xs font-bold text-[#1A1A1B] uppercase tracking-wider`
+const Label = tw.label`text-[10px] font-semibold text-[rgb(var(--color-text-muted))] uppercase tracking-wide`
 
-const StyledInput = styled.input`
-  ${tw`px-3 py-2 bg-white border border-[#CCC] rounded-[4px] text-sm text-[#1A1A1B] transition-colors duration-200 outline-none`}
-  &:focus { ${tw`border-[#0079D3]`} }
-  &::placeholder { ${tw`text-[#787C7E]`} }
+const inputStyles = `
+  min-height: 38px;
+  &:focus { border-color: rgb(var(--color-accent)); box-shadow: 0 0 0 2px rgb(var(--color-accent) / 0.12); }
+  &:disabled { background: rgb(var(--color-surface-muted)); color: rgb(var(--color-text-subtle)); cursor: not-allowed; }
 `
 
+const StyledInput = styled.input`
+  ${tw`px-3 py-2 bg-[rgb(var(--color-surface))]/95 border border-[rgb(var(--color-border-strong))] rounded-lg text-[13px] text-[rgb(var(--color-text))] transition-all duration-150 outline-none placeholder:text-[rgb(var(--color-text-subtle))]`}
+  ${inputStyles}
+`
 const StyledTextarea = styled.textarea`
-  ${tw`px-3 py-2 bg-white border border-[#CCC] rounded-[4px] text-sm text-[#1A1A1B] transition-colors duration-200 outline-none resize-y`}
-  &:focus { ${tw`border-[#0079D3]`} }
-  &::placeholder { ${tw`text-[#787C7E]`} }
+  ${tw`px-3 py-2 bg-[rgb(var(--color-surface))]/95 border border-[rgb(var(--color-border-strong))] rounded-lg text-[13px] text-[rgb(var(--color-text))] transition-all duration-150 outline-none placeholder:text-[rgb(var(--color-text-subtle))] resize-y leading-relaxed`}
+  ${inputStyles}
 `
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -40,6 +44,7 @@ export const Textarea = ({ label, ...props }: TextareaProps) => (
 )
 
 export const Select = styled.select`
-  ${tw`px-3 py-2 bg-white border border-[#CCC] rounded-[4px] text-sm text-[#1A1A1B] outline-none transition-colors duration-200`}
-  &:focus { ${tw`border-[#0079D3]`} }
+  ${tw`px-3 py-2 bg-[rgb(var(--color-surface))]/95 border border-[rgb(var(--color-border-strong))] rounded-lg text-[13px] text-[rgb(var(--color-text))] outline-none transition-all duration-150 appearance-none`}
+  min-height: 38px;
+  &:focus { border-color: rgb(var(--color-accent)); box-shadow: 0 0 0 2px rgb(var(--color-accent) / 0.12); }
 `

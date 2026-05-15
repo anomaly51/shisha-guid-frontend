@@ -16,4 +16,10 @@ export default defineConfig({
       usePolling: true,
     },
   },
+  ssr: {
+    noExternal: ['react-router', 'react-router-dom', 'styled-components'],
+    resolve: {
+      conditions: ['module-sync', 'module', 'node'],
+    },
+  },
 })

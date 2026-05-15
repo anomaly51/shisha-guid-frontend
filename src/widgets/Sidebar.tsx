@@ -1,44 +1,40 @@
-import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import tw from 'twin.macro'
+import { CatalogIcon, type CatalogIconName } from '../shared/ui/Icons'
 
 const navItems = [
-  { path: '/', label: 'Home' },
-  { path: '/bowls', label: 'Bowls' },
-  { path: '/tobaccos', label: 'Tobaccos' },
-  { path: '/coals', label: 'Coals' },
-  { path: '/kalouds', label: 'Kalouds' },
-  { path: '/coal-placements', label: 'Placements' },
-  { path: '/bowl-setup-types', label: 'Setup Types' },
-]
+  { path: '/', labelKey: 'nav.feed', icon: 'feed' },
+  { path: '/bowls', labelKey: 'nav.bowls', icon: 'bowl' },
+  { path: '/tobaccos', labelKey: 'nav.tobaccos', icon: 'tobacco' },
+  { path: '/coals', labelKey: 'nav.coals', icon: 'coal' },
+  { path: '/kalouds', labelKey: 'nav.kalouds', icon: 'kaloud' },
+] satisfies Array<{ path: string; labelKey: string; icon: CatalogIconName }>
 
 export const Sidebar = () => {
   const location = useLocation()
+  const { t } = useTranslation()
 
   return (
-    <div tw="bg-white border border-[#CCC] rounded-[4px] overflow-hidden">
-      <div tw="h-10 bg-[#0079D3] flex items-center px-3">
-        <span tw="text-white text-sm font-bold">ShishaGuid</span>
-      </div>
-      <div tw="py-1">
-        {navItems.map((item) => {
-          const active = location.pathname === item.path
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              css={[
-                tw`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors`,
-                active
-                  ? tw`bg-[#F6F7F8] text-[#0079D3] border-l-[3px] border-[#0079D3]`
-                  : tw`text-[#1A1A1B] border-l-[3px] border-transparent hover:bg-[#F6F7F8]`,
-              ]}
-            >
-              {item.label}
-            </Link>
-          )
-        })}
-      </div>
-    </div>
+    <nav tw="bg-[rgb(var(--color-surface))] rounded-xl border border-[rgb(var(--color-border-muted))] shadow-[0_1px_3px_0_rgba(0,0,0,0.04),0_1px_2px_-1px_rgba(0,0,0,0.03)] py-2">
+      {navItems.map((item) => {
+        const active = location.pathname === item.path
+        return (
+          <Link
+            key={item.path}
+            to={item.path}
+            css={[
+              tw`flex items-center gap-2.5 mx-1.5 px-3 py-2 text-[13px] font-medium rounded-lg transition-colors`,
+              active
+                ? tw`bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text))]`
+                : tw`text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-muted))] hover:text-[rgb(var(--color-text))]`,
+            ]}
+          >
+            <CatalogIcon name={item.icon} size={15} />
+            {t(item.labelKey)}
+          </Link>
+        )
+      })}
+    </nav>
   )
 }

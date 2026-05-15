@@ -1,17 +1,21 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 
+const apiBaseUrl = import.meta.env.SSR
+  ? import.meta.env.VITE_SSR_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+  : import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: fetchBaseQuery({
-    baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
+    baseUrl: apiBaseUrl,
     prepareHeaders: (headers) => {
-      const token = localStorage.getItem('token')
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
       if (token) {
         headers.set('authorization', `Bearer ${token}`)
       }
       return headers
     },
   }),
-  tagTypes: ['Setups', 'Bowls', 'Tobaccos', 'Coals', 'Kalouds', 'CoalPlacements', 'BowlSetupTypes', 'Profile'],
+  tagTypes: ['Setups', 'SetupReviews', 'Bowls', 'Tobaccos', 'Coals', 'Kalouds', 'CoalPlacements', 'BowlSetupTypes', 'Profile', 'AdminUsers'],
   endpoints: () => ({}),
 })

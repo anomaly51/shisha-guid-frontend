@@ -1,6 +1,6 @@
-import React from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import tw from 'twin.macro'
+import { useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import 'twin.macro'
 import { ItemForm } from './ItemForm'
 
 interface EditItemProps {
@@ -10,26 +10,25 @@ interface EditItemProps {
 }
 
 export const EditItem = ({ title, detailHook, updateHook }: EditItemProps) => {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const { data: item, isLoading: loadingItem } = detailHook(id!)
   const [update, { isLoading: updating }] = updateHook()
-  const navigate = useNavigate()
 
   if (loadingItem) {
-    return <div tw="text-center py-8 text-[#787C7E] text-sm">Loading...</div>
+    return <div tw="text-center py-8 text-[rgb(var(--color-text-subtle))] text-sm">{t('common.loading')}</div>
   }
 
   if (!item) {
     return (
-      <div tw="bg-white border border-[#CCC] rounded-[4px] p-6 text-center text-sm text-[#787C7E]">
-        Item not found.
+      <div tw="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border))] rounded-[4px] p-6 text-center text-sm text-[rgb(var(--color-text-subtle))]">
+        {t('common.itemNotFound')}
       </div>
     )
   }
 
   const handleSubmit = async (values: any) => {
     await update({ id: id!, ...values }).unwrap()
-    navigate(-1)
   }
 
   return (

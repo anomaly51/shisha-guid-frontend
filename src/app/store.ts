@@ -1,13 +1,22 @@
-import { configureStore } from '@reduxjs/toolkit'
+import { combineReducers, configureStore } from '@reduxjs/toolkit'
 import { api } from '../shared/api/base'
 
-export const store = configureStore({
-  reducer: {
-    [api.reducerPath]: api.reducer,
-  },
+const rootReducer = combineReducers({
+  [api.reducerPath]: api.reducer,
+})
+
+export type RootState = ReturnType<typeof rootReducer>
+
+const createStore = (preloadedState?: Partial<RootState>) => configureStore({
+  reducer: rootReducer,
+  preloadedState,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(api.middleware),
 })
 
-export type RootState = ReturnType<typeof store.getState>
-export type AppDispatch = typeof store.dispatch
+export const store = createStore()
+
+export const createAppStore = (preloadedState?: Partial<RootState>) => createStore(preloadedState)
+
+export type AppStore = ReturnType<typeof createAppStore>
+export type AppDispatch = AppStore['dispatch']

@@ -1,10 +1,31 @@
 import { api } from './base'
 
-const makeCrud = <T extends string>(name: T, path: string, tag: string) =>
+type ListQueryParams = Record<string, string | number | string[] | undefined> | void
+
+const withParams = (path: string, params: ListQueryParams) => {
+  if (!params) return path
+
+  const searchParams = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === '') return
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item) searchParams.append(key, item)
+      })
+      return
+    }
+    searchParams.set(key, String(value))
+  })
+
+  const query = searchParams.toString()
+  return query ? `${path}?${query}` : path
+}
+
+const makeCrud = <T extends string>(name: T, path: string, tag: any) =>
   api.injectEndpoints({
     endpoints: (builder) => ({
-      [`get${name}s` as const]: builder.query<any[], void>({
-        query: () => path,
+      [`get${name}s` as const]: builder.query<any[], ListQueryParams>({
+        query: (params) => withParams(path, params),
         providesTags: [tag],
       }),
       [`get${name}` as const]: builder.query<any, string>({

@@ -1,6 +1,8 @@
 export { api } from './base'
 export { useGoogleLoginMutation, useLogoutMutation } from './auth'
 export { useGetProfileQuery, useUpdateProfileMutation } from './profile'
+export { useGetAdminUsersQuery, useUpdateAdminUserMutation } from './admin'
+export type { AdminUser, BadgeEffect, UserBadge } from './admin'
 export {
   useGetBowlsQuery, useGetBowlQuery, useCreateBowlMutation, useUpdateBowlMutation, useDeleteBowlMutation,
   useGetTobaccosQuery, useGetTobaccoQuery, useCreateTobaccoMutation, useUpdateTobaccoMutation, useDeleteTobaccoMutation,
@@ -10,6 +12,7 @@ export {
   useGetBowlSetupTypesQuery, useGetBowlSetupTypeQuery, useCreateBowlSetupTypeMutation, useUpdateBowlSetupTypeMutation, useDeleteBowlSetupTypeMutation,
 } from './catalog'
 export {
-  useGetSetupsQuery, useGetSetupQuery, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
+  useGetSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
+  useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation,
 } from './setups'
 export { useGetUploadPolicyMutation } from './upload'

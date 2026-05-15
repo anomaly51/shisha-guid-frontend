@@ -4,21 +4,26 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "dev": "node server.mjs",
+    "build": "tsc && vite build --outDir dist/client && vite build --ssr src/entry-server.tsx --outDir dist/server",
+    "preview": "NODE_ENV=production node server.mjs"
   },
   "dependencies": {
+    "@react-three/fiber": "^8.18.0",
     "@reduxjs/toolkit": "^2.0.0",
+    "i18next": "^26.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-i18next": "^17.0.8",
     "react-redux": "^9.0.0",
     "react-router-dom": "^7.15.0",
-    "styled-components": "^6.1.8"
+    "styled-components": "^6.1.8",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
+    "@types/three": "^0.184.1",
     "@vitejs/plugin-react": "^4.2.1",
     "babel-plugin-macros": "^3.1.0",
     "babel-plugin-styled-components": "^2.1.4",

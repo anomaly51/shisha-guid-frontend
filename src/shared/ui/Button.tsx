@@ -1,21 +1,39 @@
-import tw, { styled } from 'twin.macro'
+import styled from 'styled-components'
+import tw from 'twin.macro'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline'
-  size?: 'sm' | 'md' | 'lg'
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'subtle'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   $fullWidth?: boolean
 }
 
-export const Button = styled.button<ButtonProps>(({ variant = 'primary', size = 'md', $fullWidth }) => [
-  tw`font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-2 border`,
+interface StyledButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  $variant?: ButtonProps['variant']
+  $size?: ButtonProps['size']
+  $fullWidth?: boolean
+}
+
+const StyledButton = styled.button<StyledButtonProps>(({ $variant = 'primary', $size = 'md', $fullWidth }) => [
+  tw`font-medium rounded-lg transition-all duration-150 inline-flex items-center justify-center gap-1.5 select-none whitespace-nowrap`,
+  `--button-icon-size: 14px;`,
   $fullWidth && tw`w-full`,
-  size === 'sm' && tw`px-3 py-1 text-xs`,
-  size === 'md' && tw`px-4 py-1.5 text-sm`,
-  size === 'lg' && tw`px-6 py-2 text-base`,
-  variant === 'primary' && tw`bg-[#FF4500] text-white border-[#FF4500] hover:bg-[#E03D00]`,
-  variant === 'secondary' && tw`bg-[#0079D3] text-white border-[#0079D3] hover:bg-[#006CBD]`,
-  variant === 'danger' && tw`bg-white text-red-500 border-red-500 hover:bg-red-50`,
-  variant === 'ghost' && tw`bg-transparent text-[#1A1A1B] border-transparent hover:bg-[#EDEFF1]`,
-  variant === 'outline' && tw`bg-white text-[#0079D3] border-[#0079D3] hover:bg-[#F6F7F8]`,
-  `&:disabled { ${tw`opacity-50 cursor-not-allowed`} }`,
+  $size === 'sm' && [tw`px-2.5 py-1.5 text-xs`, `--button-icon-size: 12px;`],
+  $size === 'md' && [tw`px-3.5 py-2 text-[13px]`, `--button-icon-size: 13px;`],
+  $size === 'lg' && [tw`px-4 py-2 text-sm`, `--button-icon-size: 14px;`],
+  $size === 'xl' && [tw`px-5 py-2.5 text-[14px]`, `--button-icon-size: 15px;`],
+  $variant === 'primary' && tw`bg-[rgb(var(--color-accent))] text-white hover:bg-[rgb(var(--color-accent-hover))] active:bg-[rgb(var(--color-accent))] active:scale-[0.98]`,
+  $variant === 'secondary' && tw`bg-[rgb(var(--color-surface-subtle))] text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-surface-subtle))] active:bg-[rgb(var(--color-surface-subtle))] active:scale-[0.98]`,
+  $variant === 'danger' && tw`bg-[rgb(var(--color-surface))] text-[rgb(var(--color-danger))] border border-[rgb(var(--color-danger-border))] hover:bg-[rgb(var(--color-danger-surface))] active:bg-[rgb(var(--color-surface))]`,
+  $variant === 'ghost' && tw`bg-transparent text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-subtle))] active:bg-transparent`,
+  $variant === 'outline' && tw`bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text))] border border-[rgb(var(--color-border-strong))] hover:bg-[rgb(var(--color-accent-muted))] hover:border-[rgb(var(--color-accent))] active:bg-[rgb(var(--color-surface))]`,
+  $variant === 'subtle' && tw`bg-transparent text-[rgb(var(--color-text-subtle))] hover:text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-subtle))] active:bg-transparent`,
+  `& > svg[aria-hidden="true"] {
+    width: var(--button-icon-size);
+    height: var(--button-icon-size);
+  }`,
+  `&:disabled { ${tw`opacity-40 cursor-not-allowed pointer-events-none`} }`,
 ])
+
+export const Button = ({ variant = 'primary', size = 'md', ...props }: ButtonProps) => (
+  <StyledButton $variant={variant} $size={size} {...props} />
+)
