@@ -22,6 +22,35 @@
         }
       })()
     </script>
+    <script>
+      (() => {
+        const reloadKey = 'shisha-guid-asset-reload'
+        const reloadWithCacheBust = () => {
+          try {
+            const lastReload = Number(sessionStorage.getItem(reloadKey) || 0)
+            if (Date.now() - lastReload < 10000) return
+            sessionStorage.setItem(reloadKey, String(Date.now()))
+            const nextUrl = new URL(window.location.href)
+            nextUrl.searchParams.set('_r', String(Date.now()))
+            window.location.replace(nextUrl.toString())
+          } catch {
+            window.location.reload()
+          }
+        }
+
+        window.addEventListener('error', (event) => {
+          const target = event.target
+          if (!(target instanceof HTMLElement)) return
+          const assetUrl = target.getAttribute('src') || target.getAttribute('href') || ''
+          if (assetUrl.includes('/assets/')) reloadWithCacheBust()
+        }, true)
+
+        window.addEventListener('vite:preloadError', (event) => {
+          event.preventDefault()
+          reloadWithCacheBust()
+        })
+      })()
+    </script>
     <!--ssr-styles-->
   </head>
   <body>

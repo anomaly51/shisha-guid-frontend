@@ -9,6 +9,10 @@ const isProduction = process.env.NODE_ENV === 'production'
 const port = Number(process.env.PORT || 5173)
 const base = process.env.BASE || '/'
 const clientRoot = path.resolve(__dirname, 'dist/client')
+const htmlHeaders = {
+  'Content-Type': 'text/html; charset=utf-8',
+  'Cache-Control': 'no-store, max-age=0',
+}
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -53,8 +57,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     const url = req.url.replace(base, '/')
+    if (isProduction && !isNavigationRequest(req, pathname)) {
+      send(res, 404, 'Not Found', { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' })
+      return
+    }
+
     const html = await createHtml(url)
-    send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8' })
+    send(res, 200, html, htmlHeaders)
   } catch (error) {
     if (!isProduction && vite) {
       vite.ssrFixStacktrace(error)
@@ -84,6 +93,14 @@ if (isProduction) {
 const send = (res, statusCode, body, headers = {}) => {
   res.writeHead(statusCode, headers)
   res.end(body)
+}
+
+const isNavigationRequest = (req, pathname) => {
+  if (req.method && req.method !== 'GET' && req.method !== 'HEAD') return false
+  if (pathname.startsWith('/assets/')) return false
+  if (path.extname(pathname)) return false
+  const accept = req.headers.accept || ''
+  return accept.includes('text/html') || accept.includes('*/*') || accept === ''
 }
 
 const serveStatic = async (req, res) => {
