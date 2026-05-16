@@ -11,6 +11,7 @@ import { SetupForm } from '../pages/SetupForm'
 import { SetupDetail } from '../pages/SetupDetail'
 import { EditSetup } from '../pages/EditSetup'
 import { Profile } from '../pages/Profile'
+import { PageTitle } from './PageTitle'
 import {
   useGetBowlsQuery, useCreateBowlMutation, useGetBowlQuery, useUpdateBowlMutation, useDeleteBowlMutation,
   useGetTobaccosQuery, useCreateTobaccoMutation, useGetTobaccoQuery, useUpdateTobaccoMutation, useDeleteTobaccoMutation,
@@ -41,9 +42,11 @@ export const AppRoutes = () => {
   const { t } = useTranslation()
 
   return (
-  <Routes>
-    <Route path="/" element={<Layout />}>
-      <Route index element={<Feed />} />
+  <>
+    <PageTitle />
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Feed />} />
 
       <Route path="bowls" element={
         <Catalog title={t('routes.bowls')} listHook={useGetBowlsQuery}
@@ -135,7 +138,8 @@ export const AppRoutes = () => {
       <Route path="setups/:id/edit" element={<EditSetup />} />
 
       <Route path="profile" element={<Profile />} />
-    </Route>
-  </Routes>
+      </Route>
+    </Routes>
+  </>
   )
 }

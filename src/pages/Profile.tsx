@@ -24,7 +24,7 @@ import { LANGUAGES, type LanguageCode } from '../shared/i18n'
 import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
 import { useTheme, type ThemePreference } from '../app/theme'
-import { hasAuthToken } from '../shared/authToken'
+import { clearAuthSession, hasAuthToken } from '../shared/authToken'
 
 const badgeEffectOptions: BadgeEffect[] = ['none', 'frost', 'fire', 'chemical', 'electric', 'cosmic', 'shimmer']
 
@@ -325,7 +325,7 @@ export const Profile = () => {
 
   const handleLogout = async () => {
     await logout()
-    localStorage.removeItem('token')
+    clearAuthSession()
     window.location.reload()
   }
 

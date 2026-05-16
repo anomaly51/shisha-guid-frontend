@@ -4,6 +4,7 @@ import 'twin.macro'
 import { Modal } from '../shared/ui/Modal'
 import { Button } from '../shared/ui/Button'
 import { useGoogleLoginMutation } from '../shared/api'
+import { setAuthToken } from '../shared/authToken'
 
 interface AuthModalProps {
   open: boolean
@@ -26,7 +27,7 @@ export const AuthModal = ({ open, onClose }: AuthModalProps) => {
     setAuthPending(true)
     try {
       const result = await googleLogin({ code, redirect_uri: redirectUri }).unwrap()
-      localStorage.setItem('token', result.access_token)
+      setAuthToken(result.access_token)
       sessionStorage.removeItem('google_oauth_state')
       window.location.reload()
     } catch {

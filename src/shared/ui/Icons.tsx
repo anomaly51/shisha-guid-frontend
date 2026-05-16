@@ -152,6 +152,12 @@ export const BackIcon = ({ size = 13, ...props }: IconProps) => (
   </svg>
 )
 
+export const ChevronDownIcon = ({ size = 14, ...props }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M3.5 5.25 7 8.75l3.5-3.5" />
+  </svg>
+)
+
 export const LogoutIcon = ({ size = 12, ...props }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true" {...props}>
     <path d="M5 3H3.5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1H5M9.5 10 12 7 9.5 4M12 7H5.5" />

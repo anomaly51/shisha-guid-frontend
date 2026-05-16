@@ -11,6 +11,7 @@ const isProduction = process.env.NODE_ENV === 'production'
 const port = Number(process.env.PORT || 5173)
 const base = normalizeBase(process.env.BASE || '/')
 const clientRoot = path.resolve(__dirname, 'dist/client')
+const publicRoot = path.resolve(__dirname, 'public')
 
 const app = express()
 const server = http.createServer(app)
@@ -21,6 +22,10 @@ app.use(compression())
 app.use('/.well-known/appspecific', (_req, res) => {
   res.status(204).end()
 })
+
+if (!isProduction) {
+  app.use(base, sirv(publicRoot, { dev: true, extensions: [] }))
+}
 
 if (isProduction) {
   app.use(

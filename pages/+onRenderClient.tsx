@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom'
 import type { PageContextClient } from 'vike/types'
 import { AppProviders } from '../src/app/providers'
 import { createAppStore, type RootState } from '../src/app/store'
+import { profileApi } from '../src/shared/api/profile'
+import { getCachedProfile, hasAuthToken } from '../src/shared/authToken'
 
 type ClientPageContext = PageContextClient & {
   Page: React.ComponentType
@@ -18,6 +20,10 @@ export const onRenderClient = (pageContext: ClientPageContext) => {
   }
 
   const store = createAppStore(pageContext.preloadedState)
+  const cachedProfile = hasAuthToken() ? getCachedProfile() : null
+  if (cachedProfile) {
+    store.dispatch(profileApi.util.upsertQueryData('getProfile', undefined, cachedProfile))
+  }
   const { Page } = pageContext
 
   hydrateRoot(

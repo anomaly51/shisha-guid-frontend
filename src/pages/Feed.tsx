@@ -6,12 +6,13 @@ import { Card } from '../shared/ui/Card'
 import { Button } from '../shared/ui/Button'
 import { useGetBowlSetupTypesQuery, useGetBowlsQuery, useGetSetupsQuery, useGetTobaccosQuery } from '../shared/api'
 import { CardSkeleton } from '../shared/ui/Skeleton'
-import { CatalogIcon, CloseIcon, EyeIcon, PlusIcon } from '../shared/ui/Icons'
+import { CatalogIcon, ChevronDownIcon, CloseIcon, EyeIcon, PlusIcon } from '../shared/ui/Icons'
 import { MIX_COLORS, MixBowlPreview, detectBowlModel, detectSetupKind, type MixBowlItem } from '../shared/ui/MixBowlPreview'
 import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
 import { AuthorChip } from '../shared/ui/AuthorChip'
 import { getSetupHeaviness } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
+import { getSetupAggregateRating } from '../shared/tobaccoRatings'
 
 type SortValue = 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' | 'name'
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
@@ -25,12 +26,6 @@ const getItem = (items: any[] | undefined, id: string | undefined) => (
 const getName = (items: any[] | undefined, id: string | undefined, fallback = 'Tobacco') => (
   items?.find((item) => item.id === id)?.name || fallback
 )
-
-const getSetupAggregateRating = (setup: any) => {
-  const value = setup.average_rating ?? setup.rating_average ?? setup.reviews_average ?? setup.rating
-  const numeric = Number(value)
-  return Number.isFinite(numeric) ? numeric : undefined
-}
 
 const getSetupRating = (setup: any) => getSetupAggregateRating(setup) ?? 0
 
@@ -402,14 +397,39 @@ export const Feed = () => {
             type="button"
             onClick={() => setTobaccoPickerOpen((open) => !open)}
             aria-expanded={tobaccoPickerOpen}
-            tw="flex h-[42px] items-center justify-between gap-2 rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-3 text-[13px] font-bold text-[rgb(var(--color-text))] transition-all hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] lg:min-w-[168px]"
+            className="group"
+            tw="flex h-[42px] cursor-pointer items-center justify-between gap-3 rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface-raised))] px-3 text-[13px] font-black text-[rgb(var(--color-text))] shadow-[inset_0_-1px_0_rgba(0,0,0,0.04),0_14px_28px_-24px_rgba(83,48,31,0.85)] transition-all hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] hover:shadow-[inset_0_-1px_0_rgba(0,0,0,0.04),0_18px_32px_-24px_rgba(83,48,31,0.95)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(139,74,43,0.22)] active:bg-[rgb(var(--color-surface-subtle))] lg:min-w-[168px]"
+            css={(tobaccoPickerOpen || selectedTobaccos.length)
+              ? { borderColor: 'rgb(var(--color-accent))', backgroundColor: 'rgb(var(--color-accent-muted))' }
+              : undefined}
           >
-            <span tw="inline-flex items-center gap-1.5">
-              <CatalogIcon name="tobacco" size={14} />
-              {t('feed.filters.tobaccos')}
+            <span tw="inline-flex min-w-0 items-center gap-2">
+              <span tw="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-accent))] transition-colors group-hover:border-[rgb(var(--color-accent))]">
+                <CatalogIcon name="tobacco" size={14} tw="block" />
+              </span>
+              <span tw="truncate">
+                {t('feed.filters.tobaccos')}
+              </span>
             </span>
-            <span tw="rounded-md bg-[rgb(var(--color-surface-subtle))] px-1.5 py-0.5 text-[11px] text-[rgb(var(--color-text-muted))] tabular-nums">
-              {selectedTobaccos.length || t('feed.controls.off')}
+            <span tw="inline-flex shrink-0 items-center gap-2">
+              {selectedTobaccos.length > 0 && (
+                <span tw="rounded-md bg-[rgb(var(--color-surface-inverse))] px-1.5 py-0.5 text-[11px] text-[rgb(var(--color-text-inverse))] tabular-nums">
+                  {selectedTobaccos.length}
+                </span>
+              )}
+              <span
+                tw="flex h-6 w-6 items-center justify-center rounded-md border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-accent))] transition-colors group-hover:border-[rgb(var(--color-accent))]"
+                aria-hidden="true"
+              >
+                <ChevronDownIcon
+                  size={14}
+                  tw="block transition-transform"
+                  css={{
+                    transform: tobaccoPickerOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transformOrigin: 'center',
+                  }}
+                />
+              </span>
             </span>
           </button>
         </div>

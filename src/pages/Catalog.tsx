@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import 'twin.macro'
@@ -6,11 +6,12 @@ import { Button } from '../shared/ui/Button'
 import { Card } from '../shared/ui/Card'
 import { Modal } from '../shared/ui/Modal'
 import { Skeleton } from '../shared/ui/Skeleton'
-import { useGetProfileQuery } from '../shared/api'
+import { useGetProfileQuery, useGetSetupsQuery } from '../shared/api'
 import { CatalogIcon, type CatalogIconName, EditIcon, EmptyIcon, PlusIcon, TrashIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { hasAuthToken } from '../shared/authToken'
+import { getTobaccoRatingMap } from '../shared/tobaccoRatings'
 
 type CatalogItemKind = 'default' | 'bowl' | 'tobacco' | 'coal' | 'kaloud' | 'placement' | 'setupType'
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
@@ -102,6 +103,12 @@ const formatTobaccoPackageLine = (item: any, t: any) => (
     : null
 )
 
+const formatRatingLine = (rating: number | undefined, t: any) => (
+  typeof rating === 'number' && Number.isFinite(rating)
+    ? `${t('catalog.factRating')} ${rating.toFixed(1)}`
+    : null
+)
+
 const getHeroMetric = (item: any, itemKind: CatalogItemKind, t: any) => {
   if (itemKind === 'bowl') return formatBowlCapacityLine(item, t)
   if (itemKind === 'tobacco') return formatTobaccoPackageLine(item, t)
@@ -129,6 +136,10 @@ export const Catalog = ({
     strength,
   } : undefined
   const { data, isLoading } = listHook(tobaccoQueryParams)
+  const { data: setupsForRatings } = useGetSetupsQuery(
+    itemKind === 'tobacco' ? { limit: 1000, sort: 'rating' } : undefined,
+    { skip: itemKind !== 'tobacco' },
+  )
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
   const [deleteItem, { isLoading: deleting }] = deleteHook()
   const navigate = useNavigate()
@@ -136,6 +147,7 @@ export const Catalog = ({
   const isAdmin = profile?.role === 'admin'
   const hasActiveFilters = strength !== 'all' || minPrice.trim() !== '' || maxPrice.trim() !== ''
   const showTobaccoFilters = itemKind === 'tobacco' && (Boolean(data?.length) || hasActiveFilters)
+  const tobaccoRatings = useMemo(() => getTobaccoRatingMap(setupsForRatings), [setupsForRatings])
 
   const updateSearch = useCallback((updater: (next: URLSearchParams) => void) => {
     setSearchParams((current) => {
@@ -280,7 +292,11 @@ export const Catalog = ({
             <div tw="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {(data || []).map((item: any) => {
                 const facts = getCatalogFacts(item, itemKind, t)
-                const heroMetric = getHeroMetric(item, itemKind, t)
+                const tobaccoRating = itemKind === 'tobacco' ? tobaccoRatings.get(item.id) : undefined
+                const heroMetric = itemKind === 'tobacco'
+                  ? formatRatingLine(tobaccoRating, t)
+                  : getHeroMetric(item, itemKind, t)
+                const packageLine = itemKind === 'tobacco' ? formatTobaccoPackageLine(item, t) : null
                 const price = formatPrice(item.price, item.price_currency)
 
                 return (
@@ -298,9 +314,9 @@ export const Catalog = ({
                           </div>
                         )}
                         <div tw="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(23,19,18,0.03)_35%,rgba(23,19,18,0.34))]" />
-                        <div tw="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur">
+                        <div tw="pointer-events-none absolute left-2.5 top-2.5 flex max-w-[calc(100%-1.25rem)] items-center gap-1.5 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur">
                           <CatalogIcon name={iconByKind[itemKind]} size={12} />
-                          <span tw="max-w-[120px] truncate">{title}</span>
+                          <span tw="max-w-[120px] truncate">{packageLine || title}</span>
                         </div>
                         {!isAdmin && item.photo_urls?.length > 1 && (
                           <span tw="absolute right-2 top-2 rounded-md bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[11px] font-bold text-[rgb(var(--color-text))] shadow-sm ring-1 ring-black/5">

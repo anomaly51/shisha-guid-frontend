@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
@@ -9,10 +9,12 @@ import { AuthModal } from './AuthModal'
 import { LogoutIcon, PlusIcon, ShishaGuidLogo } from '../shared/ui/Icons'
 import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
-import { hasAuthToken } from '../shared/authToken'
+import { clearAuthSession, hasAuthToken } from '../shared/authToken'
 
 const HeaderBar = tw.header`bg-[rgb(var(--color-surface-inverse))]/95 backdrop-blur-xl border-b border-[rgb(var(--color-border))]`
 const Inner = tw.div`w-full max-w-[1160px] mx-auto px-4 h-14 flex items-center justify-between gap-3 min-w-0 sm:px-5 sm:gap-4`
+const NewSetupPlaceholder = tw.span`hidden h-9 w-[118px] shrink-0 opacity-0 sm:inline-flex`
+const ProfilePlaceholder = tw.span`flex h-9 w-[148px] shrink-0 opacity-0`
 const NewSetupLink = styled(Link)`
   ${tw`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[12px] font-black text-white transition-all duration-150 sm:h-9 sm:px-3.5 sm:text-[13px]`}
   background:
@@ -42,15 +44,22 @@ const NewSetupLink = styled(Link)`
 `
 
 export const Header = () => {
-  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
+  const [hasToken, setHasToken] = useState<boolean | null>(null)
+  const { data: profile } = useGetProfileQuery(undefined, { skip: hasToken !== true })
   const [logout] = useLogoutMutation()
   const [authOpen, setAuthOpen] = useState(false)
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const isResolvingAuth = hasToken === null
+  const isResolvingProfile = hasToken === true && !profile
+
+  useEffect(() => {
+    setHasToken(hasAuthToken())
+  }, [])
 
   const handleLogout = async () => {
     await logout()
-    localStorage.removeItem('token')
+    clearAuthSession()
     window.location.reload()
   }
 
@@ -69,6 +78,7 @@ export const Header = () => {
                 <span>{t('feed.newSetup')}</span>
               </NewSetupLink>
             )}
+            {(isResolvingAuth || isResolvingProfile) && <NewSetupPlaceholder aria-hidden="true" />}
           </div>
 
           <div tw="flex items-center gap-2">
@@ -99,6 +109,8 @@ export const Header = () => {
                   <span>{t('profile.logout')}</span>
                 </button>
               </>
+            ) : isResolvingAuth || isResolvingProfile ? (
+              <ProfilePlaceholder aria-hidden="true" />
             ) : (
               <Button variant="primary" size="sm" onClick={() => setAuthOpen(true)}>
                 {t('auth.signIn')}

@@ -159,6 +159,7 @@ export const onRenderHtml = async (pageContext: ServerPageContext) => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <meta name="theme-color" content="#FAFAFA" />
           <meta name="description" content="ShishaGuid - share and discover shisha setups" />
+          <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
           <title>ShishaGuid</title>
           <script>${dangerouslySkipEscape(themeScript)}</script>
           <script>${dangerouslySkipEscape(assetReloadScript)}</script>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
@@ -800,6 +800,22 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
     })
   }
 
+  const handleEquipmentChange = (value: string) => {
+    activeEquipment.onChange(value)
+
+    const nextEquipmentItems = equipmentItems.map((item, index) => (
+      index === activeEquipmentIndex ? { ...item, value } : item
+    ))
+    const nextMissingIndex = nextEquipmentItems.findIndex((item) => !item.value)
+
+    if (nextMissingIndex === -1) {
+      setStep(1)
+      return
+    }
+
+    setActiveEquipmentIndex(nextMissingIndex)
+  }
+
   const updateTobaccoPercent = (tobaccoId: string, percentage: number) => {
     setTobaccoMix((items) => items.map((item) => (
       item.tobacco_id === tobaccoId ? { ...item, percentage } : item
@@ -819,8 +835,33 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
     })
   }
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault()
+  const handleNextStep = () => {
+    setError('')
+
+    if (step === 0) {
+      if (!equipmentReady) {
+        setError(t('setupForm.completeEquipment'))
+        return
+      }
+      setStep(1)
+      return
+    }
+
+    if (step === 1) {
+      if (!mixReady) {
+        setError(t('setupForm.completeMix'))
+        return
+      }
+      setStep(2)
+    }
+  }
+
+  const handleSave = async () => {
+    if (step < 2) {
+      handleNextStep()
+      return
+    }
+
     const preparedTobaccos = tobaccoMix.map((item) => ({
       tobacco_id: item.tobacco_id,
       percentage: Number(item.percentage),
@@ -890,7 +931,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
         {t('common.back')}
       </button>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={(event) => event.preventDefault()}>
         <Card>
           <div tw="flex flex-col gap-4 p-4 sm:p-5">
             <div tw="flex items-start justify-between gap-3">
@@ -999,32 +1040,11 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                       )
                     })}
                   </div>
-                  {equipmentReady && (
-                    <div tw="mt-3 flex flex-col gap-2 rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div tw="min-w-0">
-                        <p tw="text-[13px] font-semibold text-[rgb(var(--color-text))]">{t('setupForm.equipmentReadyTitle')}</p>
-                        <p tw="mt-0.5 text-[12px] font-medium leading-relaxed text-[rgb(var(--color-text-muted))]">{t('setupForm.equipmentReadyCta')}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setStep(1)}
-                        tw="inline-flex shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface-muted))] px-3 py-2 text-[13px] font-semibold text-[rgb(var(--color-text))] transition-colors hover:border-[rgb(var(--color-accent-border))] hover:bg-[rgb(var(--color-accent-muted))] active:bg-[rgb(var(--color-surface))]"
-                      >
-                        {t('common.next')}
-                      </button>
-                    </div>
-                  )}
                 </div>
                 <Choice
                   label={activeEquipment.label}
                   value={activeEquipment.value}
-                  onChange={(value) => {
-                    activeEquipment.onChange(value)
-                    const nextIndex = equipmentItems.findIndex((item, index) => index > activeEquipmentIndex && !item.value)
-                    if (nextIndex !== -1) {
-                      setActiveEquipmentIndex(nextIndex)
-                    }
-                  }}
+                  onChange={handleEquipmentChange}
                   options={activeEquipment.options}
                   icon={activeEquipment.icon}
                 />
@@ -1289,12 +1309,12 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                     variant="primary"
                     type="button"
                     disabled={step === 0 ? !equipmentReady : !mixReady}
-                    onClick={() => setStep(step + 1)}
+                    onClick={handleNextStep}
                   >
                     {t('common.next')}
                   </Button>
                 ) : (
-                  <Button variant="primary" type="submit" disabled={isSaving || !canSubmit}>
+                  <Button variant="primary" type="button" disabled={isSaving || !canSubmit} onClick={handleSave}>
                     {isSaving ? t('common.saving') : isEdit ? t('setupForm.saveSetup') : t('setupForm.publishSetup')}
                   </Button>
                 )}
