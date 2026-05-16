@@ -8,7 +8,7 @@ const explicitStrength = (tobacco: any) => {
 
 export const getTobaccoStrength = (tobacco: any) => {
   const explicit = explicitStrength(tobacco)
-  if (explicit) return explicit
+  if (explicit !== undefined) return explicit
 
   const text = `${tobacco?.name || ''} ${tobacco?.description || ''}`.toLowerCase()
   let score = 5

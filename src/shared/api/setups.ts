@@ -66,7 +66,7 @@ export const setupsApi = api.injectEndpoints({
         method: 'POST',
         body: { rating, description },
       }),
-      invalidatesTags: (_result, _error, { setupId }) => [{ type: 'SetupReviews', id: setupId }],
+      invalidatesTags: (_result, _error, { setupId }) => [{ type: 'SetupReviews', id: setupId }, 'Setups'],
     }),
     updateSetupReview: builder.mutation<any, { setupId: string; reviewId: string; rating: number; description: string }>({
       query: ({ setupId, reviewId, rating, description }) => ({
@@ -74,7 +74,7 @@ export const setupsApi = api.injectEndpoints({
         method: 'PATCH',
         body: { rating, description },
       }),
-      invalidatesTags: (_result, _error, { setupId }) => [{ type: 'SetupReviews', id: setupId }],
+      invalidatesTags: (_result, _error, { setupId }) => [{ type: 'SetupReviews', id: setupId }, 'Setups'],
     }),
   }),
 })

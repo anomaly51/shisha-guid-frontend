@@ -22,10 +22,18 @@ import { Card } from '../shared/ui/Card'
 import { Textarea } from '../shared/ui/Input'
 import { Modal } from '../shared/ui/Modal'
 import { Skeleton } from '../shared/ui/Skeleton'
-import { AlertIcon, BackIcon, CatalogIcon, EyeIcon, type CatalogIconName } from '../shared/ui/Icons'
+import { AlertIcon, BackIcon, CatalogIcon, EyeIcon, VoteDownIcon, type CatalogIconName } from '../shared/ui/Icons'
 import { MIX_COLORS, MixBowlPreview, detectBowlModel, detectSetupKind, type MixBowlItem } from '../shared/ui/MixBowlPreview'
+import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
 import { AuthorChip } from '../shared/ui/AuthorChip'
-import { getReviewAverage, type SetupReview } from '../shared/reviews'
+import {
+  REVIEW_RATING_MAX,
+  REVIEW_RATING_MIN,
+  REVIEW_RATING_STEP,
+  getReviewAverage,
+  normalizeReviewRating,
+  type SetupReview,
+} from '../shared/reviews'
 import { getSetupHeaviness } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { calculateSetupCost, formatMoney } from '../shared/setupCost'
@@ -95,6 +103,8 @@ const CostSummary = ({ cost }: { cost: ReturnType<typeof calculateSetupCost> }) 
   const tobaccoValue = formatMoney(cost.tobaccoCost, cost.currency) || '-'
   const coalValue = formatMoney(cost.coalCost, cost.currency) || '-'
   const totalValue = formatMoney(cost.total, cost.currency) || t('setupDetail.costIncomplete')
+  const tobaccoAmount = cost.tobaccoGrams ? t('setupDetail.gramsShort', { value: cost.tobaccoGrams.toFixed(1) }) : null
+  const coalAmount = cost.coalCount ? t('setupDetail.coalCountShort', { count: cost.coalCount }) : null
 
   return (
     <div tw="rounded-xl border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-inverse))] p-3 text-white shadow-[0_18px_36px_-30px_rgba(23,19,18,0.75)]">
@@ -112,12 +122,18 @@ const CostSummary = ({ cost }: { cost: ReturnType<typeof calculateSetupCost> }) 
 
       <div tw="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1.1fr)] items-stretch gap-1.5">
         <div tw="min-w-0 rounded-lg border border-white/10 bg-[rgb(var(--color-surface))]/10 px-2 py-2">
-          <p tw="truncate text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">{t('setupDetail.tobaccoCost')}</p>
+          <p tw="truncate text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">
+            {t('setupDetail.tobaccoCost')}
+            {tobaccoAmount && <span tw="normal-case text-white/55"> ({tobaccoAmount})</span>}
+          </p>
           <p tw="mt-0.5 truncate text-[12px] font-black tabular-nums">{tobaccoValue}</p>
         </div>
         <span tw="flex items-center justify-center text-[16px] font-black text-white/45">+</span>
         <div tw="min-w-0 rounded-lg border border-white/10 bg-[rgb(var(--color-surface))]/10 px-2 py-2">
-          <p tw="truncate text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">{t('setupDetail.coalCost')}</p>
+          <p tw="truncate text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">
+            {t('setupDetail.coalCost')}
+            {coalAmount && <span tw="normal-case text-white/55"> ({coalAmount})</span>}
+          </p>
           <p tw="mt-0.5 truncate text-[12px] font-black tabular-nums">{coalValue}</p>
         </div>
         <span tw="flex items-center justify-center text-[16px] font-black text-white/45">=</span>
@@ -127,14 +143,6 @@ const CostSummary = ({ cost }: { cost: ReturnType<typeof calculateSetupCost> }) 
         </div>
       </div>
 
-      <div tw="mt-2 grid grid-cols-2 gap-1.5 text-[10px] font-semibold text-white/60">
-        <div tw="truncate">
-          {cost.tobaccoGrams ? t('setupDetail.gramsValue', { value: cost.tobaccoGrams.toFixed(1) }) : t('setupDetail.noGrams')}
-        </div>
-        <div tw="truncate text-right">
-          {cost.coalCount ? t('setupDetail.coalCountValue', { count: cost.coalCount }) : t('setupDetail.noCoalCount')}
-        </div>
-      </div>
     </div>
   )
 }
@@ -259,41 +267,65 @@ const RatingPicker = ({
   onChange: (value: number) => void
 }) => (
   <div tw="grid gap-2">
-    <div tw="flex flex-wrap gap-1.5">
-      {Array.from({ length: 10 }).map((_, index) => {
-        const option = index + 1
+    <div tw="grid grid-cols-5 gap-1.5">
+      {Array.from({ length: (REVIEW_RATING_MAX - REVIEW_RATING_MIN) / REVIEW_RATING_STEP + 1 }).map((_, index) => {
+        const option = REVIEW_RATING_MIN + index * REVIEW_RATING_STEP
+        const active = value === option
         return (
           <button
             key={option}
             type="button"
             onClick={() => onChange(option)}
             disabled={disabled}
+            aria-pressed={active}
             css={[
-              tw`h-8 w-8 rounded-lg border text-[12px] font-black tabular-nums transition-colors`,
-              value === option
+              tw`h-8 rounded-lg border px-1 text-[11px] font-black tabular-nums transition-colors`,
+              active
                 ? tw`border-[rgb(var(--color-accent))] bg-[rgb(var(--color-accent))] text-white`
                 : tw`border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] hover:border-[rgb(var(--color-accent))]`,
               disabled && tw`cursor-not-allowed opacity-45`,
             ]}
           >
-            {option}
+            {Number.isInteger(option) ? option : option.toFixed(1)}
           </button>
         )
       })}
     </div>
     <input
-      min={1}
-      max={10}
+      min={REVIEW_RATING_MIN}
+      max={REVIEW_RATING_MAX}
+      step={REVIEW_RATING_STEP}
       type="range"
       value={value}
-      onChange={(event) => onChange(Number(event.target.value))}
+      onChange={(event) => onChange(normalizeReviewRating(Number(event.target.value)))}
       disabled={disabled}
       tw="w-full accent-[rgb(var(--color-accent))]"
     />
   </div>
 )
 
-const SetupReviews = ({ setupId }: { setupId: string }) => {
+const ReviewJumpButton = ({ onClick }: { onClick: () => void }) => {
+  const { t } = useTranslation()
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={t('setupDetail.jumpToReviews')}
+      title={t('setupDetail.jumpToReviews')}
+      tw="inline-flex h-11 items-center gap-2 rounded-xl border border-[rgb(var(--color-accent-border))] bg-[rgb(var(--color-surface))] px-2.5 pr-3 text-[rgb(var(--color-text))] shadow-[0_0_0_1px_rgba(222,139,87,0.08),0_0_18px_rgba(222,139,87,0.14),0_14px_30px_-22px_rgba(23,19,18,0.9)] transition hover:-translate-y-0.5 hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-surface-raised))]"
+    >
+      <span tw="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-accent))]">
+        <VoteDownIcon size={15} />
+      </span>
+      <span tw="whitespace-nowrap text-[12px] font-bold leading-none">
+        {t('setupDetail.jumpToReviewsShort')}
+      </span>
+    </button>
+  )
+}
+
+const SetupReviews = ({ setupId, highlighted = false }: { setupId: string; highlighted?: boolean }) => {
   const { i18n, t } = useTranslation()
   const hasToken = hasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
@@ -318,7 +350,7 @@ const SetupReviews = ({ setupId }: { setupId: string }) => {
   useEffect(() => {
     setError('')
     if (ownReview) {
-      setRating(Number(ownReview.rating || 8))
+      setRating(normalizeReviewRating(Number(ownReview.rating || 8)))
       setDescription(ownReview.description || '')
       return
     }
@@ -342,11 +374,14 @@ const SetupReviews = ({ setupId }: { setupId: string }) => {
       return
     }
 
+    const normalizedRating = normalizeReviewRating(rating)
+    setRating(normalizedRating)
+
     try {
       if (ownReview) {
-        await updateReview({ setupId, reviewId: ownReview.id, rating, description: text }).unwrap()
+        await updateReview({ setupId, reviewId: ownReview.id, rating: normalizedRating, description: text }).unwrap()
       } else {
-        await createReview({ setupId, rating, description: text }).unwrap()
+        await createReview({ setupId, rating: normalizedRating, description: text }).unwrap()
         setDescription('')
         setRating(8)
       }
@@ -356,7 +391,12 @@ const SetupReviews = ({ setupId }: { setupId: string }) => {
   }
 
   return (
-    <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-4 sm:p-5">
+    <section
+      css={[
+        tw`rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-4 transition-shadow sm:p-5`,
+        highlighted && tw`shadow-[0_0_0_3px_rgba(139,74,43,0.22),0_22px_60px_-44px_rgba(23,19,18,0.72)]`,
+      ]}
+    >
       <div tw="flex flex-wrap items-start justify-between gap-3">
         <div tw="min-w-0">
           <Label>{t('reviews.titleLabel')}</Label>
@@ -437,7 +477,7 @@ const SetupReviews = ({ setupId }: { setupId: string }) => {
             <RatingPicker
               value={rating}
               disabled={!profile || isSaving}
-              onChange={(value) => setRating(Math.min(10, Math.max(1, value)))}
+              onChange={(value) => setRating(normalizeReviewRating(value))}
             />
           </div>
         </div>
@@ -463,6 +503,9 @@ export const SetupDetail = () => {
   const [recordSetupView] = useRecordSetupViewMutation()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [reviewsHighlighted, setReviewsHighlighted] = useState(false)
+  const [showReviewJump, setShowReviewJump] = useState(true)
+  const reviewsRef = useRef<HTMLDivElement>(null)
   const { data: bowls } = useGetBowlsQuery()
   const { data: tobaccos } = useGetTobaccosQuery()
   const { data: coals } = useGetCoalsQuery()
@@ -495,6 +538,19 @@ export const SetupDetail = () => {
     recordSetupView(id).catch(() => undefined)
   }, [id, recordSetupView])
 
+  useEffect(() => {
+    const reviewsNode = reviewsRef.current
+    if (!reviewsNode || typeof IntersectionObserver === 'undefined') return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowReviewJump(!entry.isIntersecting),
+      { threshold: 0.04 },
+    )
+
+    observer.observe(reviewsNode)
+    return () => observer.disconnect()
+  }, [item?.id])
+
   const handleDelete = async () => {
     if (!item?.id) return
     setDeleteError('')
@@ -505,6 +561,12 @@ export const SetupDetail = () => {
     } catch {
       setDeleteError(t('setupDetail.deleteFailed'))
     }
+  }
+
+  const jumpToReviews = () => {
+    reviewsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setReviewsHighlighted(true)
+    window.setTimeout(() => setReviewsHighlighted(false), 1400)
   }
 
   if (isLoading) {
@@ -531,14 +593,16 @@ export const SetupDetail = () => {
   }
 
   return (
-    <div tw="mx-auto flex w-full max-w-5xl flex-col gap-4">
-      <button
-        onClick={() => navigate('/')}
-        tw="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[rgb(var(--color-text-muted))] transition-colors hover:text-[rgb(var(--color-text))]"
-      >
-        <BackIcon />
-        {t('common.backToFeed')}
-      </button>
+    <>
+      <div tw="relative mx-auto w-full max-w-5xl">
+        <div tw="flex min-w-0 flex-col gap-4">
+          <button
+            onClick={() => navigate('/')}
+            tw="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[rgb(var(--color-text-muted))] transition-colors hover:text-[rgb(var(--color-text))]"
+          >
+            <BackIcon />
+            {t('common.backToFeed')}
+          </button>
 
       <Card>
         <div tw="grid overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(430px,480px)]">
@@ -549,6 +613,7 @@ export const SetupDetail = () => {
               items={mixItems}
               style={{ width: '100%', height: '100%' }}
             />
+            <TobaccoPhotoStack items={mixItems} variant="detail" />
           </div>
 
           <div tw="flex flex-col border-t border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-4 lg:border-l lg:border-t-0">
@@ -595,6 +660,12 @@ export const SetupDetail = () => {
           </div>
         </div>
       </Card>
+
+          {showReviewJump && (
+            <div tw="sticky top-[58px] z-30 flex justify-end py-1 2xl:hidden">
+              <ReviewJumpButton onClick={jumpToReviews} />
+            </div>
+          )}
 
       <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-4 sm:p-5">
         <StepHeader
@@ -672,7 +743,17 @@ export const SetupDetail = () => {
         </div>
       </section>
 
-      <SetupReviews setupId={item.id} />
+      <div ref={reviewsRef} style={{ scrollMarginTop: 72 }}>
+        <SetupReviews setupId={item.id} highlighted={reviewsHighlighted} />
+      </div>
+        </div>
+
+        <aside tw="absolute left-[calc(100%+1rem)] top-0 hidden h-full w-[120px] pt-9 2xl:block">
+          <div tw="sticky top-[116px]">
+            {showReviewJump && <ReviewJumpButton onClick={jumpToReviews} />}
+          </div>
+        </aside>
+      </div>
 
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title={t('setupDetail.deleteTitle')}>
         <div tw="grid gap-4">
@@ -695,6 +776,6 @@ export const SetupDetail = () => {
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   )
 }

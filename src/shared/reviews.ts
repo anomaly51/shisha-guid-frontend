@@ -19,7 +19,18 @@ export interface SetupReview {
   created_at: string
 }
 
+export const REVIEW_RATING_MIN = 1
+export const REVIEW_RATING_MAX = 10
+export const REVIEW_RATING_STEP = 0.5
+
+export const normalizeReviewRating = (value: number) => {
+  const numeric = Number.isFinite(value) ? value : 8
+  const clamped = Math.min(REVIEW_RATING_MAX, Math.max(REVIEW_RATING_MIN, numeric))
+  return Math.round(clamped / REVIEW_RATING_STEP) * REVIEW_RATING_STEP
+}
+
 export const getReviewAverage = (reviews: Pick<SetupReview, 'rating'>[]) => {
   if (!reviews.length) return 0
-  return reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
+  const average = reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
+  return Number(average.toFixed(1))
 }

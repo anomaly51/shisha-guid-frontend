@@ -8,6 +8,7 @@ import { useGetBowlSetupTypesQuery, useGetBowlsQuery, useGetSetupsQuery, useGetT
 import { CardSkeleton } from '../shared/ui/Skeleton'
 import { CatalogIcon, CloseIcon, EyeIcon, PlusIcon } from '../shared/ui/Icons'
 import { MIX_COLORS, MixBowlPreview, detectBowlModel, detectSetupKind, type MixBowlItem } from '../shared/ui/MixBowlPreview'
+import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
 import { AuthorChip } from '../shared/ui/AuthorChip'
 import { getSetupHeaviness } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
@@ -16,7 +17,10 @@ type SortValue = 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' 
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
 
 const SETUP_PAGE_SIZE = 12
-const isServerRender = typeof window === 'undefined'
+
+const getItem = (items: any[] | undefined, id: string | undefined) => (
+  items?.find((item) => item.id === id)
+)
 
 const getName = (items: any[] | undefined, id: string | undefined, fallback = 'Tobacco') => (
   items?.find((item) => item.id === id)?.name || fallback
@@ -43,13 +47,31 @@ const getSearchSort = (value: string | null): SortValue => (
 )
 
 const buildMixItems = (setup: any, tobaccos: any[] | undefined, fallbackName: (index: number) => string): MixBowlItem[] => (
-  setup.tobaccos?.map((item: any, index: number) => ({
-    id: item.tobacco_id || item.id || `${setup.id}-${index}`,
-    name: getName(tobaccos, item.tobacco_id, fallbackName(index)),
-    percentage: Number(item.percentage || 0),
-    color: item.color || MIX_COLORS[index % MIX_COLORS.length],
-  })) || []
+  setup.tobaccos?.map((item: any, index: number) => {
+    const tobacco = getItem(tobaccos, item.tobacco_id)
+
+    return {
+      id: item.tobacco_id || item.id || `${setup.id}-${index}`,
+      name: tobacco?.name || getName(tobaccos, item.tobacco_id, fallbackName(index)),
+      percentage: Number(item.percentage || 0),
+      color: item.color || MIX_COLORS[index % MIX_COLORS.length],
+      photo_url: tobacco?.photo_urls?.[0],
+    }
+  }) || []
 )
+
+const normalizeSetupsPage = (setupsPage: any): { items: any[]; total: number; offset: number; has_more: boolean } | null => {
+  if (!setupsPage) return null
+
+  return Array.isArray(setupsPage)
+    ? {
+      items: setupsPage,
+      total: setupsPage.length,
+      offset: 0,
+      has_more: false,
+    }
+    : setupsPage
+}
 
 const SetupCard = memo(({
   setup,
@@ -90,6 +112,7 @@ const SetupCard = memo(({
             renderMode="snapshot"
             sceneScale={1.02}
           />
+          <TobaccoPhotoStack items={mixItems} />
           <div tw="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur">
             <CatalogIcon name="placement" size={12} />
             {t(`feed.kind.${kind}`)}
@@ -175,6 +198,7 @@ export const Feed = () => {
     isLoading,
     refetch: refetchSetups,
   } = useGetSetupsQuery(setupQueryParams)
+  const normalizedSetupsPage = useMemo(() => normalizeSetupsPage(setupsPage), [setupsPage])
   const { data: tobaccos } = useGetTobaccosQuery()
   const tobaccoPickerQueryParams = useMemo(() => ({
     search: tobaccoSearch.trim() || undefined,
@@ -188,8 +212,10 @@ export const Feed = () => {
   const openSetup = useCallback((setupId: string) => {
     navigate(`/setups/${setupId}`)
   }, [navigate])
-  const visibleSetups = loadedSetups
-  const canLoadMore = hasMoreSetups
+  const initialSetups: any[] = normalizedSetupsPage?.offset === 0 ? normalizedSetupsPage.items : []
+  const visibleSetups = loadedSetups.length ? loadedSetups : initialSetups
+  const visibleTotal = loadedSetups.length ? totalSetups : normalizedSetupsPage?.total || 0
+  const canLoadMore = loadedSetups.length ? hasMoreSetups : Boolean(normalizedSetupsPage?.has_more)
   const bowlsById = useMemo(() => new Map<string, any>((bowls || []).map((bowl: any) => [bowl.id, bowl])), [bowls])
   const typesById = useMemo(() => new Map<string, any>((types || []).map((type: any) => [type.id, type])), [types])
 
@@ -250,15 +276,8 @@ export const Feed = () => {
   }, [selectedTobaccoKey, sort, strength])
 
   useEffect(() => {
-    if (!setupsPage) return
-    const page = Array.isArray(setupsPage)
-      ? {
-        items: setupsPage,
-        total: setupsPage.length,
-        offset: 0,
-        has_more: false,
-      }
-      : setupsPage
+    if (!normalizedSetupsPage) return
+    const page = normalizedSetupsPage
 
     setTotalSetups(page.total)
     setHasMoreSetups(page.has_more)
@@ -270,7 +289,7 @@ export const Feed = () => {
         ...page.items.filter((setup) => !seen.has(setup.id)),
       ]
     })
-  }, [setupsPage])
+  }, [normalizedSetupsPage])
 
   useEffect(() => {
     if (!isSetupsError || loadedSetups.length) return undefined
@@ -313,15 +332,7 @@ export const Feed = () => {
     )
   }
 
-  if (!loadedSetups.length && !isFetching && !hasActiveFilters && isServerRender) {
-    return (
-      <div tw="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3, 4, 5, 6].map((n) => <CardSkeleton key={n} />)}
-      </div>
-    )
-  }
-
-  if (!loadedSetups.length && !isFetching && !hasActiveFilters) {
+  if (!visibleSetups.length && !isFetching && !hasActiveFilters) {
     return (
       <div tw="flex flex-col items-center justify-center py-20 text-center">
         <div tw="w-20 h-20 bg-[rgb(var(--color-surface-muted))] rounded-3xl flex items-center justify-center mb-6">
@@ -350,11 +361,11 @@ export const Feed = () => {
         </div>
         <div tw="inline-flex w-fit items-center gap-2 rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] px-3 py-2 text-[12px] font-bold text-[rgb(var(--color-text-muted))]">
           <CatalogIcon name="feed" size={14} />
-          <span tw="tabular-nums">{t('feed.controls.count', { shown: visibleSetups.length, total: totalSetups })}</span>
+          <span tw="tabular-nums">{t('feed.controls.count', { shown: visibleSetups.length, total: visibleTotal })}</span>
         </div>
       </div>
 
-      <div tw="sticky top-0 z-10 -mx-2 mb-5 border-y border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))]/95 px-2 py-3 backdrop-blur sm:static sm:mx-0 sm:rounded-lg sm:border sm:bg-[rgb(var(--color-surface))] sm:p-3 sm:shadow-[0_18px_42px_-36px_rgba(83,48,31,0.45)]">
+      <div tw="-mx-2 mb-5 border-y border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))]/95 px-2 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border sm:bg-[rgb(var(--color-surface))] sm:p-3 sm:shadow-[0_18px_42px_-36px_rgba(83,48,31,0.45)] lg:sticky lg:top-[var(--sticky-filter-top)] lg:z-30">
         <div tw="grid grid-cols-1 gap-2 lg:grid-cols-[220px_minmax(0,1fr)_auto]">
           <label tw="relative block min-w-0">
             <span tw="sr-only">{t('feed.controls.showFirst')}</span>

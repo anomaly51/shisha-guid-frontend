@@ -1051,11 +1051,21 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                   </div>
                   <div tw="grid grid-cols-3 gap-2 text-center">
                     <div tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1.5">
-                      <p tw="text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">{t('setupDetail.tobaccoCost')}</p>
+                      <p tw="truncate text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">
+                        {t('setupDetail.tobaccoCost')}
+                        {setupCost.tobaccoGrams && (
+                          <span tw="normal-case text-[rgb(var(--color-text-muted))]"> ({t('setupDetail.gramsShort', { value: setupCost.tobaccoGrams.toFixed(1) })})</span>
+                        )}
+                      </p>
                       <p tw="mt-0.5 text-[12px] font-black tabular-nums text-[rgb(var(--color-text))]">{formatMoney(setupCost.tobaccoCost, setupCost.currency) || '-'}</p>
                     </div>
                     <div tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1.5">
-                      <p tw="text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">{t('setupDetail.coalCost')}</p>
+                      <p tw="truncate text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">
+                        {t('setupDetail.coalCost')}
+                        {setupCost.coalCount && (
+                          <span tw="normal-case text-[rgb(var(--color-text-muted))]"> ({t('setupDetail.coalCountShort', { count: setupCost.coalCount })})</span>
+                        )}
+                      </p>
                       <p tw="mt-0.5 text-[12px] font-black tabular-nums text-[rgb(var(--color-text))]">{formatMoney(setupCost.coalCost, setupCost.currency) || '-'}</p>
                     </div>
                     <div tw="rounded-md bg-[rgb(var(--color-surface-inverse))] px-2 py-1.5 text-white">

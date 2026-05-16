@@ -28,6 +28,8 @@ const CustomStyles = createGlobalStyle`
     --color-success-border: 188 231 206;
     --shadow-card: 0 1px 2px rgba(24,24,27,0.03);
     --shadow-card-hover: 0 16px 32px -24px rgba(24,24,27,0.38);
+    --sticky-nav-height: 42px;
+    --sticky-filter-top: calc(var(--sticky-nav-height) + 8px);
     --page-background:
       radial-gradient(circle at 12% 0%, rgba(190, 118, 72, 0.12), transparent 28rem),
       linear-gradient(180deg, #F7F3EE 0%, #F8F7F4 42%, #F2F5F2 100%);
