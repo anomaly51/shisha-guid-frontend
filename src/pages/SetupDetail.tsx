@@ -22,7 +22,7 @@ import { Card } from '../shared/ui/Card'
 import { Textarea } from '../shared/ui/Input'
 import { Modal } from '../shared/ui/Modal'
 import { Skeleton } from '../shared/ui/Skeleton'
-import { AlertIcon, BackIcon, CatalogIcon, EyeIcon, VoteDownIcon, type CatalogIconName } from '../shared/ui/Icons'
+import { AlertIcon, BackIcon, CatalogIcon, EyeIcon, type CatalogIconName } from '../shared/ui/Icons'
 import { MIX_COLORS, MixBowlPreview, detectBowlModel, detectSetupKind, type MixBowlItem } from '../shared/ui/MixBowlPreview'
 import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
 import { AuthorChip } from '../shared/ui/AuthorChip'
@@ -304,28 +304,7 @@ const RatingPicker = ({
   </div>
 )
 
-const ReviewJumpButton = ({ onClick }: { onClick: () => void }) => {
-  const { t } = useTranslation()
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={t('setupDetail.jumpToReviews')}
-      title={t('setupDetail.jumpToReviews')}
-      tw="inline-flex h-11 items-center gap-2 rounded-xl border border-[rgb(var(--color-accent-border))] bg-[rgb(var(--color-surface))] px-2.5 pr-3 text-[rgb(var(--color-text))] shadow-[0_0_0_1px_rgba(222,139,87,0.08),0_0_18px_rgba(222,139,87,0.14),0_14px_30px_-22px_rgba(23,19,18,0.9)] transition hover:-translate-y-0.5 hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-surface-raised))]"
-    >
-      <span tw="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-accent))]">
-        <VoteDownIcon size={15} />
-      </span>
-      <span tw="whitespace-nowrap text-[12px] font-bold leading-none">
-        {t('setupDetail.jumpToReviewsShort')}
-      </span>
-    </button>
-  )
-}
-
-const SetupReviews = ({ setupId, highlighted = false }: { setupId: string; highlighted?: boolean }) => {
+const SetupReviews = ({ setupId }: { setupId: string }) => {
   const { i18n, t } = useTranslation()
   const hasToken = hasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
@@ -391,12 +370,7 @@ const SetupReviews = ({ setupId, highlighted = false }: { setupId: string; highl
   }
 
   return (
-    <section
-      css={[
-        tw`rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-4 transition-shadow sm:p-5`,
-        highlighted && tw`shadow-[0_0_0_3px_rgba(139,74,43,0.22),0_22px_60px_-44px_rgba(23,19,18,0.72)]`,
-      ]}
-    >
+    <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-4 sm:p-5">
       <div tw="flex flex-wrap items-start justify-between gap-3">
         <div tw="min-w-0">
           <Label>{t('reviews.titleLabel')}</Label>
@@ -503,9 +477,6 @@ export const SetupDetail = () => {
   const [recordSetupView] = useRecordSetupViewMutation()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-  const [reviewsHighlighted, setReviewsHighlighted] = useState(false)
-  const [showReviewJump, setShowReviewJump] = useState(true)
-  const reviewsRef = useRef<HTMLDivElement>(null)
   const { data: bowls } = useGetBowlsQuery()
   const { data: tobaccos } = useGetTobaccosQuery()
   const { data: coals } = useGetCoalsQuery()
@@ -538,19 +509,6 @@ export const SetupDetail = () => {
     recordSetupView(id).catch(() => undefined)
   }, [id, recordSetupView])
 
-  useEffect(() => {
-    const reviewsNode = reviewsRef.current
-    if (!reviewsNode || typeof IntersectionObserver === 'undefined') return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => setShowReviewJump(!entry.isIntersecting),
-      { threshold: 0.04 },
-    )
-
-    observer.observe(reviewsNode)
-    return () => observer.disconnect()
-  }, [item?.id])
-
   const handleDelete = async () => {
     if (!item?.id) return
     setDeleteError('')
@@ -561,12 +519,6 @@ export const SetupDetail = () => {
     } catch {
       setDeleteError(t('setupDetail.deleteFailed'))
     }
-  }
-
-  const jumpToReviews = () => {
-    reviewsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    setReviewsHighlighted(true)
-    window.setTimeout(() => setReviewsHighlighted(false), 1400)
   }
 
   if (isLoading) {
@@ -661,11 +613,7 @@ export const SetupDetail = () => {
         </div>
       </Card>
 
-          {showReviewJump && (
-            <div tw="sticky top-[58px] z-30 flex justify-end py-1 2xl:hidden">
-              <ReviewJumpButton onClick={jumpToReviews} />
-            </div>
-          )}
+      <SetupReviews setupId={item.id} />
 
       <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-4 sm:p-5">
         <StepHeader
@@ -743,16 +691,7 @@ export const SetupDetail = () => {
         </div>
       </section>
 
-      <div ref={reviewsRef} style={{ scrollMarginTop: 72 }}>
-        <SetupReviews setupId={item.id} highlighted={reviewsHighlighted} />
-      </div>
         </div>
-
-        <aside tw="absolute left-[calc(100%+1rem)] top-0 hidden h-full w-[120px] pt-9 2xl:block">
-          <div tw="sticky top-[116px]">
-            {showReviewJump && <ReviewJumpButton onClick={jumpToReviews} />}
-          </div>
-        </aside>
       </div>
 
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title={t('setupDetail.deleteTitle')}>

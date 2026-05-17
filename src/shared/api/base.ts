@@ -23,6 +23,7 @@ export const api = createApi({
     const result = await rawBaseQuery(args, baseQueryApi, extraOptions)
     if (result.error?.status === 401) {
       clearAuthSession()
+      baseQueryApi.dispatch(api.util.resetApiState())
     }
     return result
   },

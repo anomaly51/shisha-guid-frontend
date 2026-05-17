@@ -19,7 +19,7 @@ import {
   ACCEPTED_MEDIA_INPUT,
   isAcceptedMediaFile,
 } from '../shared/ui/PhotoUploader'
-import { CatalogIcon, LockIcon, LogoutIcon } from '../shared/ui/Icons'
+import { CatalogIcon, CheckIcon, LockIcon, LogoutIcon } from '../shared/ui/Icons'
 import { LANGUAGES, type LanguageCode } from '../shared/i18n'
 import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
@@ -244,6 +244,8 @@ export const Profile = () => {
   const [logout] = useLogoutMutation()
   const [nickname, setNickname] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [savedNickname, setSavedNickname] = useState('')
+  const [savedAvatarUrl, setSavedAvatarUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -252,8 +254,12 @@ export const Profile = () => {
 
   useEffect(() => {
     if (!profile) return
-    setNickname(profile.nickname || '')
-    setAvatarUrl(profile.avatar_url || null)
+    const nextNickname = (profile.nickname || '').trim()
+    const nextAvatarUrl = profile.avatar_url || null
+    setNickname(nextNickname)
+    setAvatarUrl(nextAvatarUrl)
+    setSavedNickname(nextNickname)
+    setSavedAvatarUrl(nextAvatarUrl)
   }, [profile])
 
   const displayName = useMemo(() => {
@@ -288,6 +294,20 @@ export const Profile = () => {
     )
   }
 
+  const normalizedNickname = nickname.trim()
+  const nicknameChanged = normalizedNickname !== savedNickname
+  const avatarChanged = avatarUrl !== savedAvatarUrl
+  const hasProfileChanges = nicknameChanged || avatarChanged
+  const saveLabel = saving ? t('common.saving') : t('common.saveChanges')
+  const applyLabel = saving ? t('common.saving') : t('profile.applyChanges')
+
+  const resetProfileChanges = () => {
+    setNickname(savedNickname)
+    setAvatarUrl(savedAvatarUrl)
+    setMessage('')
+    setError('')
+  }
+
   const uploadAvatar = async (file: File | undefined) => {
     if (!file) return
     setMessage('')
@@ -310,13 +330,19 @@ export const Profile = () => {
   }
 
   const handleSave = async () => {
+    if (!hasProfileChanges) return
     setMessage('')
     setError('')
+    const nextNickname = nickname.trim()
+    const nextAvatarUrl = avatarUrl
     try {
       await updateProfile({
-        nickname: nickname.trim() || null,
-        avatar_url: avatarUrl,
+        nickname: nextNickname || null,
+        avatar_url: nextAvatarUrl,
       }).unwrap()
+      setNickname(nextNickname)
+      setSavedNickname(nextNickname)
+      setSavedAvatarUrl(nextAvatarUrl)
       setMessage(t('profile.updated'))
     } catch {
       setError(t('profile.updateFailed'))
@@ -370,6 +396,16 @@ export const Profile = () => {
               </label>
               <p tw="text-xs text-[rgb(var(--color-text-subtle))] text-center sm:text-left lg:text-center">{t('common.mediaRules')}</p>
 
+              {avatarChanged && (
+                <div tw="rounded-lg border border-[rgb(var(--color-accent-border))] bg-[rgb(var(--color-accent-muted))] px-3 py-2.5">
+                  <div tw="mb-2 text-center text-[12px] font-bold text-[rgb(var(--color-text))] sm:text-left lg:text-center">{t('profile.avatarPending')}</div>
+                  <Button type="button" size="sm" onClick={handleSave} disabled={saving || uploading} $fullWidth>
+                    <CheckIcon />
+                    {applyLabel}
+                  </Button>
+                </div>
+              )}
+
               {avatarUrl && (
                 <Button
                   type="button"
@@ -407,9 +443,20 @@ export const Profile = () => {
                 onChange={(e) => {
                   setNickname(e.target.value)
                   setMessage('')
+                  setError('')
                 }}
                 placeholder={t('profile.nicknamePlaceholder')}
               />
+
+              {nicknameChanged && (
+                <div tw="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[rgb(var(--color-accent-border))] bg-[rgb(var(--color-accent-muted))] px-3 py-2.5">
+                  <span tw="text-[12px] font-bold text-[rgb(var(--color-text))]">{t('profile.nicknamePending')}</span>
+                  <Button type="button" size="sm" onClick={handleSave} disabled={saving || uploading}>
+                    <CheckIcon />
+                    {applyLabel}
+                  </Button>
+                </div>
+              )}
 
               <div tw="rounded-lg bg-[rgb(var(--color-accent-muted))] border border-[rgb(var(--color-border))] px-3 py-2.5">
                 <div tw="text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">{t('common.account')}</div>
@@ -453,10 +500,22 @@ export const Profile = () => {
                 </div>
               </div>
 
+              {hasProfileChanges && (
+                <div tw="sticky bottom-3 z-10 -mx-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[rgb(var(--color-accent-border))] bg-[rgb(var(--color-surface))]/95 px-3 py-3 shadow-[0_16px_42px_-28px_rgba(0,0,0,0.65)] backdrop-blur">
+                  <div tw="min-w-0 text-[12px] font-bold text-[rgb(var(--color-text))]">{t('profile.unsavedTitle')}</div>
+                  <div tw="flex shrink-0 flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={resetProfileChanges} disabled={saving || uploading}>
+                      {t('common.cancel')}
+                    </Button>
+                    <Button type="button" variant="primary" size="sm" onClick={handleSave} disabled={saving || uploading}>
+                      <CheckIcon />
+                      {saveLabel}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div tw="flex flex-wrap gap-2 pt-1">
-                <Button variant="primary" onClick={handleSave} disabled={saving || uploading}>
-                  {saving ? t('common.saving') : t('common.saveChanges')}
-                </Button>
                 <Button variant="danger" onClick={handleLogout}>
                   <LogoutIcon />
                   {t('profile.logout')}

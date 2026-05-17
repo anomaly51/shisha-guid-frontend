@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
@@ -9,7 +9,8 @@ import { AuthModal } from './AuthModal'
 import { LogoutIcon, PlusIcon, ShishaGuidLogo } from '../shared/ui/Icons'
 import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
-import { clearAuthSession, hasAuthToken } from '../shared/authToken'
+import { clearAuthSession } from '../shared/authToken'
+import { useHasAuthToken } from '../shared/useAuthToken'
 
 const HeaderBar = tw.header`bg-[rgb(var(--color-surface-inverse))]/95 backdrop-blur-xl border-b border-[rgb(var(--color-border))]`
 const Inner = tw.div`w-full max-w-[1160px] mx-auto px-4 h-14 flex items-center justify-between gap-3 min-w-0 sm:px-5 sm:gap-4`
@@ -44,23 +45,18 @@ const NewSetupLink = styled(Link)`
 `
 
 export const Header = () => {
-  const [hasToken, setHasToken] = useState<boolean | null>(null)
-  const { data: profile } = useGetProfileQuery(undefined, { skip: hasToken !== true })
+  const hasToken = useHasAuthToken()
+  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
   const [logout] = useLogoutMutation()
   const [authOpen, setAuthOpen] = useState(false)
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const isResolvingAuth = hasToken === null
+  const isResolvingAuth = hasToken === undefined
   const isResolvingProfile = hasToken === true && !profile
-
-  useEffect(() => {
-    setHasToken(hasAuthToken())
-  }, [])
 
   const handleLogout = async () => {
     await logout()
     clearAuthSession()
-    window.location.reload()
   }
 
   return (

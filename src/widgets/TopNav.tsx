@@ -13,8 +13,8 @@ const categories = [
 ] satisfies Array<{ path: string; labelKey: string; icon: CatalogIconName }>
 
 const NavIcon = styled(CatalogIcon)`
-  width: 18px;
-  height: 18px;
+  width: 12px;
+  height: 12px;
 
   @media (min-width: 640px) {
     width: 14px;
@@ -28,7 +28,7 @@ export const TopNav = () => {
 
   return (
     <div tw="sticky top-0 z-40 h-[var(--sticky-nav-height)] w-full overflow-hidden border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-accent-muted))]/95 backdrop-blur-lg">
-      <div tw="mx-auto flex h-full w-full max-w-[1160px] min-w-0 items-center gap-0.5 overflow-x-auto px-5">
+      <div tw="mx-auto grid h-full w-full max-w-[1160px] min-w-0 grid-cols-5 items-center gap-0.5 overflow-hidden px-2 sm:flex sm:overflow-x-auto sm:px-5">
         {categories.map((cat) => {
           const active = location.pathname === cat.path
           return (
@@ -36,14 +36,14 @@ export const TopNav = () => {
               key={cat.path}
               to={cat.path}
               css={[
-                tw`flex items-center gap-1.5 shrink-0 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-colors`,
+                tw`flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-2.5 text-[11px] font-medium transition-colors sm:shrink-0 sm:justify-start sm:gap-1.5 sm:px-3 sm:text-[13px]`,
                 active
                   ? tw`text-[rgb(var(--color-text))] bg-[rgb(var(--color-surface-subtle))]`
                   : tw`text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-accent-muted))]`,
               ]}
             >
               <NavIcon name={cat.icon} size={14} />
-              <span tw="hidden sm:inline">{t(cat.labelKey)}</span>
+              <span tw="min-w-0 truncate">{t(cat.labelKey)}</span>
             </Link>
           )
         })}

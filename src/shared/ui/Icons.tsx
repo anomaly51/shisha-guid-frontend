@@ -185,6 +185,12 @@ export const AlertIcon = ({ size = 22, ...props }: IconProps) => (
   </svg>
 )
 
+export const CheckIcon = ({ size = 14, ...props }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="m2.5 7.2 3 3 6-6.4" />
+  </svg>
+)
+
 export const CloseIcon = ({ size = 12, ...props }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true" {...props}>
     <path d="M1 1 13 13M13 1 1 13" />
