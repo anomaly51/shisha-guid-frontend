@@ -2,7 +2,6 @@ import tw from 'twin.macro'
 import type { UserBadge } from '../api'
 import { RoleBadge, shouldShowRoleBadge } from './RoleBadge'
 import { UserBadges } from './UserBadges'
-import { SafeImage } from './SafeImage'
 
 export interface PublicCreator {
   id?: string
@@ -34,7 +33,7 @@ export const AuthorChip = ({ author, compact = false }: { author?: PublicCreator
         ]}
       >
         {author?.avatar_url ? (
-          <SafeImage src={author.avatar_url} alt="" tw="h-full w-full object-cover" fallback={getInitial(name)} />
+          <img src={author.avatar_url} alt="" tw="h-full w-full object-cover" />
         ) : (
           getInitial(name)
         )}

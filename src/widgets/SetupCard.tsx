@@ -1,6 +1,5 @@
 import 'twin.macro'
 import { Card } from '../shared/ui/Card'
-import { SafeImage } from '../shared/ui/SafeImage'
 
 interface SetupCardProps {
   setup: any
@@ -11,7 +10,7 @@ export const SetupCard = ({ setup }: SetupCardProps) => (
     <div tw="flex flex-col">
       {setup.photo_urls?.length > 0 ? (
         <div tw="aspect-square bg-[rgb(var(--color-surface-muted))] overflow-hidden">
-          <SafeImage src={setup.photo_urls[0]} alt={setup.name} tw="object-cover w-full h-full" />
+          <img src={setup.photo_urls[0]} alt={setup.name} tw="object-cover w-full h-full" />
         </div>
       ) : (
         <div tw="aspect-square bg-[rgb(var(--color-surface-muted))]" />

@@ -2,7 +2,6 @@ import 'twin.macro'
 import styled from 'styled-components'
 import { CatalogIcon } from './Icons'
 import type { MixBowlItem } from './MixBowlPreview'
-import { SafeImage } from './SafeImage'
 
 type TobaccoPhotoStackVariant = 'feed' | 'detail'
 
@@ -80,15 +79,10 @@ export const TobaccoPhotoStack = ({
             }}
           >
             {item.photo_url ? (
-              <SafeImage
+              <img
                 src={item.photo_url}
                 alt={item.name}
                 tw="h-full w-full object-cover"
-                fallback={(
-                  <div tw="flex h-full w-full items-center justify-center" style={{ backgroundColor: item.color }}>
-                    <CatalogIcon name="tobacco" size={Math.max(18, size - 14)} tw="text-white/90" />
-                  </div>
-                )}
               />
             ) : (
               <div tw="flex h-full w-full items-center justify-center" style={{ backgroundColor: item.color }}>

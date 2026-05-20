@@ -25,7 +25,6 @@ import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
 import { useTheme, type ThemePreference } from '../app/theme'
 import { clearAuthSession, hasAuthToken } from '../shared/authToken'
-import { SafeImage } from '../shared/ui/SafeImage'
 
 const badgeEffectOptions: BadgeEffect[] = ['none', 'frost', 'fire', 'chemical', 'electric', 'cosmic', 'shimmer']
 
@@ -368,7 +367,7 @@ export const Profile = () => {
           <div tw="p-4 sm:flex sm:items-start sm:gap-4 sm:p-5 lg:block">
             <div tw="mx-auto aspect-square w-[min(100%,180px)] overflow-hidden rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-inverse))] shadow-[0_18px_42px_-30px_rgba(0,0,0,0.65)] flex items-center justify-center text-4xl font-semibold text-white sm:mx-0 sm:w-32 sm:text-5xl md:w-36 lg:w-full lg:text-6xl">
               {avatarUrl ? (
-                <SafeImage src={avatarUrl} alt="" tw="w-full h-full object-cover" fallback={initials} />
+                <img src={avatarUrl} alt="" tw="w-full h-full object-cover" />
               ) : (
                 initials
               )}
