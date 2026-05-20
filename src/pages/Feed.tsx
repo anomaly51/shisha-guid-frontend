@@ -13,6 +13,7 @@ import { AuthorChip } from '../shared/ui/AuthorChip'
 import { getSetupHeaviness } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { getSetupAggregateRating } from '../shared/tobaccoRatings'
+import { SafeImage } from '../shared/ui/SafeImage'
 
 type SortValue = 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' | 'name'
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
@@ -525,7 +526,16 @@ export const Feed = () => {
                   >
                     <div tw="relative aspect-square overflow-hidden bg-[rgb(var(--color-surface-muted))]">
                       {photo ? (
-                        <img src={photo} alt={tobacco.name} tw="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
+                        <SafeImage
+                          src={photo}
+                          alt={tobacco.name}
+                          tw="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                          fallback={(
+                            <div tw="flex h-full w-full items-center justify-center text-[rgb(var(--color-text-subtle))]">
+                              <CatalogIcon name="tobacco" size={28} />
+                            </div>
+                          )}
+                        />
                       ) : (
                         <div tw="flex h-full w-full items-center justify-center text-[rgb(var(--color-text-subtle))]">
                           <CatalogIcon name="tobacco" size={28} />

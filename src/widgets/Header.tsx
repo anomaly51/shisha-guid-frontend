@@ -11,6 +11,7 @@ import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
 import { clearAuthSession } from '../shared/authToken'
 import { useHasAuthToken } from '../shared/useAuthToken'
+import { SafeImage } from '../shared/ui/SafeImage'
 
 const HeaderBar = tw.header`bg-[rgb(var(--color-surface-inverse))]/95 backdrop-blur-xl border-b border-[rgb(var(--color-border))]`
 const Inner = tw.div`w-full max-w-[1160px] mx-auto px-4 h-14 flex items-center justify-between gap-3 min-w-0 sm:px-5 sm:gap-4`
@@ -86,7 +87,12 @@ export const Header = () => {
                 >
                   <span tw="w-7 h-7 bg-[rgb(var(--color-surface-subtle))] rounded-xl flex items-center justify-center text-[rgb(var(--color-accent-soft))] text-xs font-semibold">
                     {profile.avatar_url ? (
-                      <img src={profile.avatar_url} alt="" tw="w-full h-full object-cover rounded-xl" />
+                      <SafeImage
+                        src={profile.avatar_url}
+                        alt=""
+                        tw="w-full h-full object-cover rounded-xl"
+                        fallback={(profile.nickname || profile.email)[0].toUpperCase()}
+                      />
                     ) : (
                       (profile.nickname || profile.email)[0].toUpperCase()
                     )}

@@ -12,6 +12,7 @@ import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { hasAuthToken } from '../shared/authToken'
 import { getTobaccoRatingMap } from '../shared/tobaccoRatings'
+import { SafeImage } from '../shared/ui/SafeImage'
 
 type CatalogItemKind = 'default' | 'bowl' | 'tobacco' | 'coal' | 'kaloud' | 'placement' | 'setupType'
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
@@ -57,6 +58,15 @@ const iconByKind: Record<CatalogItemKind, CatalogIconName> = {
   placement: 'placement',
   setupType: 'setupType',
 }
+
+const CatalogImageFallback = ({ itemKind }: { itemKind: CatalogItemKind }) => (
+  <div tw="flex h-full w-full items-center justify-center">
+    <div tw="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(255,255,255,0.82),transparent_40%),linear-gradient(180deg,rgba(255,248,241,0.72),rgba(229,218,207,0.42))]" />
+    <div tw="relative flex h-16 w-16 items-center justify-center rounded-xl border border-white/70 bg-[rgb(var(--color-surface))]/70 text-[rgb(var(--color-accent))] shadow-[0_18px_42px_-28px_rgba(83,48,31,0.7)]">
+      <CatalogIcon name={iconByKind[itemKind]} size={34} />
+    </div>
+  </div>
+)
 
 const pickFirst = (item: any, keys: string[]) => {
   const key = keys.find((entry) => item?.[entry] !== undefined && item?.[entry] !== null && item?.[entry] !== '')
@@ -137,7 +147,7 @@ export const Catalog = ({
   } : undefined
   const { data, isLoading } = listHook(tobaccoQueryParams)
   const { data: setupsForRatings } = useGetSetupsQuery(
-    itemKind === 'tobacco' ? { limit: 1000, sort: 'rating' } : undefined,
+    itemKind === 'tobacco' ? { limit: 50, sort: 'rating' } : undefined,
     { skip: itemKind !== 'tobacco' },
   )
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
@@ -304,14 +314,14 @@ export const Catalog = ({
                     <div tw="flex h-full flex-col bg-[rgb(var(--color-surface))]">
                       <div tw="relative aspect-square overflow-hidden border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))]">
                         {item.photo_urls?.length > 0 ? (
-                          <img src={item.photo_urls[0]} alt={item.name} tw="h-full w-full object-cover transition-transform duration-200" />
+                          <SafeImage
+                            src={item.photo_urls[0]}
+                            alt={item.name}
+                            tw="h-full w-full object-cover transition-transform duration-200"
+                            fallback={<CatalogImageFallback itemKind={itemKind} />}
+                          />
                         ) : (
-                          <div tw="flex h-full w-full items-center justify-center">
-                            <div tw="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(255,255,255,0.82),transparent_40%),linear-gradient(180deg,rgba(255,248,241,0.72),rgba(229,218,207,0.42))]" />
-                            <div tw="relative flex h-16 w-16 items-center justify-center rounded-xl border border-white/70 bg-[rgb(var(--color-surface))]/70 text-[rgb(var(--color-accent))] shadow-[0_18px_42px_-28px_rgba(83,48,31,0.7)]">
-                              <CatalogIcon name={iconByKind[itemKind]} size={34} />
-                            </div>
-                          </div>
+                          <CatalogImageFallback itemKind={itemKind} />
                         )}
                         <div tw="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(23,19,18,0.03)_35%,rgba(23,19,18,0.34))]" />
                         <div tw="pointer-events-none absolute left-2.5 top-2.5 flex max-w-[calc(100%-1.25rem)] items-center gap-1.5 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur">
