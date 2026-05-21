@@ -8,7 +8,6 @@ import { Card } from '../shared/ui/Card'
 import { Input, Textarea } from '../shared/ui/Input'
 import { Button } from '../shared/ui/Button'
 import {
-  type AgentSetupDraft,
   useGetBowlsQuery, useGetTobaccosQuery, useGetCoalsQuery, useGetKaloudsQuery,
   useGetCoalPlacementsQuery, useGetBowlSetupTypesQuery,
   useCreateSetupMutation, useUpdateSetupMutation, useGetProfileQuery,
@@ -19,7 +18,6 @@ import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { BowlPreviewFallback, detectBowlModel, useIsomorphicLayoutEffect, type BowlModel } from '../shared/ui/MixBowlPreview'
 import { calculateSetupCost, formatMoney } from '../shared/setupCost'
 import { hasAuthToken } from '../shared/authToken'
-import { SetupAgentWidget } from '../widgets/SetupAgentWidget'
 
 const Label = tw.label`text-[10px] font-semibold text-[rgb(var(--color-text-muted))] uppercase tracking-wide`
 const Muted = tw.span`text-[11px] font-medium text-[rgb(var(--color-text-subtle))]`
@@ -99,10 +97,6 @@ const MIX_COLORS = ['#9F1D24', '#1F1716', '#B96A18', '#5F2D22', '#7A171E', '#3E2
 
 const getName = (items: any[] | undefined, id: string) => (
   items?.find((item) => item.id === id)?.name || ''
-)
-
-const getItem = (items: any[] | undefined, id: string) => (
-  items?.find((item) => item.id === id)
 )
 
 const normalizeName = (value: string) => value.toLowerCase().replace(/\s+/g, '')
@@ -246,20 +240,6 @@ const equalized = (items: TobaccoMixRow[]) => {
     ...item,
     percentage: base + (index === 0 ? remainder : 0),
   }))
-}
-
-const normalizedMix = (items: TobaccoMixRow[]) => {
-  if (!items.length) return items
-  const total = items.reduce((sum, item) => sum + Number(item.percentage || 0), 0)
-  if (total <= 0) return equalized(items)
-
-  const next = items.map((item) => ({
-    ...item,
-    percentage: Math.max(1, Math.round(Number(item.percentage || 0) / total * 100)),
-  }))
-  const diff = 100 - next.reduce((sum, item) => sum + item.percentage, 0)
-  next[0] = { ...next[0], percentage: Math.max(1, next[0].percentage + diff) }
-  return next
 }
 
 const BowlScene = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: SetupKind; items: MixPreviewItem[] }) => {
@@ -803,28 +783,6 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const activeEquipment = equipmentItems[activeEquipmentIndex] || equipmentItems[0]
   const selectedEquipmentCount = equipmentItems.filter((item) => item.value).length
   const nextMissingEquipment = equipmentItems.find((item) => !item.value)?.label
-  const formDraft = useMemo<AgentSetupDraft>(() => ({
-    name: name || null,
-    description: description || null,
-    bowl_id: bowlId || null,
-    bowl_name: getName(bowls, bowlId) || null,
-    kaloud_id: kaloudId || null,
-    kaloud_name: getName(kalouds, kaloudId) || null,
-    coal_id: coalId || null,
-    coal_name: getName(coals, coalId) || null,
-    coal_placement_id: placementId || null,
-    coal_placement_name: getName(placements, placementId) || null,
-    bowl_setup_type_id: typeId || null,
-    bowl_setup_type_name: getName(types, typeId) || null,
-    tobaccos: tobaccoMix
-      .filter((item) => item.tobacco_id)
-      .map((item) => ({
-        tobacco_id: item.tobacco_id,
-        tobacco_name: getName(tobaccos, item.tobacco_id) || null,
-        percentage: Number(item.percentage || 0),
-      })),
-  }), [bowlId, bowls, coalId, coals, description, kaloudId, kalouds, name, placementId, placements, tobaccoMix, tobaccos, typeId, types])
-
   useEffect(() => {
     if (!nameEdited) {
       setName(generatedName)
@@ -839,36 +797,6 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
     if (!placementId && placements?.[0]?.id) setPlacementId(placements[0].id)
     if (!typeId && types?.[0]?.id) setTypeId(types[0].id)
   }, [bowlId, bowls, coalId, coals, isEdit, kaloudId, kalouds, placementId, placements, typeId, types])
-
-  const applyAgentDraft = (draft: AgentSetupDraft) => {
-    if (draft.name) {
-      setName(draft.name)
-      setNameEdited(true)
-    }
-    if (typeof draft.description === 'string') {
-      setDescription(draft.description)
-    }
-    if (draft.bowl_id && getItem(bowls, draft.bowl_id)) setBowlId(draft.bowl_id)
-    if (draft.kaloud_id && getItem(kalouds, draft.kaloud_id)) setKaloudId(draft.kaloud_id)
-    if (draft.coal_id && getItem(coals, draft.coal_id)) setCoalId(draft.coal_id)
-    if (draft.coal_placement_id && getItem(placements, draft.coal_placement_id)) setPlacementId(draft.coal_placement_id)
-    if (draft.bowl_setup_type_id && getItem(types, draft.bowl_setup_type_id)) setTypeId(draft.bowl_setup_type_id)
-
-    const nextMix = (draft.tobaccos || [])
-      .filter((item) => item.tobacco_id && getItem(tobaccos, item.tobacco_id))
-      .map((item, index) => ({
-        tobacco_id: item.tobacco_id as string,
-        percentage: item.percentage || 1,
-        color: MIX_COLORS[index % MIX_COLORS.length],
-      }))
-
-    if (nextMix.length) {
-      setTobaccoMix(normalizedMix(nextMix))
-      setStep(draft.name ? 2 : 1)
-    } else {
-      setStep(0)
-    }
-  }
 
   const toggleTobacco = (tobaccoId: string) => {
     setTobaccoMix((items) => {
@@ -1011,7 +939,6 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
         {t('common.back')}
       </button>
 
-      <div tw="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
       <form onSubmit={(event) => event.preventDefault()} tw="min-w-0">
         <Card>
           <div tw="flex flex-col gap-4 p-4 sm:p-5">
@@ -1404,16 +1331,6 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
           </div>
         </Card>
       </form>
-      {!isEdit && (
-        <aside tw="min-w-0 xl:sticky xl:top-[calc(var(--sticky-filter-top)+0.75rem)]">
-          <SetupAgentWidget
-            initialDraft={formDraft}
-            mode="embedded"
-            onDraftChange={applyAgentDraft}
-          />
-        </aside>
-      )}
-      </div>
     </div>
   )
 }

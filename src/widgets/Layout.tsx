@@ -1,9 +1,8 @@
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import styled from 'styled-components'
 import 'twin.macro'
 import { Header } from './Header'
 import { TopNav } from './TopNav'
-import { SetupAgentWidget } from './SetupAgentWidget'
 
 const Main = styled.main`
   animation: fadeIn 0.3s ease-out;
@@ -14,9 +13,6 @@ const Main = styled.main`
 `
 
 export const Layout = () => {
-  const location = useLocation()
-  const hideFloatingAgent = location.pathname === '/setups/create'
-
   return (
     <div tw="min-h-screen w-full flex flex-col" style={{ overflowX: 'clip' }}>
       <Header />
@@ -28,7 +24,6 @@ export const Layout = () => {
           </Main>
         </div>
       </div>
-      {!hideFloatingAgent && <SetupAgentWidget />}
     </div>
   )
 }

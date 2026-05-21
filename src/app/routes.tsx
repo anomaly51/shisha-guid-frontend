@@ -7,10 +7,10 @@ import { Catalog } from '../pages/Catalog'
 import { Detail } from '../pages/Detail'
 import { CreateItem } from '../pages/CreateItem'
 import { EditItem } from '../pages/EditItem'
-import { SetupForm } from '../pages/SetupForm'
 import { SetupDetail } from '../pages/SetupDetail'
 import { EditSetup } from '../pages/EditSetup'
 import { Profile } from '../pages/Profile'
+import { AgentChat } from '../pages/AgentChat'
 import { PageTitle } from './PageTitle'
 import {
   useGetBowlsQuery, useCreateBowlMutation, useGetBowlQuery, useUpdateBowlMutation, useDeleteBowlMutation,
@@ -133,9 +133,10 @@ export const AppRoutes = () => {
         </AdminOnly>
       } />
 
-      <Route path="setups/create" element={<SetupForm />} />
+      <Route path="setups/create" element={<AgentChat />} />
       <Route path="setups/:id" element={<SetupDetail />} />
       <Route path="setups/:id/edit" element={<EditSetup />} />
+      <Route path="ai-chat" element={<AgentChat />} />
 
       <Route path="profile" element={<Profile />} />
       </Route>

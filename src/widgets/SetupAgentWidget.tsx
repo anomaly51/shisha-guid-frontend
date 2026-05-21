@@ -6,9 +6,15 @@ import {
   type AgentMessage,
   type AgentSetupDraft,
   useChatWithSetupAgentMutation,
+  useGetBowlSetupTypesQuery,
+  useGetBowlsQuery,
+  useGetCoalPlacementsQuery,
+  useGetCoalsQuery,
+  useGetKaloudsQuery,
+  useGetTobaccosQuery,
   useTranscribeSetupVoiceMutation,
 } from '../shared/api'
-import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, PlusIcon, SendIcon } from '../shared/ui/Icons'
+import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, SendIcon, type CatalogIconName } from '../shared/ui/Icons'
 import {
   MIX_COLORS,
   MixBowlPreview,
@@ -17,23 +23,22 @@ import {
   type MixBowlItem,
 } from '../shared/ui/MixBowlPreview'
 
-const Shell = styled.div`
-  ${tw`fixed z-50 flex flex-col items-end gap-3`}
-  right: max(1rem, env(safe-area-inset-right));
-  bottom: max(1rem, env(safe-area-inset-bottom));
-`
-
-const ChatPanel = styled.section<{ $embedded?: boolean; $expanded?: boolean }>`
+const ChatPanel = styled.section<{ $expanded?: boolean }>`
   ${tw`flex overflow-hidden border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-2xl`}
   border-radius: 8px;
   box-shadow: 0 26px 58px -34px rgba(83, 48, 31, 0.75), 0 10px 28px -20px rgba(0, 0, 0, 0.32);
-  max-height: ${({ $embedded, $expanded }) => ($expanded ? 'calc(100vh - 2rem)' : $embedded ? 'calc(100vh - 7.5rem)' : 'min(44rem, calc(100vh - 6rem))')};
-  min-height: ${({ $embedded, $expanded }) => ($expanded ? 'min(44rem, calc(100vh - 2rem))' : $embedded ? '36rem' : 'auto')};
+  height: ${({ $expanded }) => ($expanded ? 'calc(100vh - 2rem)' : 'min(760px, calc(100vh - 12rem))')};
+  min-height: ${({ $expanded }) => ($expanded ? 'min(44rem, calc(100vh - 2rem))' : '560px')};
   position: ${({ $expanded }) => ($expanded ? 'fixed' : 'relative')};
   right: ${({ $expanded }) => ($expanded ? '1rem' : 'auto')};
   bottom: ${({ $expanded }) => ($expanded ? '1rem' : 'auto')};
-  width: ${({ $embedded, $expanded }) => ($expanded ? 'min(68rem, calc(100vw - 2rem))' : $embedded ? '100%' : 'min(calc(100vw - 1.25rem), 30rem)')};
+  width: ${({ $expanded }) => ($expanded ? 'min(72rem, calc(100vw - 2rem))' : '100%')};
   z-index: ${({ $expanded }) => ($expanded ? 60 : 'auto')};
+
+  @media (max-width: 640px) {
+    height: ${({ $expanded }) => ($expanded ? 'calc(100vh - 2rem)' : 'calc(100vh - 10rem)')};
+    min-height: 520px;
+  }
 `
 
 const Header = tw.div`flex items-start justify-between gap-3 border-b border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-4 py-3`
@@ -41,11 +46,10 @@ const Title = tw.h2`text-[15px] font-black leading-snug text-[rgb(var(--color-te
 const Subtitle = tw.div`mt-0.5 text-[11px] font-semibold text-[rgb(var(--color-text-subtle))]`
 const PanelBody = tw.div`flex min-h-0 flex-1 flex-col`
 const ScrollArea = tw.div`min-h-0 flex-1 overflow-y-auto`
-const Messages = tw.div`flex min-h-[12rem] flex-col gap-2 px-4 py-3`
+const Messages = tw.div`flex min-h-full flex-col justify-end gap-2 px-4 py-3`
 const Composer = tw.form`flex items-end gap-2 border-t border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-3`
 const Textarea = tw.textarea`min-h-[2.75rem] max-h-28 flex-1 resize-none rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-3 py-2 text-[13px] font-semibold leading-5 text-[rgb(var(--color-text))] outline-none transition placeholder:text-[rgb(var(--color-text-subtle))] focus:border-[rgb(var(--color-accent))] focus:shadow-[0_0_0_2px_rgba(139,74,43,0.1)] disabled:opacity-60`
 const IconButton = tw.button`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] hover:text-[rgb(var(--color-accent))]`
-const PlusButton = tw.button`inline-flex h-14 w-14 items-center justify-center rounded-full bg-[rgb(var(--color-surface-inverse))] text-[rgb(var(--color-text-inverse))] shadow-xl transition hover:bg-[rgb(var(--color-accent-hover))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(139,74,43,0.28)]`
 const ToolButton = tw.button`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] hover:text-[rgb(var(--color-accent))] disabled:cursor-not-allowed disabled:opacity-50`
 const SendButton = tw.button`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--color-accent))] text-[rgb(var(--color-text-inverse))] shadow-[0_14px_26px_-20px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
 
@@ -56,7 +60,13 @@ const Bubble = styled.div<{ $mine?: boolean }>`
   background: ${({ $mine }) => ($mine ? 'rgb(var(--color-surface-inverse))' : 'rgb(var(--color-surface-muted))')};
 `
 
-const ThinkingBox = tw.div`w-full rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] p-3`
+const ThinkingBox = tw.div`max-w-[92%] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] p-3`
+const GuidanceShell = tw.div`mx-3 mb-3 rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-raised))] p-3`
+const GuidanceGrid = tw.div`mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2`
+const GuidanceCard = tw.div`min-w-0 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-2`
+const GuidanceTitle = tw.div`flex items-center gap-2 text-[12px] font-black text-[rgb(var(--color-text))]`
+const GuidanceHint = tw.div`mt-1 text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
+const OptionStrip = tw.div`mt-2 flex min-w-0 gap-1.5 overflow-hidden`
 const DraftShell = tw.div`mx-3 mb-3 overflow-hidden rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-[var(--shadow-card)]`
 const DraftHeader = tw.div`flex items-start justify-between gap-3 border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-raised))] px-3 py-3`
 const DraftTitle = tw.div`min-w-0`
@@ -72,19 +82,16 @@ const DetailValue = tw.div`truncate text-[12px] font-black text-[rgb(var(--color
 const PublishButton = tw.button`inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-accent))] px-4 text-[13px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_16px_28px_-22px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
 const MissingText = tw.div`text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
 
-export type SetupAgentWidgetMode = 'floating' | 'embedded'
-
 type SetupAgentWidgetProps = {
   initialDraft?: AgentSetupDraft | null
-  mode?: SetupAgentWidgetMode
   onDraftChange?: (draft: AgentSetupDraft) => void
 }
 
 const chatStages = [
-  'Разбираю описание',
-  'Сверяю табаки с каталогом',
-  'Проверяю чашу, калауд и угли',
-  'Обновляю черновик',
+  'Читаю, какую забивку ты хочешь получить',
+  'Раскладываю запрос на табаки, оборудование и тип укладки',
+  'Сверяю найденное с каталогом',
+  'Обновляю черновик и отмечаю, чего ещё не хватает',
 ]
 
 const voiceStages = [
@@ -104,7 +111,7 @@ const publishStages = [
 const initialMessages: AgentMessage[] = [
   {
     role: 'assistant',
-    content: 'Напиши или надиктуй забивку. Я соберу подробный черновик, а публикация будет только по кнопке.',
+    content: 'Опиши забивку обычными словами: вкус, табаки, проценты, чашу, калауд, угли и как хочешь уложить микс. Я соберу черновик и покажу, что ещё нужно уточнить.',
   },
 ]
 
@@ -124,6 +131,138 @@ const getMissingFields = (draft: AgentSetupDraft | null) => {
   ].filter(Boolean) as string[]
 }
 
+type GuidanceOption = {
+  id: string
+  name: string
+  icon: CatalogIconName
+  photo?: string
+}
+
+const toGuidanceOptions = (items: any[] | undefined, icon: CatalogIconName): GuidanceOption[] => (
+  (items || []).slice(0, 3).map((item, index) => ({
+    id: item.id || `${icon}-${index}`,
+    name: item.name || 'Без названия',
+    icon,
+    photo: item.photo_urls?.[0],
+  }))
+)
+
+const MissingGuidance = ({ missing }: { missing: string[] }) => {
+  const { data: bowls } = useGetBowlsQuery()
+  const { data: tobaccos } = useGetTobaccosQuery()
+  const { data: coals } = useGetCoalsQuery()
+  const { data: kalouds } = useGetKaloudsQuery()
+  const { data: placements } = useGetCoalPlacementsQuery()
+  const { data: types } = useGetBowlSetupTypesQuery()
+
+  const cards = [
+    {
+      key: 'название',
+      label: 'Название',
+      icon: 'setupType' as const,
+      hint: 'Напиши, как потом найти эту забивку в ленте.',
+      options: [
+        { id: 'name-1', name: 'Ягодный вечер', icon: 'setupType' as const },
+        { id: 'name-2', name: 'Кисло-сладкий микс', icon: 'setupType' as const },
+        { id: 'name-3', name: 'Лёгкая цитрус-мята', icon: 'setupType' as const },
+      ],
+    },
+    {
+      key: 'табак',
+      label: 'Табаки и проценты',
+      icon: 'tobacco' as const,
+      hint: 'Укажи бренды, вкусы и доли, чтобы сумма микса была 100%.',
+      options: toGuidanceOptions(tobaccos, 'tobacco'),
+    },
+    {
+      key: 'чаша',
+      label: 'Чаша',
+      icon: 'bowl' as const,
+      hint: 'Нужна конкретная чаша: она влияет на вместимость и геометрию.',
+      options: toGuidanceOptions(bowls, 'bowl'),
+    },
+    {
+      key: 'калауд',
+      label: 'Калауд',
+      icon: 'kaloud' as const,
+      hint: 'Укажи heat-management, чтобы агент понял режим жара.',
+      options: toGuidanceOptions(kalouds, 'kaloud'),
+    },
+    {
+      key: 'уголь',
+      label: 'Уголь',
+      icon: 'coal' as const,
+      hint: 'Нужен тип угля: размер и жар меняют сценарий прогрева.',
+      options: toGuidanceOptions(coals, 'coal'),
+    },
+    {
+      key: 'раскладка углей',
+      label: 'Раскладка углей',
+      icon: 'placement' as const,
+      hint: 'Опиши количество, позицию и ротацию углей.',
+      options: toGuidanceOptions(placements, 'placement'),
+    },
+    {
+      key: 'тип забивки',
+      label: 'Тип забивки',
+      icon: 'setupType' as const,
+      hint: 'Нужен формат укладки: сектора, слои или компот.',
+      options: toGuidanceOptions(types, 'setupType'),
+    },
+  ].filter((card) => missing.includes(card.key))
+
+  if (!cards.length) return null
+
+  return (
+    <GuidanceShell>
+      <div tw="flex items-start justify-between gap-3">
+        <div tw="min-w-0">
+          <div tw="text-[12px] font-black text-[rgb(var(--color-text))]">Что ещё уточнить</div>
+          <div tw="mt-0.5 text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]">
+            Можно написать одним сообщением. Картинки ниже подсказывают, какие варианты есть в каталоге.
+          </div>
+        </div>
+        <span tw="shrink-0 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]">
+          {cards.length}
+        </span>
+      </div>
+
+      <GuidanceGrid>
+        {cards.map((card) => (
+          <GuidanceCard key={card.key}>
+            <GuidanceTitle>
+              <span tw="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[rgb(var(--color-accent-muted))] text-[rgb(var(--color-accent))]">
+                <CatalogIcon name={card.icon} size={15} />
+              </span>
+              <span tw="min-w-0 truncate">{card.label}</span>
+            </GuidanceTitle>
+            <GuidanceHint>{card.hint}</GuidanceHint>
+            <OptionStrip>
+              {card.options.map((option) => (
+                <span
+                  key={option.id}
+                  tw="grid min-w-0 flex-1 grid-cols-[34px_minmax(0,1fr)] items-center gap-1.5 rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-1"
+                >
+                  <span tw="flex h-[34px] w-[34px] items-center justify-center overflow-hidden rounded bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-subtle))]">
+                    {option.photo ? (
+                      <img src={option.photo} alt="" tw="h-full w-full object-cover" />
+                    ) : (
+                      <CatalogIcon name={option.icon} size={16} />
+                    )}
+                  </span>
+                  <span tw="min-w-0 truncate text-[10px] font-bold leading-tight text-[rgb(var(--color-text-muted))]">
+                    {option.name}
+                  </span>
+                </span>
+              ))}
+            </OptionStrip>
+          </GuidanceCard>
+        ))}
+      </GuidanceGrid>
+    </GuidanceShell>
+  )
+}
+
 const buildPreviewItems = (draft: AgentSetupDraft | null): MixBowlItem[] => (
   draft?.tobaccos?.map((item, index) => ({
     id: item.tobacco_id || `${item.tobacco_name || 'tobacco'}-${index}`,
@@ -136,7 +275,7 @@ const buildPreviewItems = (draft: AgentSetupDraft | null): MixBowlItem[] => (
 const ThinkingMessage = ({ currentIndex, stages }: { currentIndex: number; stages: string[] }) => (
   <ThinkingBox>
     <div tw="mb-2 flex items-center justify-between gap-3">
-      <div tw="text-[12px] font-black text-[rgb(var(--color-text))]">Агент работает</div>
+      <div tw="text-[12px] font-black text-[rgb(var(--color-text))]">ИИ думает по шагам</div>
       <div tw="text-[11px] font-bold text-[rgb(var(--color-text-subtle))] tabular-nums">
         {Math.min(currentIndex + 1, stages.length)}/{stages.length}
       </div>
@@ -282,9 +421,8 @@ const DraftPreview = ({
   )
 }
 
-export const SetupAgentWidget = ({ initialDraft = null, mode = 'floating', onDraftChange }: SetupAgentWidgetProps) => {
+export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAgentWidgetProps) => {
   const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<AgentMessage[]>(initialMessages)
@@ -294,19 +432,27 @@ export const SetupAgentWidget = ({ initialDraft = null, mode = 'floating', onDra
   const [stageIndex, setStageIndex] = useState(0)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
+  const scrollRef = useRef<HTMLDivElement | null>(null)
   const [chatWithAgent, chatState] = useChatWithSetupAgentMutation()
   const [transcribeVoice, transcribeState] = useTranscribeSetupVoiceMutation()
   const missing = useMemo(() => getMissingFields(draft), [draft])
 
   const busy = chatState.isLoading || transcribeState.isLoading
   const stages = transcribeState.isLoading ? voiceStages : publishing ? publishStages : chatStages
-  const embedded = mode === 'embedded'
   const draftKey = JSON.stringify(initialDraft || null)
 
   useEffect(() => {
     if (!initialDraft) return
     setDraft(initialDraft)
   }, [draftKey, initialDraft])
+
+  useEffect(() => {
+    const node = scrollRef.current
+    if (!node) return
+    requestAnimationFrame(() => {
+      node.scrollTop = node.scrollHeight
+    })
+  }, [messages, busy, draft, missing.length])
 
   useEffect(() => {
     if (!busy) {
@@ -417,26 +563,21 @@ export const SetupAgentWidget = ({ initialDraft = null, mode = 'floating', onDra
   }
 
   const panel = (
-    <ChatPanel $embedded={embedded} $expanded={expanded} aria-label="Setup agent chat">
+    <ChatPanel $expanded={expanded} aria-label="AI setup chat">
       <PanelBody>
         <Header>
           <div tw="min-w-0">
-            <Title>Новая забивка</Title>
-            <Subtitle>{recording ? 'Идет запись голоса' : embedded ? 'Агент заполняет форму справа по твоему описанию' : 'Чат собирает черновик перед публикацией'}</Subtitle>
+            <Title>AI чат по забивке</Title>
+            <Subtitle>{recording ? 'Идет запись голоса' : 'Опиши идею, а агент соберет черновик и покажет недостающие детали'}</Subtitle>
           </div>
           <div tw="flex shrink-0 items-center gap-1.5">
             <IconButton type="button" onClick={() => setExpanded((value) => !value)} aria-label="Expand setup agent">
               <ExpandIcon />
             </IconButton>
-            {!embedded && (
-              <IconButton type="button" onClick={() => setOpen(false)} aria-label="Close setup agent">
-                <CloseIcon />
-              </IconButton>
-            )}
           </div>
         </Header>
 
-        <ScrollArea>
+        <ScrollArea ref={scrollRef}>
           <Messages>
             {messages.map((message, index) => (
               <Bubble key={`${message.role}-${index}`} $mine={message.role === 'user'}>
@@ -446,11 +587,13 @@ export const SetupAgentWidget = ({ initialDraft = null, mode = 'floating', onDra
             {busy && <ThinkingMessage currentIndex={stageIndex} stages={stages} />}
           </Messages>
 
+          <MissingGuidance missing={missing} />
+
           {draft && (
             <DraftPreview
               draft={draft}
               missing={missing}
-              onPublish={embedded ? undefined : publishDraft}
+              onPublish={publishDraft}
               publishing={publishing}
             />
           )}
@@ -463,7 +606,7 @@ export const SetupAgentWidget = ({ initialDraft = null, mode = 'floating', onDra
           <Textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="Напиши табаки, проценты, чашу, уголь..."
+            placeholder="Например: хочу свежую ягодную забивку, 2-3 табака, легко по крепости..."
             disabled={chatState.isLoading}
           />
           <SendButton type="submit" disabled={!input.trim() || busy} aria-label="Send setup details">
@@ -474,15 +617,5 @@ export const SetupAgentWidget = ({ initialDraft = null, mode = 'floating', onDra
     </ChatPanel>
   )
 
-  if (embedded) return panel
-
-  return (
-    <Shell>
-      {open && panel}
-
-      <PlusButton type="button" onClick={() => setOpen((value) => !value)} aria-label="Add setup with agent">
-        <PlusIcon size={22} />
-      </PlusButton>
-    </Shell>
-  )
+  return panel
 }

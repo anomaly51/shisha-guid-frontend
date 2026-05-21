@@ -10,6 +10,7 @@ const categories = [
   { path: '/tobaccos', labelKey: 'nav.tobaccos', icon: 'tobacco' },
   { path: '/coals', labelKey: 'nav.coals', icon: 'coal' },
   { path: '/kalouds', labelKey: 'nav.kalouds', icon: 'kaloud' },
+  { path: '/ai-chat', labelKey: 'nav.aiChat', icon: 'setupType' },
 ] satisfies Array<{ path: string; labelKey: string; icon: CatalogIconName }>
 
 const NavIcon = styled(CatalogIcon)`
@@ -28,7 +29,7 @@ export const TopNav = () => {
 
   return (
     <div tw="sticky top-0 z-40 h-[var(--sticky-nav-height)] w-full overflow-hidden border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-accent-muted))]/95 backdrop-blur-lg">
-      <div tw="mx-auto grid h-full w-full max-w-[1160px] min-w-0 grid-cols-5 items-center gap-0.5 overflow-hidden px-2 sm:flex sm:overflow-x-auto sm:px-5">
+      <div tw="mx-auto grid h-full w-full max-w-[1160px] min-w-0 grid-cols-6 items-center gap-0.5 overflow-hidden px-2 sm:flex sm:overflow-x-auto sm:px-5">
         {categories.map((cat) => {
           const active = location.pathname === cat.path
           return (
