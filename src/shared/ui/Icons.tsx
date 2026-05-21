@@ -191,6 +191,21 @@ export const CheckIcon = ({ size = 14, ...props }: IconProps) => (
   </svg>
 )
 
+export const SendIcon = ({ size = 14, ...props }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M12 2 6.8 12 5.3 7.3 2 5.5 12 2Z" />
+    <path d="M5.4 7.2 8 5.5" />
+  </svg>
+)
+
+export const MicIcon = ({ size = 14, ...props }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <rect x="5" y="1.8" width="4" height="6.6" rx="2" />
+    <path d="M2.8 6.6a4.2 4.2 0 0 0 8.4 0" />
+    <path d="M7 10.8v1.4M5 12.2h4" />
+  </svg>
+)
+
 export const CloseIcon = ({ size = 12, ...props }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true" {...props}>
     <path d="M1 1 13 13M13 1 1 13" />

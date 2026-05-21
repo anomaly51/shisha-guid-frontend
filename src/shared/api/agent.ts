@@ -36,7 +36,7 @@ export type AgentChatResponse = {
 
 const agentApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    chatWithSetupAgent: builder.mutation<AgentChatResponse, { messages: AgentMessage[]; draft?: AgentSetupDraft | null }>({
+    chatWithSetupAgent: builder.mutation<AgentChatResponse, { messages: AgentMessage[]; draft?: AgentSetupDraft | null; publish?: boolean }>({
       query: (body) => ({ url: '/agent/chat', method: 'POST', body }),
       invalidatesTags: (_result) => ['Setups'],
     }),
