@@ -16,3 +16,8 @@ export {
   useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation,
 } from './setups'
 export { useGetUploadPolicyMutation, useUploadMediaMutation } from './upload'
+export {
+  useChatWithSetupAgentMutation,
+  useTranscribeSetupVoiceMutation,
+} from './agent'
+export type { AgentMessage, AgentSetupDraft } from './agent'

@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import 'twin.macro'
 import { Header } from './Header'
 import { TopNav } from './TopNav'
+import { SetupAgentWidget } from './SetupAgentWidget'
 
 const Main = styled.main`
   animation: fadeIn 0.3s ease-out;
@@ -23,5 +24,6 @@ export const Layout = () => (
         </Main>
       </div>
     </div>
+    <SetupAgentWidget />
   </div>
 )
