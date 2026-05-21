@@ -206,6 +206,13 @@ export const MicIcon = ({ size = 14, ...props }: IconProps) => (
   </svg>
 )
 
+export const ExpandIcon = ({ size = 14, ...props }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M5.5 2.5h-3v3M2.5 2.5 6 6" />
+    <path d="M8.5 11.5h3v-3M11.5 11.5 8 8" />
+  </svg>
+)
+
 export const CloseIcon = ({ size = 12, ...props }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true" {...props}>
     <path d="M1 1 13 13M13 1 1 13" />

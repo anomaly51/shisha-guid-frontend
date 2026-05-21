@@ -8,7 +8,7 @@ import {
   useChatWithSetupAgentMutation,
   useTranscribeSetupVoiceMutation,
 } from '../shared/api'
-import { CatalogIcon, CheckIcon, CloseIcon, MicIcon, PlusIcon, SendIcon } from '../shared/ui/Icons'
+import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, PlusIcon, SendIcon } from '../shared/ui/Icons'
 import {
   MIX_COLORS,
   MixBowlPreview,
@@ -23,10 +23,17 @@ const Shell = styled.div`
   bottom: max(1rem, env(safe-area-inset-bottom));
 `
 
-const ChatPanel = styled.section`
-  ${tw`flex max-h-[min(44rem,calc(100vh-6rem))] w-[min(calc(100vw-1.25rem),30rem)] overflow-hidden border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-2xl`}
+const ChatPanel = styled.section<{ $embedded?: boolean; $expanded?: boolean }>`
+  ${tw`flex overflow-hidden border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-2xl`}
   border-radius: 8px;
   box-shadow: 0 26px 58px -34px rgba(83, 48, 31, 0.75), 0 10px 28px -20px rgba(0, 0, 0, 0.32);
+  max-height: ${({ $embedded, $expanded }) => ($expanded ? 'calc(100vh - 2rem)' : $embedded ? 'calc(100vh - 7.5rem)' : 'min(44rem, calc(100vh - 6rem))')};
+  min-height: ${({ $embedded, $expanded }) => ($expanded ? 'min(44rem, calc(100vh - 2rem))' : $embedded ? '36rem' : 'auto')};
+  position: ${({ $expanded }) => ($expanded ? 'fixed' : 'relative')};
+  right: ${({ $expanded }) => ($expanded ? '1rem' : 'auto')};
+  bottom: ${({ $expanded }) => ($expanded ? '1rem' : 'auto')};
+  width: ${({ $embedded, $expanded }) => ($expanded ? 'min(68rem, calc(100vw - 2rem))' : $embedded ? '100%' : 'min(calc(100vw - 1.25rem), 30rem)')};
+  z-index: ${({ $expanded }) => ($expanded ? 60 : 'auto')};
 `
 
 const Header = tw.div`flex items-start justify-between gap-3 border-b border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-4 py-3`
@@ -64,6 +71,14 @@ const DetailLabel = tw.div`mb-1 flex items-center gap-1.5 text-[10px] font-bold 
 const DetailValue = tw.div`truncate text-[12px] font-black text-[rgb(var(--color-text))]`
 const PublishButton = tw.button`inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-accent))] px-4 text-[13px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_16px_28px_-22px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
 const MissingText = tw.div`text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
+
+export type SetupAgentWidgetMode = 'floating' | 'embedded'
+
+type SetupAgentWidgetProps = {
+  initialDraft?: AgentSetupDraft | null
+  mode?: SetupAgentWidgetMode
+  onDraftChange?: (draft: AgentSetupDraft) => void
+}
 
 const chatStages = [
   'Разбираю описание',
@@ -162,7 +177,7 @@ const DraftPreview = ({
 }: {
   draft: AgentSetupDraft
   missing: string[]
-  onPublish: () => void
+  onPublish?: () => void
   publishing: boolean
 }) => {
   const items = useMemo(() => buildPreviewItems(draft), [draft])
@@ -175,7 +190,7 @@ const DraftPreview = ({
     { icon: 'bowl' as const, label: 'Чаша', value: draft.bowl_name },
     { icon: 'kaloud' as const, label: 'Калауд', value: draft.kaloud_name },
     { icon: 'coal' as const, label: 'Уголь', value: draft.coal_name },
-    { icon: 'placement' as const, label: 'Угли', value: draft.coal_placement_name },
+    { icon: 'placement' as const, label: 'Расположение углей', value: draft.coal_placement_name },
     { icon: 'setupType' as const, label: 'Тип', value: draft.bowl_setup_type_name },
   ]
 
@@ -252,21 +267,28 @@ const DraftPreview = ({
           </MissingText>
         )}
 
-        <PublishButton type="button" onClick={onPublish} disabled={!ready || publishing}>
-          <CheckIcon size={14} />
-          {publishing ? 'Публикую' : 'Опубликовать'}
-        </PublishButton>
+        {onPublish ? (
+          <PublishButton type="button" onClick={onPublish} disabled={!ready || publishing}>
+            <CheckIcon size={14} />
+            {publishing ? 'Публикую' : 'Опубликовать'}
+          </PublishButton>
+        ) : (
+          <MissingText>
+            Черновик применен к форме. Проверь выбранные поля и опубликуй забивку кнопкой формы.
+          </MissingText>
+        )}
       </DraftContent>
     </DraftShell>
   )
 }
 
-export const SetupAgentWidget = () => {
+export const SetupAgentWidget = ({ initialDraft = null, mode = 'floating', onDraftChange }: SetupAgentWidgetProps) => {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<AgentMessage[]>(initialMessages)
-  const [draft, setDraft] = useState<AgentSetupDraft | null>(null)
+  const [draft, setDraft] = useState<AgentSetupDraft | null>(initialDraft)
   const [recording, setRecording] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [stageIndex, setStageIndex] = useState(0)
@@ -278,6 +300,13 @@ export const SetupAgentWidget = () => {
 
   const busy = chatState.isLoading || transcribeState.isLoading
   const stages = transcribeState.isLoading ? voiceStages : publishing ? publishStages : chatStages
+  const embedded = mode === 'embedded'
+  const draftKey = JSON.stringify(initialDraft || null)
+
+  useEffect(() => {
+    if (!initialDraft) return
+    setDraft(initialDraft)
+  }, [draftKey, initialDraft])
 
   useEffect(() => {
     if (!busy) {
@@ -303,7 +332,9 @@ export const SetupAgentWidget = () => {
 
     try {
       const response = await chatWithAgent({ messages: nextMessages, draft }).unwrap()
-      setDraft(response.draft || null)
+      const nextDraft = response.draft || null
+      setDraft(nextDraft)
+      if (nextDraft) onDraftChange?.(nextDraft)
       setMessages(compactMessages([...nextMessages, { role: 'assistant', content: response.reply }]))
     } catch {
       setMessages(compactMessages([...nextMessages, {
@@ -385,58 +416,69 @@ export const SetupAgentWidget = () => {
     void startRecording()
   }
 
-  return (
-    <Shell>
-      {open && (
-        <ChatPanel aria-label="Setup agent chat">
-          <PanelBody>
-            <Header>
-              <div tw="min-w-0">
-                <Title>Новая забивка</Title>
-                <Subtitle>{recording ? 'Идет запись голоса' : 'Чат собирает черновик перед публикацией'}</Subtitle>
-              </div>
+  const panel = (
+    <ChatPanel $embedded={embedded} $expanded={expanded} aria-label="Setup agent chat">
+      <PanelBody>
+        <Header>
+          <div tw="min-w-0">
+            <Title>Новая забивка</Title>
+            <Subtitle>{recording ? 'Идет запись голоса' : embedded ? 'Агент заполняет форму справа по твоему описанию' : 'Чат собирает черновик перед публикацией'}</Subtitle>
+          </div>
+          <div tw="flex shrink-0 items-center gap-1.5">
+            <IconButton type="button" onClick={() => setExpanded((value) => !value)} aria-label="Expand setup agent">
+              <ExpandIcon />
+            </IconButton>
+            {!embedded && (
               <IconButton type="button" onClick={() => setOpen(false)} aria-label="Close setup agent">
                 <CloseIcon />
               </IconButton>
-            </Header>
+            )}
+          </div>
+        </Header>
 
-            <ScrollArea>
-              <Messages>
-                {messages.map((message, index) => (
-                  <Bubble key={`${message.role}-${index}`} $mine={message.role === 'user'}>
-                    {message.content}
-                  </Bubble>
-                ))}
-                {busy && <ThinkingMessage currentIndex={stageIndex} stages={stages} />}
-              </Messages>
+        <ScrollArea>
+          <Messages>
+            {messages.map((message, index) => (
+              <Bubble key={`${message.role}-${index}`} $mine={message.role === 'user'}>
+                {message.content}
+              </Bubble>
+            ))}
+            {busy && <ThinkingMessage currentIndex={stageIndex} stages={stages} />}
+          </Messages>
 
-              {draft && (
-                <DraftPreview
-                  draft={draft}
-                  missing={missing}
-                  onPublish={publishDraft}
-                  publishing={publishing}
-                />
-              )}
-            </ScrollArea>
+          {draft && (
+            <DraftPreview
+              draft={draft}
+              missing={missing}
+              onPublish={embedded ? undefined : publishDraft}
+              publishing={publishing}
+            />
+          )}
+        </ScrollArea>
 
-            <Composer onSubmit={handleSubmit}>
-              <ToolButton type="button" onClick={handleVoice} disabled={transcribeState.isLoading || chatState.isLoading} aria-label="Record voice">
-                {recording ? <CloseIcon size={13} /> : <MicIcon size={16} />}
-              </ToolButton>
-              <Textarea
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                placeholder="Табаки, проценты, чаша, угли..."
-                disabled={chatState.isLoading}
-              />
-              <SendButton type="submit" disabled={!input.trim() || busy} aria-label="Send setup details">
-                <SendIcon size={16} />
-              </SendButton>
-            </Composer>
-          </PanelBody>
-        </ChatPanel>
-      )}
+        <Composer onSubmit={handleSubmit}>
+          <ToolButton type="button" onClick={handleVoice} disabled={transcribeState.isLoading || chatState.isLoading} aria-label="Record voice">
+            {recording ? <CloseIcon size={13} /> : <MicIcon size={16} />}
+          </ToolButton>
+          <Textarea
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="Напиши табаки, проценты, чашу, уголь..."
+            disabled={chatState.isLoading}
+          />
+          <SendButton type="submit" disabled={!input.trim() || busy} aria-label="Send setup details">
+            <SendIcon size={16} />
+          </SendButton>
+        </Composer>
+      </PanelBody>
+    </ChatPanel>
+  )
+
+  if (embedded) return panel
+
+  return (
+    <Shell>
+      {open && panel}
 
       <PlusButton type="button" onClick={() => setOpen((value) => !value)} aria-label="Add setup with agent">
         <PlusIcon size={22} />

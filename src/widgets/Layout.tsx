@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import styled from 'styled-components'
 import 'twin.macro'
 import { Header } from './Header'
@@ -13,17 +13,22 @@ const Main = styled.main`
   }
 `
 
-export const Layout = () => (
-  <div tw="min-h-screen w-full flex flex-col" style={{ overflowX: 'clip' }}>
-    <Header />
-    <TopNav />
-    <div tw="flex-1 w-full min-w-0">
-      <div tw="w-full max-w-[1040px] mx-auto px-4 py-7 min-w-0 sm:px-5 sm:py-8">
-        <Main>
-          <Outlet />
-        </Main>
+export const Layout = () => {
+  const location = useLocation()
+  const hideFloatingAgent = location.pathname === '/setups/create'
+
+  return (
+    <div tw="min-h-screen w-full flex flex-col" style={{ overflowX: 'clip' }}>
+      <Header />
+      <TopNav />
+      <div tw="flex-1 w-full min-w-0">
+        <div tw="w-full max-w-[1180px] mx-auto px-4 py-7 min-w-0 sm:px-5 sm:py-8">
+          <Main>
+            <Outlet />
+          </Main>
+        </div>
       </div>
+      {!hideFloatingAgent && <SetupAgentWidget />}
     </div>
-    <SetupAgentWidget />
-  </div>
-)
+  )
+}
