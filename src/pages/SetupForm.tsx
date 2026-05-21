@@ -783,20 +783,12 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const activeEquipment = equipmentItems[activeEquipmentIndex] || equipmentItems[0]
   const selectedEquipmentCount = equipmentItems.filter((item) => item.value).length
   const nextMissingEquipment = equipmentItems.find((item) => !item.value)?.label
+
   useEffect(() => {
     if (!nameEdited) {
       setName(generatedName)
     }
   }, [generatedName, nameEdited])
-
-  useEffect(() => {
-    if (isEdit) return
-    if (!bowlId && bowls?.[0]?.id) setBowlId(bowls[0].id)
-    if (!kaloudId && kalouds?.[0]?.id) setKaloudId(kalouds[0].id)
-    if (!coalId && coals?.[0]?.id) setCoalId(coals[0].id)
-    if (!placementId && placements?.[0]?.id) setPlacementId(placements[0].id)
-    if (!typeId && types?.[0]?.id) setTypeId(types[0].id)
-  }, [bowlId, bowls, coalId, coals, isEdit, kaloudId, kalouds, placementId, placements, typeId, types])
 
   const toggleTobacco = (tobaccoId: string) => {
     setTobaccoMix((items) => {
@@ -930,7 +922,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   }
 
   return (
-    <div tw="max-w-6xl">
+    <div tw="max-w-3xl">
       <button
         onClick={() => navigate(-1)}
         tw="mb-4 flex items-center gap-1.5 text-[13px] font-medium text-[rgb(var(--color-text-muted))] transition-colors hover:text-[rgb(var(--color-text))]"
@@ -939,7 +931,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
         {t('common.back')}
       </button>
 
-      <form onSubmit={(event) => event.preventDefault()} tw="min-w-0">
+      <form onSubmit={(event) => event.preventDefault()}>
         <Card>
           <div tw="flex flex-col gap-4 p-4 sm:p-5">
             <div tw="flex items-start justify-between gap-3">
