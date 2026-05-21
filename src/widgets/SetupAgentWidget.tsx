@@ -6,15 +6,9 @@ import {
   type AgentMessage,
   type AgentSetupDraft,
   useChatWithSetupAgentMutation,
-  useGetBowlSetupTypesQuery,
-  useGetBowlsQuery,
-  useGetCoalPlacementsQuery,
-  useGetCoalsQuery,
-  useGetKaloudsQuery,
-  useGetTobaccosQuery,
   useTranscribeSetupVoiceMutation,
 } from '../shared/api'
-import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, SendIcon, type CatalogIconName } from '../shared/ui/Icons'
+import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, SendIcon } from '../shared/ui/Icons'
 import {
   MIX_COLORS,
   MixBowlPreview,
@@ -62,11 +56,8 @@ const Bubble = styled.div<{ $mine?: boolean }>`
 
 const ThinkingBox = tw.div`max-w-[92%] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] p-3`
 const GuidanceShell = tw.div`mx-3 mb-3 rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-raised))] p-3`
-const GuidanceGrid = tw.div`mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2`
-const GuidanceCard = tw.div`min-w-0 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-2`
-const GuidanceTitle = tw.div`flex items-center gap-2 text-[12px] font-black text-[rgb(var(--color-text))]`
-const GuidanceHint = tw.div`mt-1 text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
-const OptionStrip = tw.div`mt-2 flex min-w-0 gap-1.5 overflow-hidden`
+const MissingChips = tw.div`mt-2 flex flex-wrap gap-1.5`
+const MissingChip = tw.span`inline-flex h-7 items-center rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2 text-[11px] font-black text-[rgb(var(--color-text-muted))]`
 const DraftShell = tw.div`mx-3 mb-3 overflow-hidden rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-[var(--shadow-card)]`
 const DraftHeader = tw.div`flex items-start justify-between gap-3 border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-raised))] px-3 py-3`
 const DraftTitle = tw.div`min-w-0`
@@ -111,14 +102,14 @@ const publishStages = [
 const initialMessages: AgentMessage[] = [
   {
     role: 'assistant',
-    content: 'Опиши забивку обычными словами: вкус, табаки, проценты, чашу, калауд, угли и как хочешь уложить микс. Я соберу черновик и покажу, что ещё нужно уточнить.',
+    content: 'Расскажи, какую забивку хочешь. Можно коротко: вкус, табаки, чаша, калауд, уголь или раскладка углей. Я соберу черновик и потом спрошу только то, чего не хватает.',
   },
 ]
 
 const compactMessages = (messages: AgentMessage[]) => messages.slice(-10)
 
 const getMissingFields = (draft: AgentSetupDraft | null) => {
-  if (!draft) return ['название', 'табак', 'чаша', 'калауд', 'уголь', 'раскладка углей', 'тип забивки']
+  if (!draft) return []
 
   return [
     draft.name ? null : 'название',
@@ -131,134 +122,27 @@ const getMissingFields = (draft: AgentSetupDraft | null) => {
   ].filter(Boolean) as string[]
 }
 
-type GuidanceOption = {
-  id: string
-  name: string
-  icon: CatalogIconName
-  photo?: string
-}
-
-const toGuidanceOptions = (items: any[] | undefined, icon: CatalogIconName): GuidanceOption[] => (
-  (items || []).slice(0, 3).map((item, index) => ({
-    id: item.id || `${icon}-${index}`,
-    name: item.name || 'Без названия',
-    icon,
-    photo: item.photo_urls?.[0],
-  }))
-)
-
 const MissingGuidance = ({ missing }: { missing: string[] }) => {
-  const { data: bowls } = useGetBowlsQuery()
-  const { data: tobaccos } = useGetTobaccosQuery()
-  const { data: coals } = useGetCoalsQuery()
-  const { data: kalouds } = useGetKaloudsQuery()
-  const { data: placements } = useGetCoalPlacementsQuery()
-  const { data: types } = useGetBowlSetupTypesQuery()
-
-  const cards = [
-    {
-      key: 'название',
-      label: 'Название',
-      icon: 'setupType' as const,
-      hint: 'Напиши, как потом найти эту забивку в ленте.',
-      options: [
-        { id: 'name-1', name: 'Ягодный вечер', icon: 'setupType' as const },
-        { id: 'name-2', name: 'Кисло-сладкий микс', icon: 'setupType' as const },
-        { id: 'name-3', name: 'Лёгкая цитрус-мята', icon: 'setupType' as const },
-      ],
-    },
-    {
-      key: 'табак',
-      label: 'Табаки и проценты',
-      icon: 'tobacco' as const,
-      hint: 'Укажи бренды, вкусы и доли, чтобы сумма микса была 100%.',
-      options: toGuidanceOptions(tobaccos, 'tobacco'),
-    },
-    {
-      key: 'чаша',
-      label: 'Чаша',
-      icon: 'bowl' as const,
-      hint: 'Нужна конкретная чаша: она влияет на вместимость и геометрию.',
-      options: toGuidanceOptions(bowls, 'bowl'),
-    },
-    {
-      key: 'калауд',
-      label: 'Калауд',
-      icon: 'kaloud' as const,
-      hint: 'Укажи heat-management, чтобы агент понял режим жара.',
-      options: toGuidanceOptions(kalouds, 'kaloud'),
-    },
-    {
-      key: 'уголь',
-      label: 'Уголь',
-      icon: 'coal' as const,
-      hint: 'Нужен тип угля: размер и жар меняют сценарий прогрева.',
-      options: toGuidanceOptions(coals, 'coal'),
-    },
-    {
-      key: 'раскладка углей',
-      label: 'Раскладка углей',
-      icon: 'placement' as const,
-      hint: 'Опиши количество, позицию и ротацию углей.',
-      options: toGuidanceOptions(placements, 'placement'),
-    },
-    {
-      key: 'тип забивки',
-      label: 'Тип забивки',
-      icon: 'setupType' as const,
-      hint: 'Нужен формат укладки: сектора, слои или компот.',
-      options: toGuidanceOptions(types, 'setupType'),
-    },
-  ].filter((card) => missing.includes(card.key))
-
-  if (!cards.length) return null
+  if (!missing.length) return null
 
   return (
     <GuidanceShell>
       <div tw="flex items-start justify-between gap-3">
         <div tw="min-w-0">
-          <div tw="text-[12px] font-black text-[rgb(var(--color-text))]">Что ещё уточнить</div>
+          <div tw="text-[12px] font-black text-[rgb(var(--color-text))]">Нужно уточнить</div>
           <div tw="mt-0.5 text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]">
-            Можно написать одним сообщением. Картинки ниже подсказывают, какие варианты есть в каталоге.
+            Напиши только эти пункты одним сообщением, и агент обновит черновик.
           </div>
         </div>
         <span tw="shrink-0 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]">
-          {cards.length}
+          {missing.length}
         </span>
       </div>
-
-      <GuidanceGrid>
-        {cards.map((card) => (
-          <GuidanceCard key={card.key}>
-            <GuidanceTitle>
-              <span tw="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[rgb(var(--color-accent-muted))] text-[rgb(var(--color-accent))]">
-                <CatalogIcon name={card.icon} size={15} />
-              </span>
-              <span tw="min-w-0 truncate">{card.label}</span>
-            </GuidanceTitle>
-            <GuidanceHint>{card.hint}</GuidanceHint>
-            <OptionStrip>
-              {card.options.map((option) => (
-                <span
-                  key={option.id}
-                  tw="grid min-w-0 flex-1 grid-cols-[34px_minmax(0,1fr)] items-center gap-1.5 rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-1"
-                >
-                  <span tw="flex h-[34px] w-[34px] items-center justify-center overflow-hidden rounded bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-subtle))]">
-                    {option.photo ? (
-                      <img src={option.photo} alt="" tw="h-full w-full object-cover" />
-                    ) : (
-                      <CatalogIcon name={option.icon} size={16} />
-                    )}
-                  </span>
-                  <span tw="min-w-0 truncate text-[10px] font-bold leading-tight text-[rgb(var(--color-text-muted))]">
-                    {option.name}
-                  </span>
-                </span>
-              ))}
-            </OptionStrip>
-          </GuidanceCard>
+      <MissingChips>
+        {missing.map((field) => (
+          <MissingChip key={field}>{field}</MissingChip>
         ))}
-      </GuidanceGrid>
+      </MissingChips>
     </GuidanceShell>
   )
 }
@@ -567,8 +451,8 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       <PanelBody>
         <Header>
           <div tw="min-w-0">
-            <Title>AI чат по забивке</Title>
-            <Subtitle>{recording ? 'Идет запись голоса' : 'Опиши идею, а агент соберет черновик и покажет недостающие детали'}</Subtitle>
+            <Title>Новая забивка</Title>
+            <Subtitle>{recording ? 'Идет запись голоса' : 'Чат соберет черновик и спросит только недостающие поля'}</Subtitle>
           </div>
           <div tw="flex shrink-0 items-center gap-1.5">
             <IconButton type="button" onClick={() => setExpanded((value) => !value)} aria-label="Expand setup agent">
@@ -587,7 +471,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
             {busy && <ThinkingMessage currentIndex={stageIndex} stages={stages} />}
           </Messages>
 
-          <MissingGuidance missing={missing} />
+          {draft && <MissingGuidance missing={missing} />}
 
           {draft && (
             <DraftPreview
