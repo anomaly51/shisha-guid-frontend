@@ -311,6 +311,42 @@ const isMissingQuestion = (text: string) => {
   ))
 }
 
+const isAgentAutofillRequest = (text: string) => {
+  const normalized = normalizeText(text)
+  return [
+    'сам выбери',
+    'сам выбрать',
+    'можешь сам',
+    'заполни сам',
+    'заполнить сам',
+    'заполни все',
+    'заполнить все',
+    'подбери сам',
+    'подобрать сам',
+    'для теста',
+    'тестово',
+    'демо',
+  ].some((word) => normalized.includes(normalizeText(word)))
+}
+
+const isPositiveConfirmation = (text: string) => {
+  const normalized = normalizeText(text)
+  return [
+    'да',
+    'ага',
+    'угу',
+    'ок',
+    'окей',
+    'хорошо',
+    'подтверждаю',
+    'верно',
+    'правильно',
+    'согласен',
+    'пойдет',
+    'го',
+  ].includes(normalized)
+}
+
 const isStateQuestion = (text: string) => {
   const normalized = normalizeText(text)
   return stateQuestionWords.some((word) => normalized.includes(normalizeText(word)))
@@ -527,6 +563,9 @@ const buildAgentContextMessage = (
       'Если пользователь спрашивает, что уже выбрал, перечисли current_draft и при просьбе JSON покажи компактный JSON.',
       'Если пользователь пишет мусор или один непонятный символ, скажи, что не понял ввод, и попроси уточнить; не делай вид, что это параметр забивки.',
       'Название забивки не требуй, если выбраны табаки: оно автогенерируется из названий табаков через " + ".',
+      'Если пользователь просит тебя самому выбрать/заполнить всё для теста или демо, выбери конкретные позиции из catalogs, верни полный draft с id/name/процентами и попроси проверить карточку.',
+      'Если пользователь подтверждает твой предложенный набор, верни подтвержденные значения в draft. Нельзя текстом говорить, что черновик готов, если draft пустой или неполный.',
+      'Каждый конкретный выбранный тобой параметр, который ты называешь в ответе, обязан быть в STATE_JSON-compatible draft, иначе интерфейс не сможет показать карточку.',
       'Используй только варианты из catalogs. Если пользователь пишет с опечатками, сопоставляй смысл с текущими названиями из catalogs без выдумывания новых позиций.',
       'Фронт после твоего текста покажет карточку черновика и варианты выбора, если они нужны.',
       `STATE_JSON: ${JSON.stringify(context)}`,
@@ -557,8 +596,13 @@ const explicitDraftFromResponse = (
   previousDraft: AgentSetupDraft | null,
   responseDraft: AgentSetupDraft | null | undefined,
   messages: TimelineMessage[],
+  allowAgentChoices = false,
 ): AgentSetupDraft | null => {
   if (!responseDraft) return previousDraft
+
+  if (allowAgentChoices) {
+    return hasDraftValue(responseDraft) ? withAutoDraftName(responseDraft, previousDraft) : previousDraft
+  }
 
   const userCorpus = userCorpusFrom(messages)
   const nextDraft: AgentSetupDraft = { ...(previousDraft || {}) }
@@ -1133,7 +1177,8 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
 
     try {
       const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, draftForAgent || null), draft: draftForAgent }).unwrap()
-      const nextDraft = explicitDraftFromResponse(draftForAgent || null, response.draft, nextMessages)
+      const allowAgentChoices = isAgentAutofillRequest(text) || isPositiveConfirmation(text)
+      const nextDraft = explicitDraftFromResponse(draftForAgent || null, response.draft, nextMessages, allowAgentChoices)
       const nextMissing = getMissingFields(nextDraft)
       const draftChanged = JSON.stringify(nextDraft || null) !== JSON.stringify(draft || null)
       setDraft(nextDraft)
