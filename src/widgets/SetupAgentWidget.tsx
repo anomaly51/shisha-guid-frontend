@@ -327,9 +327,15 @@ const isMissingQuestion = (text: string) => {
 const isAgentAutofillRequest = (text: string) => {
   const normalized = normalizeText(text)
   return [
+    'забей сам',
+    'собери сам',
+    'сделай сам',
     'сам выбери',
     'сам выбрать',
     'можешь сам',
+    'можешь собрать',
+    'собери мне',
+    'сделай мне',
     'заполни сам',
     'заполнить сам',
     'заполни все',
@@ -370,6 +376,10 @@ const isPositiveConfirmation = (text: string) => {
     'согласен',
     'пойдет',
     'го',
+    'давай',
+    'двавай',
+    'делай',
+    'сделай',
   ].includes(normalized)
 }
 
@@ -597,6 +607,7 @@ const buildAgentContextMessage = (
       'Если пользователь пишет мусор или один непонятный символ, скажи, что не понял ввод, и попроси уточнить; не делай вид, что это параметр забивки.',
       'Название забивки не требуй, если выбраны табаки: оно автогенерируется из названий табаков через " + ".',
       'Если пользователь просит тебя самому выбрать/заполнить всё для теста или демо, выбери конкретные позиции из catalogs, верни полный draft с id/name/процентами и попроси проверить карточку.',
+      'Фразы вроде "забей сам", "собери сам", "сделай сам", "любой", "на твой вкус" означают, что нужно самому выбрать позиции из catalogs и вернуть их в draft.',
       'Если пользователь подтверждает твой предложенный набор, верни подтвержденные значения в draft. Нельзя текстом говорить, что черновик готов, если draft пустой или неполный.',
       'Каждый конкретный выбранный тобой параметр, который ты называешь в ответе, обязан быть в STATE_JSON-compatible draft, иначе интерфейс не сможет показать карточку.',
       'Используй только варианты из catalogs. Если пользователь пишет с опечатками, сопоставляй смысл с текущими названиями из catalogs без выдумывания новых позиций.',
@@ -1161,6 +1172,19 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     return withAutoDraftName(nextDraft, baseDraft)
   }
 
+  const buildDraftFromAgentReply = (reply: string, baseDraft: AgentSetupDraft | null) => {
+    let nextDraft = baseDraft
+    ;(['tobacco', 'bowl', 'kaloud', 'coal', 'placement', 'setupType'] as CatalogKind[]).forEach((kind) => {
+      const matches = findMentionedCatalogItems(getCatalogItems(kind, catalogs), reply)
+      if (!matches.length) return
+      nextDraft = applyCatalogItemsToDraft(kind, matches, nextDraft)
+    })
+
+    return JSON.stringify(nextDraft || null) !== JSON.stringify(baseDraft || null)
+      ? withAutoDraftName(nextDraft, baseDraft)
+      : null
+  }
+
   const resolveMentionedCatalogItems = (text: string, baseDraft: AgentSetupDraft | null) => {
     const explicitKind = getKindFromText(text)
     const baseMissing = getMissingFields(baseDraft)
@@ -1285,7 +1309,9 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     try {
       const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, draftForAgent || null), draft: draftForAgent }).unwrap()
       const allowAgentChoices = response.needs_confirmation || isAgentAutofillRequest(text) || isPositiveConfirmation(text)
-      const nextDraft = explicitDraftFromResponse(draftForAgent || null, response.draft, nextMessages, allowAgentChoices)
+      const responseDraft = explicitDraftFromResponse(draftForAgent || null, response.draft, nextMessages, allowAgentChoices)
+      const replyDraft = allowAgentChoices ? buildDraftFromAgentReply(response.reply, responseDraft || draftForAgent || null) : null
+      const nextDraft = replyDraft || responseDraft
       const nextMissing = getMissingFields(nextDraft)
       const draftChanged = JSON.stringify(nextDraft || null) !== JSON.stringify(draft || null)
       setDraft(nextDraft)
