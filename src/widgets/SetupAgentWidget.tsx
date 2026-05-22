@@ -15,8 +15,7 @@ import {
   useTranscribeSetupVoiceMutation,
 } from '../shared/api'
 import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, SendIcon } from '../shared/ui/Icons'
-import { MIX_COLORS, MixBowlPreview, detectBowlModel, detectSetupKind, type MixBowlItem } from '../shared/ui/MixBowlPreview'
-import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
+import { MIX_COLORS, type MixBowlItem } from '../shared/ui/MixBowlPreview'
 
 const ChatPanel = styled.section<{ $expanded?: boolean }>`
   ${tw`flex overflow-hidden border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-2xl`}
@@ -58,29 +57,28 @@ const Bubble = styled.div<{ $mine?: boolean }>`
 const TypingBubble = tw.div`max-w-[88%] self-start rounded-lg bg-[rgb(var(--color-surface-muted))] px-3 py-2 text-[13px] font-semibold leading-5 text-[rgb(var(--color-text-subtle))]`
 const MissingChips = tw.div`mt-2 flex flex-wrap gap-1.5`
 const MissingChip = tw.span`inline-flex h-6 items-center rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2 text-[10px] font-black text-[rgb(var(--color-text-muted))]`
-const DraftShell = tw.div`w-full max-w-[620px] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-2.5 shadow-[var(--shadow-card)]`
+const DraftShell = tw.div`w-full max-w-[520px] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-2 shadow-[var(--shadow-card)]`
 const DraftHeader = tw.div`flex items-start justify-between gap-3`
 const DraftTitle = tw.div`min-w-0`
-const DraftName = tw.div`truncate text-[14px] font-black text-[rgb(var(--color-text))]`
+const DraftName = tw.div`truncate text-[13px] font-black text-[rgb(var(--color-text))]`
 const DraftLabel = tw.div`mt-0.5 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]`
 const DraftBadge = tw.span`inline-flex shrink-0 items-center gap-1 rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]`
 const DraftLine = tw.div`mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-[rgb(var(--color-text-muted))]`
 const DraftToken = tw.span`inline-flex max-w-full items-center gap-1 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1`
-const PublishButton = tw.button`inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-accent))] px-4 text-[12px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_16px_28px_-22px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
+const PublishButton = tw.button`inline-flex h-8 w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-accent))] px-3 text-[11px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_16px_28px_-22px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
 const MissingText = tw.div`text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
-const DraftVisual = tw.div`relative mt-2 overflow-hidden rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))]`
-const DraftVisualBadge = tw.div`pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur`
-const DraftSectionLabel = tw.div`mt-2 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]`
-const DraftMixGrid = tw.div`mt-1.5 grid gap-1.5`
-const DraftMixRow = tw.div`grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg bg-[rgb(var(--color-surface-muted))] p-1.5`
-const DraftMiniPhoto = tw.div`h-9 w-9 overflow-hidden rounded-md bg-[rgb(var(--color-surface))]`
+const DraftMixGrid = tw.div`mt-2 grid gap-1`
+const DraftMixRow = tw.div`grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2 rounded-md bg-[rgb(var(--color-surface-muted))] p-1`
+const DraftMiniPhoto = tw.div`h-[30px] w-[30px] overflow-hidden rounded-md bg-[rgb(var(--color-surface))]`
 const DraftMixName = tw.div`truncate text-[12px] font-black text-[rgb(var(--color-text))]`
-const DraftMixMeta = tw.div`mt-0.5 truncate text-[10px] font-semibold text-[rgb(var(--color-text-subtle))]`
-const DraftPercent = tw.div`rounded-md bg-[rgb(var(--color-surface))] px-2 py-1 text-[11px] font-black text-[rgb(var(--color-accent))] tabular-nums`
-const DraftSpecGrid = tw.div`mt-2 grid grid-cols-2 gap-1.5`
-const DraftSpec = tw.div`min-w-0 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-2`
-const DraftSpecLabel = tw.div`flex items-center gap-1 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]`
-const DraftSpecValue = tw.div`mt-1 truncate text-[12px] font-black text-[rgb(var(--color-text))]`
+const DraftMixMeta = tw.div`truncate text-[10px] font-semibold text-[rgb(var(--color-text-subtle))]`
+const DraftPercent = tw.div`rounded-md bg-[rgb(var(--color-surface))] px-1.5 py-0.5 text-[11px] font-black text-[rgb(var(--color-accent))] tabular-nums`
+const DraftSpecGrid = tw.div`mt-1.5 flex flex-wrap gap-1`
+const DraftSpec = tw.div`grid max-w-full grid-cols-[24px_minmax(0,1fr)] items-center gap-1.5 rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-1.5 py-1`
+const DraftSpecPhoto = tw.div`h-6 w-6 overflow-hidden rounded bg-[rgb(var(--color-surface-muted))]`
+const DraftSpecText = tw.div`min-w-0`
+const DraftSpecLabel = tw.div`text-[9px] font-bold uppercase leading-3 text-[rgb(var(--color-text-subtle))]`
+const DraftSpecValue = tw.div`max-w-[118px] truncate text-[11px] font-black leading-3 text-[rgb(var(--color-text))]`
 const ChoiceShell = tw.div`w-full max-w-[620px] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-2.5 shadow-[var(--shadow-card)]`
 const ChoiceHeader = tw.div`mb-2 flex items-start justify-between gap-3`
 const ChoiceTitle = tw.div`text-[13px] font-black text-[rgb(var(--color-text))]`
@@ -816,15 +814,12 @@ const DraftPreview = ({
   const ready = missing.length === 0
   const summary = compactSummary(draft)
   const mixItems = buildDraftMixItems(draft, catalogs.tobacco)
-  const bowl = getCatalogItem(catalogs.bowl, draft.bowl_id, draft.bowl_name)
-  const kind = detectSetupKind(draft.bowl_setup_type_name)
-  const bowlModel = detectBowlModel(bowl)
   const specs = [
-    { icon: 'bowl' as const, label: 'Чаша', value: draft.bowl_name },
-    { icon: 'kaloud' as const, label: 'Калауд', value: draft.kaloud_name },
-    { icon: 'coal' as const, label: 'Уголь', value: draft.coal_name },
-    { icon: 'placement' as const, label: 'Угли', value: draft.coal_placement_name },
-    { icon: 'setupType' as const, label: 'Тип', value: draft.bowl_setup_type_name },
+    { icon: 'bowl' as const, label: 'Чаша', value: draft.bowl_name, item: getCatalogItem(catalogs.bowl, draft.bowl_id, draft.bowl_name) },
+    { icon: 'kaloud' as const, label: 'Калауд', value: draft.kaloud_name, item: getCatalogItem(catalogs.kaloud, draft.kaloud_id, draft.kaloud_name) },
+    { icon: 'coal' as const, label: 'Уголь', value: draft.coal_name, item: getCatalogItem(catalogs.coal, draft.coal_id, draft.coal_name) },
+    { icon: 'placement' as const, label: 'Угли', value: draft.coal_placement_name, item: getCatalogItem(catalogs.placement, draft.coal_placement_id, draft.coal_placement_name) },
+    { icon: 'setupType' as const, label: 'Тип', value: draft.bowl_setup_type_name, item: getCatalogItem(catalogs.setupType, draft.bowl_setup_type_id, draft.bowl_setup_type_name) },
   ].filter((item) => item.value)
 
   return (
@@ -842,24 +837,6 @@ const DraftPreview = ({
 
       {ready && mixItems.length ? (
         <>
-          <DraftVisual>
-            <MixBowlPreview
-              autoRotate={false}
-              bowlModel={bowlModel}
-              interactive={false}
-              items={mixItems}
-              kind={kind}
-              renderMode="snapshot"
-              sceneScale={1.02}
-            />
-            <TobaccoPhotoStack items={mixItems} />
-            <DraftVisualBadge>
-              <CatalogIcon name="setupType" size={12} />
-              {draft.bowl_setup_type_name || 'Забивка'}
-            </DraftVisualBadge>
-          </DraftVisual>
-
-          <DraftSectionLabel>Состав</DraftSectionLabel>
           <DraftMixGrid>
             {mixItems.map((item) => (
               <DraftMixRow key={item.id}>
@@ -884,11 +861,19 @@ const DraftPreview = ({
           <DraftSpecGrid>
             {specs.map((item) => (
               <DraftSpec key={item.label}>
-                <DraftSpecLabel>
-                  <CatalogIcon name={item.icon} size={12} />
-                  {item.label}
-                </DraftSpecLabel>
-                <DraftSpecValue>{item.value}</DraftSpecValue>
+                <DraftSpecPhoto>
+                  {getItemPhoto(item.item) ? (
+                    <img src={getItemPhoto(item.item)!} alt={item.value || ''} tw="h-full w-full object-cover" />
+                  ) : (
+                    <div tw="flex h-full w-full items-center justify-center text-[rgb(var(--color-text-subtle))]">
+                      <CatalogIcon name={item.icon} size={14} />
+                    </div>
+                  )}
+                </DraftSpecPhoto>
+                <DraftSpecText>
+                  <DraftSpecLabel>{item.label}</DraftSpecLabel>
+                  <DraftSpecValue>{item.value}</DraftSpecValue>
+                </DraftSpecText>
               </DraftSpec>
             ))}
           </DraftSpecGrid>
