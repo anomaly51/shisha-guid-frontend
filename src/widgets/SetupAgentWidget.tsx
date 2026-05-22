@@ -99,6 +99,11 @@ type TimelineMessage = AgentMessage & {
   choiceSnapshot?: CatalogChoiceSnapshot
 }
 
+type LocalChatResolution = {
+  draft?: AgentSetupDraft | null
+  trailingMessages?: TimelineMessage[]
+}
+
 const initialMessages: AgentMessage[] = [
   {
     role: 'assistant',
@@ -254,15 +259,6 @@ const hasDraftValue = (draft: AgentSetupDraft | null | undefined) => Boolean(
   draft?.tobaccos?.length
 )
 
-const buildDraftReply = (draft: AgentSetupDraft | null, missing: string[], fallback: string) => {
-  if (!draft) return fallback
-  if (missing.length) {
-    return `Не хватает: ${missing.join(', ')}.`
-  }
-
-  return 'Черновик готов. Проверь карточку ниже и можно публиковать.'
-}
-
 const sanitizeAssistantReply = (reply: string) => {
   const clean = reply
     .replace(/^Черновик обновлен\.\s*/i, '')
@@ -270,7 +266,7 @@ const sanitizeAssistantReply = (reply: string) => {
     .replace(/\s*Напиши только эти пункты одним сообщением,? и агент обновит черновик\.?/i, '')
     .trim()
 
-  return clean || 'Продолжай сообщением, я обновлю черновик.'
+  return clean
 }
 
 const labelByKind: Record<CatalogKind, string> = {
@@ -293,7 +289,6 @@ const questionPatterns: Array<{ kind: CatalogKind; words: string[] }> = [
 
 const catalogQuestionWords = ['какие', 'какой', 'какая', 'что есть', 'есть', 'покажи', 'показать', 'список', 'варианты', 'выбрать']
 const metaQuestionWords = ['что это', 'че это', 'зачем', 'кто ты', 'что умеешь', 'как работает', 'помоги', 'help']
-const greetingWords = ['привет', 'здарова', 'здравствуйте', 'добрый день', 'доброе утро', 'добрый вечер', 'hi', 'hello', 'hey']
 
 const getKindFromText = (text: string) => {
   const normalized = normalizeText(text)
@@ -332,11 +327,6 @@ const stripKindWords = (text: string, kind: CatalogKind) => {
 const isMetaQuestion = (text: string) => {
   const normalized = normalizeText(text)
   return metaQuestionWords.some((word) => normalized.includes(normalizeText(word)))
-}
-
-const isGreeting = (text: string) => {
-  const normalized = normalizeText(text)
-  return greetingWords.some((word) => normalized === normalizeText(word))
 }
 
 const isPercentQuestion = (text: string) => {
@@ -477,8 +467,6 @@ const buildMissingChoice = (missing: string[], catalogs: Record<CatalogKind, any
     ? buildChoiceSnapshot(missingKind, getCatalogItems(missingKind, catalogs), 'Выбери ниже. Карточка останется в чате.', missing)
     : null
 }
-
-const chatIntro = 'Это чат для сборки забивки. Можешь писать обычным языком: "яблоко", "какие чаши есть", "добавь Rosomaha", "уголь Cocoloco". Я покажу варианты из базы, соберу черновик и буду коротко говорить, чего еще не хватает.'
 
 const cleanTitle = (text: string) => (
   text
@@ -844,41 +832,37 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     return [draftMessage]
   }
 
-  const handleCatalogMessage = async (text: string) => {
+  const createChoiceMessage = (choice: CatalogChoiceSnapshot): TimelineMessage => ({
+    id: createMessageId(),
+    role: 'assistant',
+    content: '',
+    choiceSnapshot: choice,
+  })
+
+  const resolveCatalogChoice = (text: string, preferredKind?: CatalogKind | null) => {
     const kind = getKindFromText(text) || (isShortTobaccoSearch(text) ? 'tobacco' : null)
-    if (!kind) return false
+    const resolvedKind = preferredKind || kind
+    if (!resolvedKind) return null
     const wordCount = normalizeText(text).split(' ').filter(Boolean).length
-    if (!isCatalogQuestion(text) && wordCount > 5) return false
+    if (!preferredKind && !isCatalogQuestion(text) && wordCount > 5) return null
 
-    const items = getCatalogItems(kind, catalogs)
-    if (!items.length) {
-      await typeAssistantText(`Каталог для поля "${labelByKind[kind]}" пока не загрузился или пустой.`)
-      return true
-    }
+    const items = getCatalogItems(resolvedKind, catalogs)
+    if (!items.length) return null
 
-    const query = stripKindWords(text, kind)
+    const query = stripKindWords(text, resolvedKind)
     const wantsList = isCatalogQuestion(text) || !query
     const matches = wantsList ? items.slice(0, 9) : searchCatalog(items, query)
+    if (!matches.length && !preferredKind && !isCatalogQuestion(text)) return null
+
     const choice = buildChoiceSnapshot(
-      kind,
+      resolvedKind,
       matches.length ? matches : items,
       matches.length
         ? 'Выбери ниже. Карточка останется в чате.'
         : 'Точного совпадения нет. Выбери ближайший вариант из базы.',
     )
 
-    if (!choice) return false
-
-    await typeAssistantText(
-      matches.length ? '' : `Не нашел "${query || text}" в базе. Показываю доступные варианты.`,
-      [{
-        id: createMessageId(),
-        role: 'assistant',
-        content: '',
-        choiceSnapshot: choice,
-      }],
-    )
-    return true
+    return choice
   }
 
   const updateDraftWithChoice = (baseDraft: AgentSetupDraft | null, kind: CatalogKind, item: any): AgentSetupDraft => {
@@ -923,33 +907,21 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     return nextDraft
   }
 
-  const applyCatalogItems = async (kind: CatalogKind, items: any[]) => {
-    if (!items.length) return false
+  const applyCatalogItemsToDraft = (kind: CatalogKind, items: any[], baseDraft: AgentSetupDraft | null) => {
+    if (!items.length) return null
 
     const nextDraft = items.reduce(
       (currentDraft, item) => updateDraftWithChoice(currentDraft, kind, item),
-      draft,
+      baseDraft,
     ) as AgentSetupDraft
-    const nextMissing = getMissingFields(nextDraft)
-    const names = items.map((item) => item.name).filter(Boolean).join(', ')
-    const tobaccoPercentNote = kind === 'tobacco' && nextDraft.tobaccos?.length === 1
-      ? ' Поставил 100%, потому что табак один.'
-      : kind === 'tobacco' && (nextDraft.tobaccos?.length || 0) > 1 && nextMissing.includes('проценты табаков')
-        ? ' Теперь укажи проценты или напиши "поровну".'
-        : ''
 
-    setDraft(nextDraft)
-    onDraftChange?.(nextDraft)
-    await typeAssistantText(
-      `Добавил: ${names}.${tobaccoPercentNote} ${buildDraftReply(nextDraft, nextMissing, '')}`.trim(),
-      makeDraftMessages(nextDraft, nextMissing),
-    )
-    return true
+    return nextDraft
   }
 
-  const handleMentionedCatalogItems = async (text: string) => {
+  const resolveMentionedCatalogItems = (text: string, baseDraft: AgentSetupDraft | null) => {
     const explicitKind = getKindFromText(text)
-    const missingKind = getMissingCatalogKind(missing)
+    const baseMissing = getMissingFields(baseDraft)
+    const missingKind = getMissingCatalogKind(baseMissing)
     const kinds: CatalogKind[] = explicitKind
       ? [explicitKind]
       : [
@@ -961,59 +933,64 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       const items = getCatalogItems(kind, catalogs)
       const matches = findMentionedCatalogItems(items, explicitKind ? stripKindWords(text, kind) || text : text)
       if (matches.length) {
-        return applyCatalogItems(kind, matches)
+        return applyCatalogItemsToDraft(kind, matches, baseDraft)
       }
     }
 
-    return false
+    return null
   }
 
-  const handleContextualCatalogChoice = async (text: string) => {
-    const missingKind = getMissingCatalogKind(missing)
-    if (!missingKind) return false
+  const resolveContextualCatalogChoice = (text: string, baseDraft: AgentSetupDraft | null) => {
+    const baseMissing = getMissingFields(baseDraft)
+    const missingKind = getMissingCatalogKind(baseMissing)
+    if (!missingKind) return null
 
     const matches = findMentionedCatalogItems(getCatalogItems(missingKind, catalogs), text)
     if (matches.length) {
-      return applyCatalogItems(missingKind, matches)
+      return applyCatalogItemsToDraft(missingKind, matches, baseDraft)
     }
 
-    return false
+    return null
   }
 
-  const applyTitleMessage = async (text: string) => {
-    if (!shouldUseAsTitle(draft, missing, text)) return false
+  const applyTitleMessage = (text: string, baseDraft: AgentSetupDraft | null) => {
+    const baseMissing = getMissingFields(baseDraft)
+    if (!shouldUseAsTitle(baseDraft, baseMissing, text)) return null
 
-    const nextDraft: AgentSetupDraft = { ...(draft || {}), name: cleanTitle(text) }
-    const nextMissing = getMissingFields(nextDraft)
-    setDraft(nextDraft)
-    onDraftChange?.(nextDraft)
-    await typeAssistantText(
-      `Название: ${nextDraft.name}. ${buildDraftReply(nextDraft, nextMissing, '')}`,
-      makeDraftMessages(nextDraft, nextMissing),
-    )
-    return true
+    return { ...(baseDraft || {}), name: cleanTitle(text) }
   }
 
-  const handleDraftQuestion = async (text: string) => {
+  const resolveLocalUpdate = (text: string): LocalChatResolution => {
+    const percentDraft = applyPercentMessage(draft, text)
+    if (percentDraft) return { draft: percentDraft }
+
+    const contextualDraft = resolveContextualCatalogChoice(text, draft)
+    if (contextualDraft) return { draft: contextualDraft }
+
+    const mentionedDraft = resolveMentionedCatalogItems(text, draft)
+    if (mentionedDraft) return { draft: mentionedDraft }
+
+    const titleDraft = applyTitleMessage(text, draft)
+    if (titleDraft) return { draft: titleDraft }
+
     if (isMissingQuestion(text)) {
-      await typeAssistantText(
-        missing.length ? `Не хватает: ${missing.join(', ')}.` : 'Черновик готов. Можно публиковать.',
-        draft ? makeDraftMessages(draft, missing) : [],
-      )
-      return true
+      return draft ? { trailingMessages: makeDraftMessages(draft, missing) } : {}
     }
 
     if (isPercentQuestion(text)) {
-      const tobaccoCount = draft?.tobaccos?.length || 0
-      const reply = tobaccoCount <= 1
-        ? 'Если табак один, ставлю 100% автоматически. Проценты нужны только для микса из двух и более табаков.'
-        : `Можно написать проценты сообщением, например "${draft!.tobaccos!.map((_, index) => index === 0 ? '60%' : `${Math.floor(40 / Math.max(1, tobaccoCount - 1))}%`).join(' ')}", или просто "поровну". Главное, чтобы сумма была 100%.`
-
-      await typeAssistantText(reply)
-      return true
+      return draft ? { trailingMessages: makeDraftMessages(draft, missing) } : {}
     }
 
-    return false
+    if (isMetaQuestion(text)) return {}
+
+    const explicitChoice = resolveCatalogChoice(text)
+    if (explicitChoice) return { trailingMessages: [createChoiceMessage(explicitChoice)] }
+
+    const missingKind = draft ? getMissingCatalogKind(missing) : null
+    const missingChoice = missingKind ? resolveCatalogChoice(text, missingKind) : null
+    if (missingChoice) return { trailingMessages: [createChoiceMessage(missingChoice)] }
+
+    return {}
   }
 
   const selectCatalogItem = async (kind: CatalogKind, item: any) => {
@@ -1024,17 +1001,24 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       role: 'user',
       content: `Выбрал: ${item.name}`,
     }
-    setMessages((current) => [...current, selectedMessage])
+    const nextMessages = [...messages, selectedMessage]
+    setMessages(nextMessages)
 
     const nextDraft = updateDraftWithChoice(draft, kind, item)
-    const nextMissing = getMissingFields(nextDraft)
     setDraft(nextDraft)
     onDraftChange?.(nextDraft)
 
-    await typeAssistantText(
-      `${item.name} добавлен. ${kind === 'tobacco' && nextDraft.tobaccos?.length === 1 ? 'Поставил 100%, потому что табак один. ' : ''}${buildDraftReply(nextDraft, nextMissing, '')}`,
-      makeDraftMessages(nextDraft, nextMissing),
-    )
+    try {
+      const response = await chatWithAgent({ messages: compactApiMessages(nextMessages), draft: nextDraft }).unwrap()
+      const responseDraft = explicitDraftFromResponse(nextDraft, response.draft, nextMessages)
+      const finalDraft = responseDraft || nextDraft
+      const nextMissing = getMissingFields(finalDraft)
+      setDraft(finalDraft)
+      onDraftChange?.(finalDraft)
+      await typeAssistantText(sanitizeAssistantReply(response.reply), makeDraftMessages(finalDraft, nextMissing))
+    } catch {
+      await typeAssistantText('Не получилось обработать запрос. Проверь авторизацию и попробуй еще раз.')
+    }
   }
 
   const sendText = async (rawText: string) => {
@@ -1048,45 +1032,24 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     setMessages(nextMessages)
     setInput('')
 
-    if (isGreeting(text)) {
-      await typeAssistantText('Привет. Напиши вкус, табак или любой параметр забивки, я соберу черновик.')
-      return
-    }
-
-    if (isMetaQuestion(text)) {
-      await typeAssistantText(chatIntro)
-      return
-    }
-
-    const percentDraft = applyPercentMessage(draft, text)
-    if (percentDraft) {
-      const nextMissing = getMissingFields(percentDraft)
-      setDraft(percentDraft)
-      onDraftChange?.(percentDraft)
-      await typeAssistantText(buildDraftReply(percentDraft, nextMissing, ''), makeDraftMessages(percentDraft, nextMissing))
-      return
-    }
-
-    if (await handleDraftQuestion(text)) return
-
-    if (await handleContextualCatalogChoice(text)) return
-
-    if (await handleMentionedCatalogItems(text)) return
-
-    if (await applyTitleMessage(text)) return
-
-    if (await handleCatalogMessage(text)) return
+    const localResolution = resolveLocalUpdate(text)
+    const draftForAgent = localResolution.draft !== undefined ? localResolution.draft : draft
 
     try {
-      const response = await chatWithAgent({ messages: compactApiMessages(nextMessages), draft }).unwrap()
-      const nextDraft = explicitDraftFromResponse(draft, response.draft, nextMessages)
+      const response = await chatWithAgent({ messages: compactApiMessages(nextMessages), draft: draftForAgent }).unwrap()
+      const nextDraft = explicitDraftFromResponse(draftForAgent || null, response.draft, nextMessages)
       const nextMissing = getMissingFields(nextDraft)
       const draftChanged = JSON.stringify(nextDraft || null) !== JSON.stringify(draft || null)
       setDraft(nextDraft)
       if (nextDraft) onDraftChange?.(nextDraft)
+
+      const trailingMessages = nextDraft && (draftChanged || localResolution.draft !== undefined)
+        ? makeDraftMessages(nextDraft, nextMissing)
+        : localResolution.trailingMessages || []
+
       await typeAssistantText(
-        draftChanged ? buildDraftReply(nextDraft, nextMissing, sanitizeAssistantReply(response.reply)) : sanitizeAssistantReply(response.reply),
-        draftChanged ? makeDraftMessages(nextDraft, nextMissing) : [],
+        sanitizeAssistantReply(response.reply),
+        trailingMessages,
       )
     } catch {
       await typeAssistantText('Не получилось обработать запрос. Проверь авторизацию и попробуй еще раз.')
