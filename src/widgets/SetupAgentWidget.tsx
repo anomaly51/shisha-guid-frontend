@@ -344,6 +344,13 @@ const isAgentAutofillRequest = (text: string) => {
     'случайно',
     'случайную',
     'любую',
+    'любой',
+    'любое',
+    'выбери мне',
+    'на твой вкус',
+    'как хочешь',
+    'который ты хочешь',
+    'которую ты хочешь',
     'как ты знаешь',
   ].some((word) => normalized.includes(normalizeText(word)))
 }
@@ -821,6 +828,7 @@ const DraftPreview = ({
     { icon: 'placement' as const, label: 'Угли', value: draft.coal_placement_name, item: getCatalogItem(catalogs.placement, draft.coal_placement_id, draft.coal_placement_name) },
     { icon: 'setupType' as const, label: 'Тип', value: draft.bowl_setup_type_name, item: getCatalogItem(catalogs.setupType, draft.bowl_setup_type_id, draft.bowl_setup_type_name) },
   ].filter((item) => item.value)
+  const hasVisualDraftContent = mixItems.length > 0 || specs.length > 0
 
   return (
     <DraftShell>
@@ -835,48 +843,52 @@ const DraftPreview = ({
         </DraftBadge>
       </DraftHeader>
 
-      {ready && mixItems.length ? (
+      {hasVisualDraftContent ? (
         <>
-          <DraftMixGrid>
-            {mixItems.map((item) => (
-              <DraftMixRow key={item.id}>
-                <DraftMiniPhoto>
-                  {item.photo_url ? (
-                    <img src={item.photo_url} alt={item.name} tw="h-full w-full object-cover" />
-                  ) : (
-                    <div tw="flex h-full w-full items-center justify-center text-[rgb(var(--color-text-subtle))]">
-                      <CatalogIcon name="tobacco" size={18} />
-                    </div>
-                  )}
-                </DraftMiniPhoto>
-                <div tw="min-w-0">
-                  <DraftMixName>{item.name}</DraftMixName>
-                  <DraftMixMeta>табак</DraftMixMeta>
-                </div>
-                <DraftPercent>{item.percentage}%</DraftPercent>
-              </DraftMixRow>
-            ))}
-          </DraftMixGrid>
+          {mixItems.length > 0 && (
+            <DraftMixGrid>
+              {mixItems.map((item) => (
+                <DraftMixRow key={item.id}>
+                  <DraftMiniPhoto>
+                    {item.photo_url ? (
+                      <img src={item.photo_url} alt={item.name} tw="h-full w-full object-cover" />
+                    ) : (
+                      <div tw="flex h-full w-full items-center justify-center text-[rgb(var(--color-text-subtle))]">
+                        <CatalogIcon name="tobacco" size={18} />
+                      </div>
+                    )}
+                  </DraftMiniPhoto>
+                  <div tw="min-w-0">
+                    <DraftMixName>{item.name}</DraftMixName>
+                    <DraftMixMeta>табак</DraftMixMeta>
+                  </div>
+                  <DraftPercent>{item.percentage}%</DraftPercent>
+                </DraftMixRow>
+              ))}
+            </DraftMixGrid>
+          )}
 
-          <DraftSpecGrid>
-            {specs.map((item) => (
-              <DraftSpec key={item.label}>
-                <DraftSpecPhoto>
-                  {getItemPhoto(item.item) ? (
-                    <img src={getItemPhoto(item.item)!} alt={item.value || ''} tw="h-full w-full object-cover" />
-                  ) : (
-                    <div tw="flex h-full w-full items-center justify-center text-[rgb(var(--color-text-subtle))]">
-                      <CatalogIcon name={item.icon} size={14} />
-                    </div>
-                  )}
-                </DraftSpecPhoto>
-                <DraftSpecText>
-                  <DraftSpecLabel>{item.label}</DraftSpecLabel>
-                  <DraftSpecValue>{item.value}</DraftSpecValue>
-                </DraftSpecText>
-              </DraftSpec>
-            ))}
-          </DraftSpecGrid>
+          {specs.length > 0 && (
+            <DraftSpecGrid>
+              {specs.map((item) => (
+                <DraftSpec key={item.label}>
+                  <DraftSpecPhoto>
+                    {getItemPhoto(item.item) ? (
+                      <img src={getItemPhoto(item.item)!} alt={item.value || ''} tw="h-full w-full object-cover" />
+                    ) : (
+                      <div tw="flex h-full w-full items-center justify-center text-[rgb(var(--color-text-subtle))]">
+                        <CatalogIcon name={item.icon} size={14} />
+                      </div>
+                    )}
+                  </DraftSpecPhoto>
+                  <DraftSpecText>
+                    <DraftSpecLabel>{item.label}</DraftSpecLabel>
+                    <DraftSpecValue>{item.value}</DraftSpecValue>
+                  </DraftSpecText>
+                </DraftSpec>
+              ))}
+            </DraftSpecGrid>
+          )}
         </>
       ) : (
         <DraftLine>
