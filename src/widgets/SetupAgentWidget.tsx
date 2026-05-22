@@ -14,58 +14,72 @@ import {
   useGetTobaccosQuery,
   useTranscribeSetupVoiceMutation,
 } from '../shared/api'
-import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, SendIcon } from '../shared/ui/Icons'
+import { CatalogIcon, CheckIcon, CloseIcon, MicIcon, SendIcon } from '../shared/ui/Icons'
 import { MIX_COLORS, type MixBowlItem } from '../shared/ui/MixBowlPreview'
 
-const ChatPanel = styled.section<{ $expanded?: boolean }>`
-  ${tw`flex overflow-hidden border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-2xl`}
-  border-radius: 8px;
-  box-shadow: 0 26px 58px -34px rgba(83, 48, 31, 0.75), 0 10px 28px -20px rgba(0, 0, 0, 0.32);
-  height: ${({ $expanded }) => ($expanded ? 'calc(100vh - 2rem)' : 'min(760px, calc(100vh - 12rem))')};
-  min-height: ${({ $expanded }) => ($expanded ? 'min(44rem, calc(100vh - 2rem))' : '560px')};
-  position: ${({ $expanded }) => ($expanded ? 'fixed' : 'relative')};
-  right: ${({ $expanded }) => ($expanded ? '1rem' : 'auto')};
-  bottom: ${({ $expanded }) => ($expanded ? '1rem' : 'auto')};
-  width: ${({ $expanded }) => ($expanded ? 'min(72rem, calc(100vw - 2rem))' : '100%')};
-  z-index: ${({ $expanded }) => ($expanded ? 60 : 'auto')};
+const ChatPanel = styled.section`
+  ${tw`relative flex w-full overflow-hidden border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))]`}
+  border-radius: 28px;
+  box-shadow:
+    0 34px 90px -48px rgba(83, 48, 31, 0.9),
+    0 16px 42px -28px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  height: min(820px, calc(100vh - 9rem));
+  min-height: 640px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 14% 0%, rgba(222, 139, 87, 0.18), transparent 32%),
+      radial-gradient(circle at 88% 18%, rgba(83, 48, 31, 0.11), transparent 28%),
+      linear-gradient(180deg, rgba(255, 248, 241, 0.52), transparent 36%);
+  }
 
   @media (max-width: 640px) {
-    height: ${({ $expanded }) => ($expanded ? 'calc(100vh - 2rem)' : 'calc(100vh - 10rem)')};
-    min-height: 520px;
+    border-radius: 18px;
+    height: calc(100vh - 8.5rem);
+    min-height: 560px;
   }
 `
 
-const Header = tw.div`flex items-start justify-between gap-3 border-b border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-4 py-3`
-const Title = tw.h2`text-[15px] font-black leading-snug text-[rgb(var(--color-text))]`
-const Subtitle = tw.div`mt-0.5 text-[11px] font-semibold text-[rgb(var(--color-text-subtle))]`
-const PanelBody = tw.div`flex min-h-0 flex-1 flex-col`
+const Header = tw.div`relative z-10 flex items-center justify-between gap-4 border-b border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))]/90 px-5 py-4 backdrop-blur-xl sm:px-6`
+const HeaderMark = tw.div`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--color-surface-inverse))] text-[rgb(var(--color-text-inverse))] shadow-[0_18px_34px_-24px_rgba(83,48,31,0.9)]`
+const Title = tw.h2`text-[17px] font-black leading-snug tracking-tight text-[rgb(var(--color-text))] sm:text-[19px]`
+const Subtitle = tw.div`mt-1 max-w-2xl text-[12px] font-semibold leading-5 text-[rgb(var(--color-text-subtle))]`
+const StatusPill = tw.div`hidden shrink-0 items-center gap-1.5 rounded-full border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))]/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-[rgb(var(--color-text-muted))] sm:inline-flex`
+const PanelBody = tw.div`relative z-10 flex min-h-0 flex-1 flex-col`
 const ScrollArea = tw.div`min-h-0 flex-1 overflow-y-auto`
-const Messages = tw.div`flex min-h-full flex-col justify-end gap-2 px-3 py-3 sm:px-4`
-const Composer = tw.form`flex items-end gap-2 border-t border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-3`
-const Textarea = tw.textarea`min-h-[2.75rem] max-h-28 flex-1 resize-none rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-3 py-2 text-[13px] font-semibold leading-5 text-[rgb(var(--color-text))] outline-none transition placeholder:text-[rgb(var(--color-text-subtle))] focus:border-[rgb(var(--color-accent))] focus:shadow-[0_0_0_2px_rgba(139,74,43,0.1)] disabled:opacity-60`
-const IconButton = tw.button`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] hover:text-[rgb(var(--color-accent))]`
-const ToolButton = tw.button`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] hover:text-[rgb(var(--color-accent))] disabled:cursor-not-allowed disabled:opacity-50`
-const SendButton = tw.button`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--color-accent))] text-[rgb(var(--color-text-inverse))] shadow-[0_14px_26px_-20px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
+const Messages = tw.div`flex min-h-full flex-col justify-end gap-3 px-3 py-4 sm:px-6 sm:py-5`
+const Composer = tw.form`flex items-end gap-2 border-t border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))]/95 p-3 backdrop-blur-xl sm:gap-3 sm:p-4`
+const Textarea = tw.textarea`min-h-[3.25rem] max-h-32 flex-1 resize-none rounded-2xl border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-4 py-3 text-[14px] font-semibold leading-5 text-[rgb(var(--color-text))] outline-none transition placeholder:text-[rgb(var(--color-text-subtle))] focus:border-[rgb(var(--color-accent))] focus:shadow-[0_0_0_4px_rgba(139,74,43,0.12)] disabled:opacity-60`
+const ToolButton = tw.button`inline-flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-2xl border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] shadow-[0_12px_24px_-22px_rgba(83,48,31,0.8)] transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] hover:text-[rgb(var(--color-accent))] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50`
+const SendButton = tw.button`inline-flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--color-accent))] text-[rgb(var(--color-text-inverse))] shadow-[0_18px_34px_-22px_rgba(83,48,31,1)] transition hover:bg-[rgb(var(--color-accent-hover))] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45`
 
 const Bubble = styled.div<{ $mine?: boolean }>`
-  ${tw`max-w-[88%] rounded-lg px-3 py-2 text-[13px] font-semibold leading-5`}
+  ${tw`max-w-[86%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-[13px] font-semibold leading-5 shadow-[0_14px_28px_-26px_rgba(83,48,31,0.75)] sm:max-w-[74%] sm:text-[14px]`}
   align-self: ${({ $mine }) => ($mine ? 'flex-end' : 'flex-start')};
   color: ${({ $mine }) => ($mine ? 'rgb(var(--color-text-inverse))' : 'rgb(var(--color-text))')};
-  background: ${({ $mine }) => ($mine ? 'rgb(var(--color-surface-inverse))' : 'rgb(var(--color-surface-muted))')};
+  background: ${({ $mine }) => ($mine ? 'linear-gradient(135deg, rgb(var(--color-surface-inverse)), rgba(83, 48, 31, 0.88))' : 'rgba(255, 255, 255, 0.78)')};
+  border: 1px solid ${({ $mine }) => ($mine ? 'rgba(255, 248, 241, 0.12)' : 'rgb(var(--color-border-muted))')};
+  border-bottom-right-radius: ${({ $mine }) => ($mine ? '6px' : '1rem')};
+  border-bottom-left-radius: ${({ $mine }) => ($mine ? '1rem' : '6px')};
 `
 
-const TypingBubble = tw.div`max-w-[88%] self-start rounded-lg bg-[rgb(var(--color-surface-muted))] px-3 py-2 text-[13px] font-semibold leading-5 text-[rgb(var(--color-text-subtle))]`
+const TypingBubble = tw.div`max-w-[86%] self-start rounded-2xl rounded-bl-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))]/80 px-4 py-3 text-[13px] font-semibold leading-5 text-[rgb(var(--color-text-subtle))] shadow-[0_14px_28px_-26px_rgba(83,48,31,0.75)] sm:max-w-[74%]`
 const MissingChips = tw.div`mt-2 flex flex-wrap gap-1.5`
-const MissingChip = tw.span`inline-flex h-6 items-center rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2 text-[10px] font-black text-[rgb(var(--color-text-muted))]`
-const DraftShell = tw.div`w-full max-w-[520px] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-2 shadow-[var(--shadow-card)]`
+const MissingChip = tw.span`inline-flex h-6 items-center rounded-full border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2.5 text-[10px] font-black text-[rgb(var(--color-text-muted))]`
+const DraftShell = tw.div`w-full max-w-[720px] self-start rounded-2xl border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))]/95 p-3 shadow-[0_18px_42px_-32px_rgba(83,48,31,0.85)] backdrop-blur`
 const DraftHeader = tw.div`flex items-start justify-between gap-3`
 const DraftTitle = tw.div`min-w-0`
 const DraftName = tw.div`truncate text-[13px] font-black text-[rgb(var(--color-text))]`
 const DraftLabel = tw.div`mt-0.5 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]`
-const DraftBadge = tw.span`inline-flex shrink-0 items-center gap-1 rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]`
+const DraftBadge = tw.span`inline-flex shrink-0 items-center gap-1 rounded-full border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] px-2.5 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]`
 const DraftLine = tw.div`mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-[rgb(var(--color-text-muted))]`
 const DraftToken = tw.span`inline-flex max-w-full items-center gap-1 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1`
-const PublishButton = tw.button`inline-flex h-8 w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-accent))] px-3 text-[11px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_16px_28px_-22px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
+const PublishButton = tw.button`inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--color-accent))] px-3 text-[12px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_18px_34px_-24px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50`
 const MissingText = tw.div`text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
 const DraftMixGrid = tw.div`mt-2 grid gap-1`
 const DraftMixRow = tw.div`grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2 rounded-md bg-[rgb(var(--color-surface-muted))] p-1`
@@ -79,13 +93,13 @@ const DraftSpecPhoto = tw.div`h-6 w-6 overflow-hidden rounded bg-[rgb(var(--colo
 const DraftSpecText = tw.div`min-w-0`
 const DraftSpecLabel = tw.div`text-[9px] font-bold uppercase leading-3 text-[rgb(var(--color-text-subtle))]`
 const DraftSpecValue = tw.div`max-w-[118px] truncate text-[11px] font-black leading-3 text-[rgb(var(--color-text))]`
-const ChoiceShell = tw.div`w-full max-w-[620px] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-2.5 shadow-[var(--shadow-card)]`
+const ChoiceShell = tw.div`w-full max-w-[760px] self-start rounded-2xl border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))]/95 p-3 shadow-[0_18px_42px_-32px_rgba(83,48,31,0.85)] backdrop-blur`
 const ChoiceHeader = tw.div`mb-2 flex items-start justify-between gap-3`
 const ChoiceTitle = tw.div`text-[13px] font-black text-[rgb(var(--color-text))]`
 const ChoiceHint = tw.div`mt-0.5 text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
-const ChoiceGrid = tw.div`grid gap-1.5`
-const ChoiceCard = tw.button`grid min-w-0 grid-cols-[42px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-1.5 text-left transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] disabled:cursor-not-allowed disabled:opacity-60`
-const ChoicePhoto = tw.div`h-[42px] w-[42px] overflow-hidden rounded-md bg-[rgb(var(--color-surface-muted))]`
+const ChoiceGrid = tw.div`grid gap-2 sm:grid-cols-2`
+const ChoiceCard = tw.button`grid min-w-0 grid-cols-[52px_minmax(0,1fr)] items-center gap-3 rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-2 text-left shadow-[0_12px_26px_-24px_rgba(83,48,31,0.75)] transition hover:-translate-y-0.5 hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] hover:shadow-[0_18px_32px_-26px_rgba(83,48,31,0.9)] disabled:cursor-not-allowed disabled:opacity-60`
+const ChoicePhoto = tw.div`h-[52px] w-[52px] overflow-hidden rounded-xl bg-[rgb(var(--color-surface-muted))]`
 const ChoiceBody = tw.div`min-w-0`
 const ChoiceName = tw.div`truncate text-[12px] font-black text-[rgb(var(--color-text))]`
 const ChoiceMeta = tw.div`mt-0.5 truncate text-[10px] font-semibold leading-3 text-[rgb(var(--color-text-subtle))]`
@@ -984,7 +998,6 @@ const ChoicePreview = ({
 
 export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAgentWidgetProps) => {
   const navigate = useNavigate()
-  const [expanded, setExpanded] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<TimelineMessage[]>(initialTimelineMessages)
   const [draft, setDraft] = useState<AgentSetupDraft | null>(initialDraft)
@@ -1403,18 +1416,22 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   }
 
   const panel = (
-    <ChatPanel $expanded={expanded} aria-label="AI setup chat">
+    <ChatPanel aria-label="AI setup chat">
       <PanelBody>
         <Header>
-          <div tw="min-w-0">
-            <Title>Новая забивка</Title>
-            <Subtitle>{recording ? 'Идет запись голоса' : 'Чат соберет черновик и спросит только недостающие поля'}</Subtitle>
+          <div tw="flex min-w-0 items-center gap-3">
+            <HeaderMark>
+              <CatalogIcon name="setupType" size={22} />
+            </HeaderMark>
+            <div tw="min-w-0">
+              <Title>Новая забивка через Chatbot</Title>
+              <Subtitle>{recording ? 'Идет запись голоса. Закончи запись, и я разберу текст.' : 'Опиши вкус, табаки и железо. Я соберу черновик, покажу варианты из базы и не буду спрашивать лишнее.'}</Subtitle>
+            </div>
           </div>
-          <div tw="flex shrink-0 items-center gap-1.5">
-            <IconButton type="button" onClick={() => setExpanded((value) => !value)} aria-label="Expand setup agent">
-              <ExpandIcon />
-            </IconButton>
-          </div>
+          <StatusPill>
+            <span tw="h-1.5 w-1.5 rounded-full bg-[rgb(var(--color-accent))]" />
+            AI ассистент
+          </StatusPill>
         </Header>
 
         <ScrollArea ref={scrollRef}>
