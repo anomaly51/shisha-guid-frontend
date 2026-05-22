@@ -1,4 +1,4 @@
-import { Fragment, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import tw from 'twin.macro'
@@ -517,11 +517,13 @@ const buildAgentContextMessage = (
   }
 
   return {
-    role: 'assistant',
+    role: 'user',
     content: [
-      'Скрытый контекст интерфейса ShishaGuid для следующего ответа.',
+      'Скрытые инструкции интерфейса ShishaGuid для следующего ответа. Это не сообщение пользователя, а runtime context для агента.',
       'Веди себя как гибкий агент, а не форма: отвечай на вопрос пользователя, учитывай всю историю и текущий черновик.',
-      'Не отвечай одним шаблоном "Не хватает ..."; сначала коротко скажи, что понял или что уже выбрано, потом один следующий шаг.',
+      'Не своди ответ к списку недостающих полей. Сначала ответь по смыслу последнего сообщения пользователя, потом предложи один полезный следующий шаг.',
+      'Если последнее сообщение пользователя является приветствием, small talk, вопросом о чате или непонятным коротким вводом, не перечисляй missing_fields и не обновляй черновик; ответь разговорно и мягко направь к описанию забивки.',
+      'Перечисляй missing_fields только когда пользователь уже описывает забивку, явно спрашивает что осталось выбрать или просит продолжить сборку.',
       'Если пользователь спрашивает, что уже выбрал, перечисли current_draft и при просьбе JSON покажи компактный JSON.',
       'Если пользователь пишет мусор или один непонятный символ, скажи, что не понял ввод, и попроси уточнить; не делай вид, что это параметр забивки.',
       'Название забивки не требуй, если выбраны табаки: оно автогенерируется из названий табаков через " + ".',
@@ -747,7 +749,7 @@ const DraftPreview = ({
         )}
       </DraftLine>
 
-      {!ready && <MissingText tw="mt-2">Не хватает: {missing.join(', ')}.</MissingText>}
+      {!ready && <MissingText tw="mt-2">Осталось выбрать: {missing.join(', ')}.</MissingText>}
 
       {onPublish && (
         <PublishButton type="button" onClick={onPublish} disabled={!ready || publishing} tw="mt-2">
@@ -1177,6 +1179,12 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     void sendText(input)
   }
 
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+    event.preventDefault()
+    void sendText(input)
+  }
+
   const stopRecording = () => {
     recorderRef.current?.stop()
   }
@@ -1268,6 +1276,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
           <Textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
+            onKeyDown={handleComposerKeyDown}
             placeholder="Например: хочу свежую ягодную забивку, 2-3 табака, легко по крепости..."
             disabled={busy}
           />
