@@ -147,61 +147,14 @@ const transliterateRu = (value: string) => {
 
 const searchableText = (value: string) => `${normalizeText(value)} ${transliterateRu(value)}`
 
-const phoneticTokenMap: Record<string, string> = {
-  blyu: 'blue',
-  bliu: 'blue',
-  blu: 'blue',
-  beri: 'berry',
-  berri: 'berry',
-  bery: 'berry',
-  melon: 'melon',
-  meloun: 'melon',
-  rosomaha: 'rosomaha',
-  rosamaha: 'rosomaha',
-  rosomahuy: 'rosomaha',
-  rosomahuya: 'rosomaha',
-  rasmah: 'rosomaha',
-  rasmaha: 'rosomaha',
-  mango: 'mango',
-  apelsin: 'orange',
-  oranzh: 'orange',
-  granat: 'pomegranate',
-  moroz: 'frost',
-  frost: 'frost',
-  funel: 'phunnel',
-  fanel: 'phunnel',
-  funnel: 'phunnel',
-  phunel: 'phunnel',
-  tradishnl: 'traditional',
-  tradishnal: 'traditional',
-  traditsionnaya: 'traditional',
-  traditsionka: 'traditional',
-  lotus: 'lotus',
-  lotus1: 'lotus',
-  kokoloko: 'cocoloco',
-  cocoloko: 'cocoloco',
-  cheburashka: 'cheburashka',
-  kompot: 'compot',
-}
-
-const applyPhoneticAliases = (value: string) => (
-  transliterateRu(value)
-    .split(' ')
-    .map((token) => phoneticTokenMap[token] || token)
-    .join(' ')
-)
-
 const searchForms = (value: string) => {
   const base = normalizeText(value)
   const transliterated = transliterateRu(value)
-  const aliased = applyPhoneticAliases(value)
   return Array.from(new Set([
     base,
     transliterated,
-    aliased,
     base.replace(/\s+/g, ''),
     transliterated.replace(/\s+/g, ''),
-    aliased.replace(/\s+/g, ''),
   ].filter(Boolean)))
 }
 
@@ -285,10 +238,10 @@ const labelByKind: Record<CatalogKind, string> = {
 const questionPatterns: Array<{ kind: CatalogKind; words: string[] }> = [
   { kind: 'tobacco', words: ['табак', 'табаки', 'тютюн', 'тютюни'] },
   { kind: 'bowl', words: ['чаша', 'чаши', 'чашу'] },
-  { kind: 'kaloud', words: ['калауд', 'калауды', 'kaloud', 'lotus'] },
+  { kind: 'kaloud', words: ['калауд', 'калауды', 'kaloud'] },
   { kind: 'coal', words: ['уголь', 'угли', 'угольки', 'coal'] },
-  { kind: 'placement', words: ['раскладка', 'расположение', 'углей', 'cheburashka'] },
-  { kind: 'setupType', words: ['тип', 'забивки', 'compot', 'компот'] },
+  { kind: 'placement', words: ['раскладка', 'расположение', 'углей'] },
+  { kind: 'setupType', words: ['тип', 'забивки'] },
 ]
 
 const catalogQuestionWords = ['какие', 'какой', 'какая', 'что есть', 'есть', 'покажи', 'показать', 'список', 'варианты', 'выбрать']
@@ -382,9 +335,51 @@ const getItemPhoto = (item: any) => (
   null
 )
 
+const levenshteinDistance = (left: string, right: string) => {
+  if (left === right) return 0
+  if (!left.length) return right.length
+  if (!right.length) return left.length
+
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index)
+  const current = Array.from({ length: right.length + 1 }, () => 0)
+
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    current[0] = leftIndex
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const substitutionCost = left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1
+      current[rightIndex] = Math.min(
+        current[rightIndex - 1] + 1,
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + substitutionCost,
+      )
+    }
+    previous.splice(0, previous.length, ...current)
+  }
+
+  return previous[right.length]
+}
+
+const consonantSignature = (value: string) => transliterateRu(value).replace(/[aeiouy\s\d%]+/g, '')
+
+const fuzzyTokenScore = (queryToken: string, itemToken: string) => {
+  if (queryToken.length < 4 || itemToken.length < 4) return 0
+
+  const distance = levenshteinDistance(queryToken, itemToken)
+  const maxLength = Math.max(queryToken.length, itemToken.length)
+  const similarity = 1 - distance / maxLength
+  if (similarity >= 0.72) return Math.round(similarity * queryToken.length) + 2
+
+  const querySignature = consonantSignature(queryToken)
+  const itemSignature = consonantSignature(itemToken)
+  if (querySignature.length >= 3 && querySignature === itemSignature) return queryToken.length + 3
+
+  return 0
+}
+
 const scoreCatalogItem = (item: any, query: string) => {
   const itemText = getItemText(item)
   const itemJoined = itemText.replace(/\s+/g, '')
+  const itemTokens = Array.from(new Set(itemText.split(' ').filter((token) => token.length > 1)))
 
   return searchForms(query).reduce((best, form) => {
     const tokens = form.split(' ').filter((token) => token.length > 1)
@@ -395,6 +390,7 @@ const scoreCatalogItem = (item: any, query: string) => {
     if (form.length > 2 && itemText.includes(form)) score += form.length + 6
     tokens.forEach((token) => {
       if (itemText.includes(token)) score += token.length
+      score += itemTokens.reduce((tokenBest, itemToken) => Math.max(tokenBest, fuzzyTokenScore(token, itemToken)), 0)
     })
 
     return Math.max(best, score)
@@ -529,7 +525,7 @@ const buildAgentContextMessage = (
       'Если пользователь спрашивает, что уже выбрал, перечисли current_draft и при просьбе JSON покажи компактный JSON.',
       'Если пользователь пишет мусор или один непонятный символ, скажи, что не понял ввод, и попроси уточнить; не делай вид, что это параметр забивки.',
       'Название забивки не требуй, если выбраны табаки: оно автогенерируется из названий табаков через " + ".',
-      'Используй только варианты из catalogs. Исправляй опечатки по смыслу: "росомахуй/расмах" -> Unity Rosomaha, "морс" -> 420 Pomegranate Mors, "фунел" -> Phunnel.',
+      'Используй только варианты из catalogs. Если пользователь пишет с опечатками, сопоставляй смысл с текущими названиями из catalogs без выдумывания новых позиций.',
       'Фронт после твоего текста покажет карточку черновика и варианты выбора, если они нужны.',
       `STATE_JSON: ${JSON.stringify(context)}`,
     ].join('\n'),
