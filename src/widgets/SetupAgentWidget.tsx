@@ -135,6 +135,7 @@ const transliterateRu = (value: string) => {
     а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y',
     к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u',
     ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ы: 'y', э: 'e', ю: 'yu', я: 'ya',
+    ь: '', ъ: '',
   }
   return normalizeText(value).split('').map((char) => map[char] || char).join('')
 }
@@ -158,6 +159,20 @@ const phoneticTokenMap: Record<string, string> = {
   granat: 'pomegranate',
   moroz: 'frost',
   frost: 'frost',
+  funel: 'phunnel',
+  fanel: 'phunnel',
+  funnel: 'phunnel',
+  phunel: 'phunnel',
+  tradishnl: 'traditional',
+  tradishnal: 'traditional',
+  traditsionnaya: 'traditional',
+  traditsionka: 'traditional',
+  lotus: 'lotus',
+  lotus1: 'lotus',
+  kokoloko: 'cocoloco',
+  cocoloko: 'cocoloco',
+  cheburashka: 'cheburashka',
+  kompot: 'compot',
 }
 
 const applyPhoneticAliases = (value: string) => (
@@ -278,6 +293,7 @@ const questionPatterns: Array<{ kind: CatalogKind; words: string[] }> = [
 
 const catalogQuestionWords = ['какие', 'какой', 'какая', 'что есть', 'есть', 'покажи', 'показать', 'список', 'варианты', 'выбрать']
 const metaQuestionWords = ['что это', 'че это', 'зачем', 'кто ты', 'что умеешь', 'как работает', 'помоги', 'help']
+const greetingWords = ['привет', 'здарова', 'здравствуйте', 'добрый день', 'доброе утро', 'добрый вечер', 'hi', 'hello', 'hey']
 
 const getKindFromText = (text: string) => {
   const normalized = normalizeText(text)
@@ -316,6 +332,11 @@ const stripKindWords = (text: string, kind: CatalogKind) => {
 const isMetaQuestion = (text: string) => {
   const normalized = normalizeText(text)
   return metaQuestionWords.some((word) => normalized.includes(normalizeText(word)))
+}
+
+const isGreeting = (text: string) => {
+  const normalized = normalizeText(text)
+  return greetingWords.some((word) => normalized === normalizeText(word))
 }
 
 const isPercentQuestion = (text: string) => {
@@ -431,10 +452,10 @@ const buildChoiceSnapshot = (kind: CatalogKind, items: any[], hint?: string, mis
 
 const getCatalogItems = (kind: CatalogKind, catalogs: Record<CatalogKind, any[]>) => catalogs[kind] || []
 
-const buildMissingChoice = (missing: string[], catalogs: Record<CatalogKind, any[]>) => {
+const getMissingCatalogKind = (missing: string[]): CatalogKind | null => {
   if (missing[0] === 'проценты табаков') return null
 
-  const missingKind = missing.includes('табак')
+  return missing.includes('табак')
     ? 'tobacco'
     : missing.includes('чаша')
       ? 'bowl'
@@ -447,6 +468,10 @@ const buildMissingChoice = (missing: string[], catalogs: Record<CatalogKind, any
             : missing.includes('тип забивки')
               ? 'setupType'
               : null
+}
+
+const buildMissingChoice = (missing: string[], catalogs: Record<CatalogKind, any[]>) => {
+  const missingKind = getMissingCatalogKind(missing)
 
   return missingKind
     ? buildChoiceSnapshot(missingKind, getCatalogItems(missingKind, catalogs), 'Выбери ниже. Карточка останется в чате.', missing)
@@ -924,9 +949,13 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
 
   const handleMentionedCatalogItems = async (text: string) => {
     const explicitKind = getKindFromText(text)
+    const missingKind = getMissingCatalogKind(missing)
     const kinds: CatalogKind[] = explicitKind
       ? [explicitKind]
-      : ['tobacco', 'bowl', 'kaloud', 'coal', 'placement', 'setupType']
+      : [
+          ...(missingKind ? [missingKind] : []),
+          ...(['tobacco', 'bowl', 'kaloud', 'coal', 'placement', 'setupType'] as CatalogKind[]).filter((kind) => kind !== missingKind),
+        ]
 
     for (const kind of kinds) {
       const items = getCatalogItems(kind, catalogs)
@@ -934,6 +963,18 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       if (matches.length) {
         return applyCatalogItems(kind, matches)
       }
+    }
+
+    return false
+  }
+
+  const handleContextualCatalogChoice = async (text: string) => {
+    const missingKind = getMissingCatalogKind(missing)
+    if (!missingKind) return false
+
+    const matches = findMentionedCatalogItems(getCatalogItems(missingKind, catalogs), text)
+    if (matches.length) {
+      return applyCatalogItems(missingKind, matches)
     }
 
     return false
@@ -1007,6 +1048,11 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     setMessages(nextMessages)
     setInput('')
 
+    if (isGreeting(text)) {
+      await typeAssistantText('Привет. Напиши вкус, табак или любой параметр забивки, я соберу черновик.')
+      return
+    }
+
     if (isMetaQuestion(text)) {
       await typeAssistantText(chatIntro)
       return
@@ -1022,6 +1068,8 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     }
 
     if (await handleDraftQuestion(text)) return
+
+    if (await handleContextualCatalogChoice(text)) return
 
     if (await handleMentionedCatalogItems(text)) return
 
