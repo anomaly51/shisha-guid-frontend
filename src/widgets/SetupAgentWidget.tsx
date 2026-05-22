@@ -217,15 +217,6 @@ const labelByKind: Record<CatalogKind, string> = {
   setupType: 'тип забивки',
 }
 
-const titleByKind: Record<CatalogKind, string> = {
-  tobacco: 'Табаки в базе',
-  bowl: 'Чаши в базе',
-  kaloud: 'Калауды в базе',
-  coal: 'Уголь в базе',
-  placement: 'Раскладки углей',
-  setupType: 'Типы забивки',
-}
-
 const questionPatterns: Array<{ kind: CatalogKind; words: string[] }> = [
   { kind: 'tobacco', words: ['табак', 'табаки', 'тютюн', 'тютюни'] },
   { kind: 'bowl', words: ['чаша', 'чаши', 'чашу'] },
@@ -674,7 +665,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
 
     const items = getCatalogItems(kind, catalogs)
     if (!items.length) {
-      await typeAssistantText(`Каталог "${titleByKind[kind]}" пока не загрузился или пустой.`)
+      await typeAssistantText(`Каталог для поля "${labelByKind[kind]}" пока не загрузился или пустой.`)
       return true
     }
 
@@ -693,7 +684,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
 
     await typeAssistantText(
       matches.length
-        ? `${titleByKind[kind]}: выбери подходящий вариант.`
+        ? 'Выбери подходящий вариант.'
         : `Не нашел "${query || text}" в базе. Показываю доступные варианты.`,
       [{
         id: createMessageId(),
