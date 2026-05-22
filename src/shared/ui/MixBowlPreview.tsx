@@ -1,57 +1,97 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import 'twin.macro'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-
-export type SetupKind = 'sectors' | 'layers' | 'compot'
-export type BowlModel = 'traditional' | 'phunnel'
-
-export interface MixBowlItem {
-  id: string
-  name: string
-  percentage: number
-  color: string
-  photo_url?: string
-}
+import {
+  BowlPreviewFallback,
+  MIX_COLORS,
+  useIsomorphicLayoutEffect,
+  type BowlModel,
+  type MixBowlItem,
+  type SetupKind,
+} from './mixBowlModel'
 
 const TOBACCO_SURFACE_MAX_Y = 0.765
 const TOBACCO_BASE_Y = 0.595
+const MAX_CONCURRENT_SNAPSHOTS = 1
 
-export const MIX_COLORS = ['#9F1D24', '#1F1716', '#B96A18', '#5F2D22', '#7A171E', '#3E251B', '#C18A2F']
-
-export const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
-
-export const BowlPreviewFallback = ({ hidden = false }: { hidden?: boolean }) => (
-  <div
-    aria-hidden="true"
-    tw="pointer-events-none absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-200"
-    style={{ opacity: hidden ? 0 : 1 }}
-  >
-    <svg
-      viewBox="0 0 48 48"
-      tw="h-10 w-10 text-[rgb(var(--color-text-subtle))]/70"
-      fill="none"
-    >
-      <circle cx="24" cy="24" r="16" stroke="currentColor" strokeWidth="4" opacity="0.22" />
-      <path d="M40 24a16 16 0 0 0-16-16" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-    </svg>
-  </div>
-)
-
-const normalizeName = (value: string) => value.toLowerCase().replace(/\s+/g, '')
-
-export const detectSetupKind = (name?: string | null): SetupKind => {
-  const normalized = normalizeName(name || '')
-  if (normalized.includes('sector') || normalized.includes('сектор') || normalized.includes('полов')) return 'sectors'
-  if (normalized.includes('layer') || normalized.includes('сло')) return 'layers'
-  return 'compot'
+type SnapshotTask = {
+  cancelIdle?: () => void
+  cancelled: boolean
+  released: boolean
+  reserved: boolean
+  start: (release: () => void) => void
 }
 
-export const detectBowlModel = (bowl?: { bowl_type?: string | null; name?: string | null; description?: string | null } | null): BowlModel => {
-  if (bowl?.bowl_type === 'phunnel' || bowl?.bowl_type === 'traditional') return bowl.bowl_type
-  const normalized = normalizeName(`${bowl?.name || ''} ${bowl?.description || ''}`)
-  if (normalized.includes('phunnel') || normalized.includes('funnel') || normalized.includes('фаннел')) return 'phunnel'
-  return 'traditional'
+let activeSnapshotCount = 0
+const snapshotQueue: SnapshotTask[] = []
+
+const requestIdle = (callback: () => void) => {
+  if (typeof window === 'undefined') return () => undefined
+
+  if ('requestIdleCallback' in window) {
+    const idleWindow = window as Window & {
+      cancelIdleCallback: (id: number) => void
+      requestIdleCallback: (callback: () => void, options?: { timeout: number }) => number
+    }
+    const id = idleWindow.requestIdleCallback(callback, { timeout: 900 })
+    return () => idleWindow.cancelIdleCallback(id)
+  }
+
+  const id = globalThis.setTimeout(callback, 32)
+  return () => globalThis.clearTimeout(id)
+}
+
+const pumpSnapshotQueue = () => {
+  if (activeSnapshotCount >= MAX_CONCURRENT_SNAPSHOTS) return
+
+  const task = snapshotQueue.shift()
+  if (!task) return
+  if (task.cancelled) {
+    pumpSnapshotQueue()
+    return
+  }
+
+  task.reserved = true
+  activeSnapshotCount += 1
+
+  const release = () => {
+    if (task.released) return
+    task.released = true
+    activeSnapshotCount = Math.max(0, activeSnapshotCount - 1)
+    pumpSnapshotQueue()
+  }
+
+  task.cancelIdle = requestIdle(() => {
+    task.cancelIdle = undefined
+    if (task.cancelled) {
+      release()
+      return
+    }
+    task.start(release)
+  })
+}
+
+const scheduleSnapshot = (start: (release: () => void) => void) => {
+  const task: SnapshotTask = {
+    cancelled: false,
+    released: false,
+    reserved: false,
+    start,
+  }
+
+  snapshotQueue.push(task)
+  pumpSnapshotQueue()
+
+  return () => {
+    task.cancelled = true
+    task.cancelIdle?.()
+    if (task.reserved && !task.released) {
+      task.released = true
+      activeSnapshotCount = Math.max(0, activeSnapshotCount - 1)
+      pumpSnapshotQueue()
+    }
+  }
 }
 
 const pseudoRandom = (seed: number) => {
@@ -96,11 +136,43 @@ const getSectorIndex = (angle: number, boundaries: number[]) => {
   return boundaries.length - 2
 }
 
+const useVisibilityGate = (enabled: boolean, rootMargin = '520px') => {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [visible, setVisible] = useState(!enabled)
+
+  useEffect(() => {
+    if (!enabled) {
+      setVisible(true)
+      return undefined
+    }
+
+    const node = ref.current
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setVisible(true)
+      return undefined
+    }
+
+    if (visible) return undefined
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return
+      setVisible(true)
+      observer.disconnect()
+    }, { rootMargin })
+
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [enabled, rootMargin, visible])
+
+  return { ref, visible }
+}
+
 const TobaccoColorSurface = ({
   colorAt,
   end = Math.PI * 2,
   inner = 0,
   outer = 1.02,
+  resolution = 44,
   seed,
   start = 0,
   y,
@@ -109,12 +181,12 @@ const TobaccoColorSurface = ({
   end?: number
   inner?: number
   outer?: number
+  resolution?: number
   seed: number
   start?: number
   y: number
 }) => {
   const geometry = useMemo(() => {
-    const resolution = 44
     const positions: number[] = []
     const colors: number[] = []
     const indices: number[] = []
@@ -165,7 +237,7 @@ const TobaccoColorSurface = ({
     moundGeometry.setIndex(indices)
     moundGeometry.computeVertexNormals()
     return moundGeometry
-  }, [colorAt, end, inner, outer, seed, start, y])
+  }, [colorAt, end, inner, outer, resolution, seed, start, y])
 
   return (
     <mesh geometry={geometry} castShadow receiveShadow>
@@ -174,7 +246,7 @@ const TobaccoColorSurface = ({
   )
 }
 
-const SectorTobacco = ({ bowlModel, items }: { bowlModel: BowlModel; items: MixBowlItem[] }) => {
+const SectorTobacco = ({ bowlModel, items, resolution }: { bowlModel: BowlModel; items: MixBowlItem[]; resolution?: number }) => {
   const colorAt = useMemo(() => {
     let acc = 0
     const boundaries = [0, ...items.map((item) => {
@@ -189,17 +261,17 @@ const SectorTobacco = ({ bowlModel, items }: { bowlModel: BowlModel; items: MixB
     }
   }, [items])
 
-  return <TobaccoColorSurface colorAt={colorAt} inner={bowlModel === 'phunnel' ? 0.34 : 0.02} outer={1} seed={7} y={TOBACCO_BASE_Y} />
+  return <TobaccoColorSurface colorAt={colorAt} inner={bowlModel === 'phunnel' ? 0.34 : 0.02} outer={1} resolution={resolution} seed={7} y={TOBACCO_BASE_Y} />
 }
 
-const LayerTobacco = ({ bowlModel, items }: { bowlModel: BowlModel; items: MixBowlItem[] }) => {
+const LayerTobacco = ({ bowlModel, items, resolution }: { bowlModel: BowlModel; items: MixBowlItem[]; resolution?: number }) => {
   const topColor = items[items.length - 1]?.color || MIX_COLORS[0]
   const topColorAt = useMemo(() => () => topColor, [topColor])
 
-  return <TobaccoColorSurface colorAt={topColorAt} inner={bowlModel === 'phunnel' ? 0.34 : 0.02} outer={1} seed={29} y={TOBACCO_BASE_Y + 0.012} />
+  return <TobaccoColorSurface colorAt={topColorAt} inner={bowlModel === 'phunnel' ? 0.34 : 0.02} outer={1} resolution={resolution} seed={29} y={TOBACCO_BASE_Y + 0.012} />
 }
 
-const CompotTobacco = ({ bowlModel, items }: { bowlModel: BowlModel; items: MixBowlItem[] }) => {
+const CompotTobacco = ({ bowlModel, items, resolution }: { bowlModel: BowlModel; items: MixBowlItem[]; resolution?: number }) => {
   const colorAt = useMemo(() => {
     const thresholds = items.reduce<Array<{ limit: number; color: string }>>((result, item) => {
       const previous = result[result.length - 1]?.limit || 0
@@ -213,7 +285,7 @@ const CompotTobacco = ({ bowlModel, items }: { bowlModel: BowlModel; items: MixB
     }
   }, [items])
 
-  return <TobaccoColorSurface colorAt={colorAt} inner={bowlModel === 'phunnel' ? 0.34 : 0.02} outer={1} seed={43} y={TOBACCO_BASE_Y} />
+  return <TobaccoColorSurface colorAt={colorAt} inner={bowlModel === 'phunnel' ? 0.34 : 0.02} outer={1} resolution={resolution} seed={43} y={TOBACCO_BASE_Y} />
 }
 
 const BowlScene = ({
@@ -222,6 +294,7 @@ const BowlScene = ({
   interactive = true,
   kind,
   items,
+  quality = 'live',
   sceneScale = 0.98,
 }: {
   autoRotate?: boolean
@@ -229,6 +302,7 @@ const BowlScene = ({
   interactive?: boolean
   kind: SetupKind
   items: MixBowlItem[]
+  quality?: 'live' | 'snapshot'
   sceneScale?: number
 }) => {
   const groupRef = useRef<THREE.Group>(null)
@@ -237,6 +311,10 @@ const BowlScene = ({
   const dragRef = useRef({ active: false, x: 0, y: 0, rotation: 0.2, tilt: 0.04 })
   const invalidate = useThree((state) => state.invalidate)
   const isPhunnel = bowlModel === 'phunnel'
+  const latheSegments = quality === 'snapshot' ? 72 : 128
+  const torusSegments = quality === 'snapshot' ? 64 : 128
+  const cylinderSegments = quality === 'snapshot' ? 56 : 96
+  const tobaccoResolution = quality === 'snapshot' ? 28 : 44
   const bowlProfile = useMemo(() => (
     isPhunnel
       ? [
@@ -340,56 +418,56 @@ const BowlScene = ({
       }}
     >
       <mesh castShadow receiveShadow>
-        <latheGeometry args={[bowlProfile, 128]} />
+        <latheGeometry args={[bowlProfile, latheSegments]} />
         <meshPhysicalMaterial color="#654A3D" roughness={0.55} metalness={0.03} clearcoat={0.32} clearcoatRoughness={0.5} side={THREE.DoubleSide} />
       </mesh>
 
       <mesh position={[0, 0.035, 0]} castShadow>
-        <latheGeometry args={[innerProfile, 128]} />
+        <latheGeometry args={[innerProfile, latheSegments]} />
         <meshStandardMaterial color="#413027" roughness={0.74} metalness={0.01} side={THREE.DoubleSide} />
       </mesh>
 
       <mesh position={[0, isPhunnel ? 0.78 : 0.72, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[1.12, 0.105, 24, 128]} />
+        <torusGeometry args={[1.12, 0.105, 20, torusSegments]} />
         <meshPhysicalMaterial color="#594237" roughness={0.49} metalness={0.04} clearcoat={0.36} clearcoatRoughness={0.48} />
       </mesh>
 
       {isPhunnel && (
         <>
           <mesh position={[0, 0.48, 0]} castShadow receiveShadow>
-            <cylinderGeometry args={[0.31, 0.39, 0.44, 96]} />
+            <cylinderGeometry args={[0.31, 0.39, 0.44, cylinderSegments]} />
             <meshPhysicalMaterial color="#654A3D" roughness={0.55} metalness={0.03} clearcoat={0.32} clearcoatRoughness={0.5} />
           </mesh>
           <mesh position={[0, 0.7, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <torusGeometry args={[0.23, 0.065, 18, 96]} />
+            <torusGeometry args={[0.23, 0.065, 16, cylinderSegments]} />
             <meshPhysicalMaterial color="#594237" roughness={0.5} metalness={0.03} clearcoat={0.28} clearcoatRoughness={0.5} />
           </mesh>
           <mesh position={[0, 0.728, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[0.16, 72]} />
+            <circleGeometry args={[0.16, cylinderSegments]} />
             <meshBasicMaterial color="#0B0705" side={THREE.DoubleSide} />
           </mesh>
         </>
       )}
 
       <mesh position={[0, isPhunnel ? -1.84 : -1.05, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[0.58, 0.045, 18, 96]} />
+        <torusGeometry args={[0.58, 0.045, 16, cylinderSegments]} />
         <meshPhysicalMaterial color="#563F35" roughness={0.58} clearcoat={0.24} />
       </mesh>
 
       <mesh position={[0, isPhunnel ? -1.92 : -1.12, 0]} receiveShadow>
-        <cylinderGeometry args={[0.68, 0.54, 0.08, 96]} />
+        <cylinderGeometry args={[0.68, 0.54, 0.08, cylinderSegments]} />
         <meshStandardMaterial color="#49372E" roughness={0.66} />
       </mesh>
 
       {items.length ? (
         kind === 'sectors'
-          ? <SectorTobacco bowlModel={bowlModel} items={items} />
+          ? <SectorTobacco bowlModel={bowlModel} items={items} resolution={tobaccoResolution} />
           : kind === 'layers'
-            ? <LayerTobacco bowlModel={bowlModel} items={items} />
-            : <CompotTobacco bowlModel={bowlModel} items={items} />
+            ? <LayerTobacco bowlModel={bowlModel} items={items} resolution={tobaccoResolution} />
+            : <CompotTobacco bowlModel={bowlModel} items={items} resolution={tobaccoResolution} />
       ) : (
         <mesh position={[0, 0.58, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          {isPhunnel ? <ringGeometry args={[0.36, 0.96, 96]} /> : <circleGeometry args={[0.96, 96]} />}
+          {isPhunnel ? <ringGeometry args={[0.36, 0.96, cylinderSegments]} /> : <circleGeometry args={[0.96, cylinderSegments]} />}
           <meshStandardMaterial color="#211916" roughness={0.86} />
         </mesh>
       )}
@@ -424,8 +502,12 @@ export const MixBowlPreview = ({
 }) => {
   const [mounted, setMounted] = useState(false)
   const [sceneReady, setSceneReady] = useState(false)
+  const [snapshotRenderAllowed, setSnapshotRenderAllowed] = useState(renderMode === 'live')
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null)
+  const snapshotReleaseRef = useRef<(() => void) | null>(null)
   const total = items.reduce((sum, item) => sum + item.percentage, 0)
+  const isSnapshot = renderMode === 'snapshot'
+  const { ref: visibilityRef, visible: isPreviewVisible } = useVisibilityGate(isSnapshot)
   const normalizedItems = useMemo(() => (
     total > 0
       ? items.map((item) => ({ ...item, percentage: item.percentage / total * 100 }))
@@ -448,14 +530,41 @@ export const MixBowlPreview = ({
   useEffect(() => {
     setSceneReady(false)
     setSnapshotUrl(null)
+    setSnapshotRenderAllowed(renderMode === 'live')
   }, [sceneKey])
 
-  const showCanvas = mounted && (renderMode === 'live' || !snapshotUrl)
-  const isSnapshot = renderMode === 'snapshot'
+  useEffect(() => {
+    if (!mounted || !isSnapshot || !isPreviewVisible || snapshotUrl) return undefined
+
+    let active = true
+    const cancel = scheduleSnapshot((release) => {
+      if (!active) {
+        release()
+        return
+      }
+      snapshotReleaseRef.current = release
+      setSnapshotRenderAllowed(true)
+    })
+
+    return () => {
+      active = false
+      cancel()
+      snapshotReleaseRef.current?.()
+      snapshotReleaseRef.current = null
+    }
+  }, [isPreviewVisible, isSnapshot, mounted, sceneKey, snapshotUrl])
+
+  const releaseSnapshot = () => {
+    snapshotReleaseRef.current?.()
+    snapshotReleaseRef.current = null
+  }
+
+  const showCanvas = mounted && (renderMode === 'live' || (!snapshotUrl && isPreviewVisible && snapshotRenderAllowed))
 
   return (
     <div
       className={className}
+      ref={visibilityRef}
       style={style}
       tw="relative aspect-square overflow-hidden bg-[rgb(var(--color-surface-muted))]"
       onClick={(event) => {
@@ -485,12 +594,13 @@ export const MixBowlPreview = ({
               requestAnimationFrame(() => {
                 if (isSnapshot) {
                   setSnapshotUrl(gl.domElement.toDataURL('image/webp', 0.88))
+                  releaseSnapshot()
                 }
                 setSceneReady(true)
               })
             })
           }}
-          shadows={{ enabled: true, type: THREE.PCFShadowMap }}
+          shadows={isSnapshot ? false : { enabled: true, type: THREE.PCFShadowMap }}
           style={{
             background: 'transparent',
             cursor: interactive ? 'grab' : 'pointer',
@@ -506,7 +616,7 @@ export const MixBowlPreview = ({
           <directionalLight position={[-4, 2.4, -3]} intensity={0.78} color="#F1D5BC" />
           <pointLight position={[0, 1.7, 1.8]} intensity={1.15} color="#FFD6A8" distance={5.8} />
           <pointLight position={[0, 0.9, -1.7]} intensity={0.38} color="#EBA268" distance={4.5} />
-          <BowlScene autoRotate={autoRotate && !isSnapshot} bowlModel={bowlModel} interactive={interactive} kind={kind} items={normalizedItems} sceneScale={sceneScale} />
+          <BowlScene autoRotate={autoRotate && !isSnapshot} bowlModel={bowlModel} interactive={interactive} kind={kind} items={normalizedItems} quality={isSnapshot ? 'snapshot' : 'live'} sceneScale={sceneScale} />
         </Canvas>
       )}
     </div>

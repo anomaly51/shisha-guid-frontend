@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import 'twin.macro'
@@ -7,7 +7,7 @@ import { Button } from '../shared/ui/Button'
 import { useGetBowlSetupTypesQuery, useGetBowlsQuery, useGetSetupsQuery, useGetTobaccosQuery } from '../shared/api'
 import { CardSkeleton } from '../shared/ui/Skeleton'
 import { CatalogIcon, ChevronDownIcon, CloseIcon, EyeIcon, PlusIcon } from '../shared/ui/Icons'
-import { MIX_COLORS, MixBowlPreview, detectBowlModel, detectSetupKind, type MixBowlItem } from '../shared/ui/MixBowlPreview'
+import { BowlPreviewFallback, MIX_COLORS, detectBowlModel, detectSetupKind, type BowlModel, type MixBowlItem, type SetupKind } from '../shared/ui/mixBowlModel'
 import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
 import { AuthorChip } from '../shared/ui/AuthorChip'
 import { getSetupHeaviness } from '../shared/setupMetrics'
@@ -18,6 +18,65 @@ type SortValue = 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' 
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
 
 const SETUP_PAGE_SIZE = 12
+
+const LazyMixBowlPreview = lazy(() => (
+  import('../shared/ui/MixBowlPreview').then(({ MixBowlPreview }) => ({ default: MixBowlPreview }))
+))
+
+const runWhenIdle = (callback: () => void) => {
+  if (typeof window === 'undefined') return () => undefined
+
+  if ('requestIdleCallback' in window) {
+    const idleWindow = window as Window & {
+      cancelIdleCallback: (id: number) => void
+      requestIdleCallback: (callback: () => void, options?: { timeout: number }) => number
+    }
+    const id = idleWindow.requestIdleCallback(callback, { timeout: 1200 })
+    return () => idleWindow.cancelIdleCallback(id)
+  }
+
+  const id = globalThis.setTimeout(callback, 80)
+  return () => globalThis.clearTimeout(id)
+}
+
+const BowlPreviewPlaceholder = () => (
+  <div tw="relative aspect-square overflow-hidden bg-[rgb(var(--color-surface-muted))]">
+    <div tw="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(255,255,255,0.82),transparent_38%),linear-gradient(180deg,rgba(255,248,241,0.72),rgba(229,218,207,0.42))]" />
+    <BowlPreviewFallback />
+  </div>
+)
+
+const DeferredMixBowlPreview = (props: {
+  autoRotate?: boolean
+  bowlModel?: BowlModel
+  interactive?: boolean
+  kind: SetupKind
+  items: MixBowlItem[]
+  renderMode?: 'live' | 'snapshot'
+  sceneScale?: number
+}) => {
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    const cancel = runWhenIdle(() => {
+      if (active) setReady(true)
+    })
+
+    return () => {
+      active = false
+      cancel()
+    }
+  }, [])
+
+  if (!ready) return <BowlPreviewPlaceholder />
+
+  return (
+    <Suspense fallback={<BowlPreviewPlaceholder />}>
+      <LazyMixBowlPreview {...props} />
+    </Suspense>
+  )
+}
 
 const getItem = (items: any[] | undefined, id: string | undefined) => (
   items?.find((item) => item.id === id)
@@ -98,7 +157,7 @@ const SetupCard = memo(({
     <Card variant="hover" onClick={() => onOpen(setup.id)} className="h-full">
       <div tw="flex h-full flex-col bg-[rgb(var(--color-surface))]">
         <div tw="relative border-b border-[rgb(var(--color-border))]">
-          <MixBowlPreview
+          <DeferredMixBowlPreview
             autoRotate={false}
             bowlModel={bowlModel}
             interactive={false}
@@ -192,14 +251,14 @@ export const Feed = () => {
     isFetching,
     isLoading,
     refetch: refetchSetups,
-  } = useGetSetupsQuery(setupQueryParams)
+  } = useGetSetupsQuery(setupQueryParams, { refetchOnMountOrArgChange: false })
   const normalizedSetupsPage = useMemo(() => normalizeSetupsPage(setupsPage), [setupsPage])
-  const { data: tobaccos } = useGetTobaccosQuery()
+  const { data: tobaccos } = useGetTobaccosQuery(undefined, { refetchOnMountOrArgChange: false })
   const tobaccoPickerQueryParams = useMemo(() => ({
     search: tobaccoSearch.trim() || undefined,
-    limit: tobaccoPickerOpen ? 18 : 8,
-  }), [tobaccoPickerOpen, tobaccoSearch])
-  const { data: pickerTobaccos = [] } = useGetTobaccosQuery(tobaccoPickerQueryParams)
+    limit: 18,
+  }), [tobaccoSearch])
+  const { data: pickerTobaccos = [] } = useGetTobaccosQuery(tobaccoPickerQueryParams, { skip: !tobaccoPickerOpen })
   const { data: types } = useGetBowlSetupTypesQuery()
   const { data: bowls } = useGetBowlsQuery()
   const navigate = useNavigate()
@@ -525,7 +584,7 @@ export const Feed = () => {
                   >
                     <div tw="relative aspect-square overflow-hidden bg-[rgb(var(--color-surface-muted))]">
                       {photo ? (
-                        <img src={photo} alt={tobacco.name} tw="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
+                        <img src={photo} alt={tobacco.name} loading="lazy" decoding="async" tw="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
                       ) : (
                         <div tw="flex h-full w-full items-center justify-center text-[rgb(var(--color-text-subtle))]">
                           <CatalogIcon name="tobacco" size={28} />

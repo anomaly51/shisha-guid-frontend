@@ -15,7 +15,7 @@ import {
   useTranscribeSetupVoiceMutation,
 } from '../shared/api'
 import { CatalogIcon, CheckIcon, CloseIcon, MicIcon, SendIcon } from '../shared/ui/Icons'
-import { MIX_COLORS, type MixBowlItem } from '../shared/ui/MixBowlPreview'
+import { MIX_COLORS, type MixBowlItem } from '../shared/ui/mixBowlModel'
 
 const ChatPanel = styled.section`
   ${tw`relative flex w-full overflow-hidden border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))]`}

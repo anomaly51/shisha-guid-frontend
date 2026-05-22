@@ -1,7 +1,7 @@
 import 'twin.macro'
 import styled from 'styled-components'
 import { CatalogIcon } from './Icons'
-import type { MixBowlItem } from './MixBowlPreview'
+import type { MixBowlItem } from './mixBowlModel'
 
 type TobaccoPhotoStackVariant = 'feed' | 'detail'
 
@@ -82,6 +82,8 @@ export const TobaccoPhotoStack = ({
               <img
                 src={item.photo_url}
                 alt={item.name}
+                loading="lazy"
+                decoding="async"
                 tw="h-full w-full object-cover"
               />
             ) : (

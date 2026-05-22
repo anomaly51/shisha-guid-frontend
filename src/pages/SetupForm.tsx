@@ -15,7 +15,7 @@ import {
 import { BackIcon, CatalogIcon, type CatalogIconName, LockIcon, VoteDownIcon, VoteUpIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
-import { BowlPreviewFallback, detectBowlModel, useIsomorphicLayoutEffect, type BowlModel } from '../shared/ui/MixBowlPreview'
+import { BowlPreviewFallback, detectBowlModel, useIsomorphicLayoutEffect, type BowlModel } from '../shared/ui/mixBowlModel'
 import { calculateSetupCost, formatMoney } from '../shared/setupCost'
 import { hasAuthToken } from '../shared/authToken'
 

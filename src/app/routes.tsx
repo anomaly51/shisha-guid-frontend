@@ -1,17 +1,7 @@
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
-import type { ReactElement } from 'react'
+import { lazy, Suspense, type ComponentType, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Layout } from '../widgets/Layout'
-import { Feed } from '../pages/Feed'
-import { Catalog } from '../pages/Catalog'
-import { Detail } from '../pages/Detail'
-import { CreateItem } from '../pages/CreateItem'
-import { EditItem } from '../pages/EditItem'
-import { SetupDetail } from '../pages/SetupDetail'
-import { EditSetup } from '../pages/EditSetup'
-import { SetupForm } from '../pages/SetupForm'
-import { Profile } from '../pages/Profile'
-import { AgentChat } from '../pages/AgentChat'
 import { PageTitle } from './PageTitle'
 import {
   useGetBowlsQuery, useCreateBowlMutation, useGetBowlQuery, useUpdateBowlMutation, useDeleteBowlMutation,
@@ -23,6 +13,42 @@ import {
   useGetProfileQuery,
 } from '../shared/api'
 import { hasAuthToken } from '../shared/authToken'
+
+const routeComponent = <TModule extends Record<string, ComponentType<any>>, TKey extends keyof TModule>(
+  loader: () => Promise<TModule>,
+  exportName: TKey,
+) => lazy(() => loader().then((module) => ({ default: module[exportName] })))
+
+const Feed = import.meta.env.SSR
+  ? (await import('../pages/Feed')).Feed
+  : routeComponent(() => import('../pages/Feed'), 'Feed')
+const Catalog = import.meta.env.SSR
+  ? (await import('../pages/Catalog')).Catalog
+  : routeComponent(() => import('../pages/Catalog'), 'Catalog')
+const Detail = import.meta.env.SSR
+  ? (await import('../pages/Detail')).Detail
+  : routeComponent(() => import('../pages/Detail'), 'Detail')
+const CreateItem = import.meta.env.SSR
+  ? (await import('../pages/CreateItem')).CreateItem
+  : routeComponent(() => import('../pages/CreateItem'), 'CreateItem')
+const EditItem = import.meta.env.SSR
+  ? (await import('../pages/EditItem')).EditItem
+  : routeComponent(() => import('../pages/EditItem'), 'EditItem')
+const SetupDetail = import.meta.env.SSR
+  ? (await import('../pages/SetupDetail')).SetupDetail
+  : routeComponent(() => import('../pages/SetupDetail'), 'SetupDetail')
+const EditSetup = import.meta.env.SSR
+  ? (await import('../pages/EditSetup')).EditSetup
+  : routeComponent(() => import('../pages/EditSetup'), 'EditSetup')
+const SetupForm = import.meta.env.SSR
+  ? (await import('../pages/SetupForm')).SetupForm
+  : routeComponent(() => import('../pages/SetupForm'), 'SetupForm')
+const Profile = import.meta.env.SSR
+  ? (await import('../pages/Profile')).Profile
+  : routeComponent(() => import('../pages/Profile'), 'Profile')
+const AgentChat = import.meta.env.SSR
+  ? (await import('../pages/AgentChat')).AgentChat
+  : routeComponent(() => import('../pages/AgentChat'), 'AgentChat')
 
 const AdminOnly = ({ children }: { children: ReactElement }) => {
   const hasToken = hasAuthToken()
@@ -45,9 +71,10 @@ export const AppRoutes = () => {
   return (
   <>
     <PageTitle />
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<Feed />} />
+    <Suspense fallback={null}>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Feed />} />
 
       <Route path="bowls" element={
         <Catalog title={t('routes.bowls')} listHook={useGetBowlsQuery}
@@ -140,8 +167,9 @@ export const AppRoutes = () => {
       <Route path="ai-chat" element={<AgentChat />} />
 
       <Route path="profile" element={<Profile />} />
-      </Route>
-    </Routes>
+        </Route>
+      </Routes>
+    </Suspense>
   </>
   )
 }
