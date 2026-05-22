@@ -15,6 +15,8 @@ import {
   useTranscribeSetupVoiceMutation,
 } from '../shared/api'
 import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, SendIcon } from '../shared/ui/Icons'
+import { MIX_COLORS, MixBowlPreview, detectBowlModel, detectSetupKind, type MixBowlItem } from '../shared/ui/MixBowlPreview'
+import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
 
 const ChatPanel = styled.section<{ $expanded?: boolean }>`
   ${tw`flex overflow-hidden border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-2xl`}
@@ -66,6 +68,19 @@ const DraftLine = tw.div`mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold t
 const DraftToken = tw.span`inline-flex max-w-full items-center gap-1 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1`
 const PublishButton = tw.button`inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-accent))] px-4 text-[12px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_16px_28px_-22px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
 const MissingText = tw.div`text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
+const DraftVisual = tw.div`relative mt-2 overflow-hidden rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))]`
+const DraftVisualBadge = tw.div`pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur`
+const DraftSectionLabel = tw.div`mt-2 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]`
+const DraftMixGrid = tw.div`mt-1.5 grid gap-1.5`
+const DraftMixRow = tw.div`grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg bg-[rgb(var(--color-surface-muted))] p-1.5`
+const DraftMiniPhoto = tw.div`h-9 w-9 overflow-hidden rounded-md bg-[rgb(var(--color-surface))]`
+const DraftMixName = tw.div`truncate text-[12px] font-black text-[rgb(var(--color-text))]`
+const DraftMixMeta = tw.div`mt-0.5 truncate text-[10px] font-semibold text-[rgb(var(--color-text-subtle))]`
+const DraftPercent = tw.div`rounded-md bg-[rgb(var(--color-surface))] px-2 py-1 text-[11px] font-black text-[rgb(var(--color-accent))] tabular-nums`
+const DraftSpecGrid = tw.div`mt-2 grid grid-cols-2 gap-1.5`
+const DraftSpec = tw.div`min-w-0 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-2`
+const DraftSpecLabel = tw.div`flex items-center gap-1 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]`
+const DraftSpecValue = tw.div`mt-1 truncate text-[12px] font-black text-[rgb(var(--color-text))]`
 const ChoiceShell = tw.div`w-full max-w-[620px] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-2.5 shadow-[var(--shadow-card)]`
 const ChoiceHeader = tw.div`mb-2 flex items-start justify-between gap-3`
 const ChoiceTitle = tw.div`text-[13px] font-black text-[rgb(var(--color-text))]`
@@ -326,6 +341,12 @@ const isAgentAutofillRequest = (text: string) => {
     'для теста',
     'тестово',
     'демо',
+    'рандом',
+    'рандомно',
+    'случайно',
+    'случайную',
+    'любую',
+    'как ты знаешь',
   ].some((word) => normalized.includes(normalizeText(word)))
 }
 
@@ -370,6 +391,13 @@ const getItemPhoto = (item: any) => (
   item?.image ||
   null
 )
+
+const getCatalogItem = (items: any[], id?: string | null, name?: string | null) => {
+  const normalizedName = normalizeText(name || '')
+  return items.find((item) => item.id && id && item.id === id) ||
+    items.find((item) => normalizedName && normalizeText(item.name || '') === normalizedName) ||
+    null
+}
 
 const levenshteinDistance = (left: string, right: string) => {
   if (left === right) return 0
@@ -758,19 +786,46 @@ const compactSummary = (draft: AgentSetupDraft) => {
   ].filter(Boolean) as string[]
 }
 
+const buildDraftMixItems = (draft: AgentSetupDraft, tobaccoCatalog: any[]): MixBowlItem[] => (
+  draft.tobaccos?.map((item, index) => {
+    const tobacco = getCatalogItem(tobaccoCatalog, item.tobacco_id, item.tobacco_name)
+
+    return {
+      id: item.tobacco_id || tobacco?.id || `${item.tobacco_name || 'tobacco'}-${index}`,
+      name: tobacco?.name || item.tobacco_name || `Табак ${index + 1}`,
+      percentage: Number(item.percentage || 0),
+      color: MIX_COLORS[index % MIX_COLORS.length],
+      photo_url: getItemPhoto(tobacco),
+    }
+  }) || []
+)
+
 const DraftPreview = ({
   draft,
   missing,
   onPublish,
   publishing,
+  catalogs,
 }: {
   draft: AgentSetupDraft
   missing: string[]
   onPublish?: () => void
   publishing: boolean
+  catalogs: Record<CatalogKind, any[]>
 }) => {
   const ready = missing.length === 0
   const summary = compactSummary(draft)
+  const mixItems = buildDraftMixItems(draft, catalogs.tobacco)
+  const bowl = getCatalogItem(catalogs.bowl, draft.bowl_id, draft.bowl_name)
+  const kind = detectSetupKind(draft.bowl_setup_type_name)
+  const bowlModel = detectBowlModel(bowl)
+  const specs = [
+    { icon: 'bowl' as const, label: 'Чаша', value: draft.bowl_name },
+    { icon: 'kaloud' as const, label: 'Калауд', value: draft.kaloud_name },
+    { icon: 'coal' as const, label: 'Уголь', value: draft.coal_name },
+    { icon: 'placement' as const, label: 'Угли', value: draft.coal_placement_name },
+    { icon: 'setupType' as const, label: 'Тип', value: draft.bowl_setup_type_name },
+  ].filter((item) => item.value)
 
   return (
     <DraftShell>
@@ -785,13 +840,68 @@ const DraftPreview = ({
         </DraftBadge>
       </DraftHeader>
 
-      <DraftLine>
-        {summary.length ? summary.map((item) => (
-          <DraftToken key={item}>{item}</DraftToken>
-        )) : (
-          <span>Пока ничего не выбрано</span>
-        )}
-      </DraftLine>
+      {ready && mixItems.length ? (
+        <>
+          <DraftVisual>
+            <MixBowlPreview
+              autoRotate={false}
+              bowlModel={bowlModel}
+              interactive={false}
+              items={mixItems}
+              kind={kind}
+              renderMode="snapshot"
+              sceneScale={1.02}
+            />
+            <TobaccoPhotoStack items={mixItems} />
+            <DraftVisualBadge>
+              <CatalogIcon name="setupType" size={12} />
+              {draft.bowl_setup_type_name || 'Забивка'}
+            </DraftVisualBadge>
+          </DraftVisual>
+
+          <DraftSectionLabel>Состав</DraftSectionLabel>
+          <DraftMixGrid>
+            {mixItems.map((item) => (
+              <DraftMixRow key={item.id}>
+                <DraftMiniPhoto>
+                  {item.photo_url ? (
+                    <img src={item.photo_url} alt={item.name} tw="h-full w-full object-cover" />
+                  ) : (
+                    <div tw="flex h-full w-full items-center justify-center text-[rgb(var(--color-text-subtle))]">
+                      <CatalogIcon name="tobacco" size={18} />
+                    </div>
+                  )}
+                </DraftMiniPhoto>
+                <div tw="min-w-0">
+                  <DraftMixName>{item.name}</DraftMixName>
+                  <DraftMixMeta>табак</DraftMixMeta>
+                </div>
+                <DraftPercent>{item.percentage}%</DraftPercent>
+              </DraftMixRow>
+            ))}
+          </DraftMixGrid>
+
+          <DraftSpecGrid>
+            {specs.map((item) => (
+              <DraftSpec key={item.label}>
+                <DraftSpecLabel>
+                  <CatalogIcon name={item.icon} size={12} />
+                  {item.label}
+                </DraftSpecLabel>
+                <DraftSpecValue>{item.value}</DraftSpecValue>
+              </DraftSpec>
+            ))}
+          </DraftSpecGrid>
+        </>
+      ) : (
+        <DraftLine>
+          {summary.length ? summary.map((item) => (
+            <DraftToken key={item}>{item}</DraftToken>
+          )) : (
+            <span>Пока ничего не выбрано</span>
+          )}
+        </DraftLine>
+      )}
 
       {!ready && <MissingText tw="mt-2">Осталось выбрать: {missing.join(', ')}.</MissingText>}
 
@@ -1177,7 +1287,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
 
     try {
       const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, draftForAgent || null), draft: draftForAgent }).unwrap()
-      const allowAgentChoices = isAgentAutofillRequest(text) || isPositiveConfirmation(text)
+      const allowAgentChoices = response.needs_confirmation || isAgentAutofillRequest(text) || isPositiveConfirmation(text)
       const nextDraft = explicitDraftFromResponse(draftForAgent || null, response.draft, nextMessages, allowAgentChoices)
       const nextMissing = getMissingFields(nextDraft)
       const draftChanged = JSON.stringify(nextDraft || null) !== JSON.stringify(draft || null)
@@ -1299,6 +1409,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
                     missing={message.missingSnapshot || getMissingFields(message.draftSnapshot)}
                     onPublish={message.id === activeDraftMessageId ? publishDraft : undefined}
                     publishing={publishing}
+                    catalogs={catalogs}
                   />
                 )}
                 {message.choiceSnapshot && (
