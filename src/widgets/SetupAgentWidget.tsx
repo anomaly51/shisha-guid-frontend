@@ -1157,7 +1157,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       onDraftChange?.(finalDraft)
       await typeAssistantText(sanitizeAssistantReply(response.reply), makeDraftMessages(finalDraft, nextMissing))
     } catch {
-      await typeAssistantText('Не получилось обработать запрос. Проверь авторизацию и попробуй еще раз.')
+      await typeAssistantText('Не получилось обработать запрос. Попробуй еще раз.')
     }
   }
 
@@ -1193,7 +1193,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
         trailingMessages,
       )
     } catch {
-      await typeAssistantText('Не получилось обработать запрос. Проверь авторизацию и попробуй еще раз.')
+      await typeAssistantText('Не получилось обработать запрос. Попробуй еще раз.')
     }
   }
 
