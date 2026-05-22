@@ -12,12 +12,24 @@ const port = Number(process.env.PORT || 5173)
 const base = normalizeBase(process.env.BASE || '/')
 const clientRoot = path.resolve(__dirname, 'dist/client')
 const publicRoot = path.resolve(__dirname, 'public')
+const buildVersion = process.env.APP_VERSION || process.env.VCS_REF || 'unknown'
+const buildCommit = process.env.VCS_REF || ''
+const buildDate = process.env.BUILD_DATE || ''
 
 const app = express()
 const server = http.createServer(app)
 
 app.disable('x-powered-by')
 app.use(compression())
+
+app.get('/health', (_req, res) => {
+  res.status(200).set('Cache-Control', 'no-store, max-age=0').json({
+    status: 'ok',
+    version: buildVersion,
+    commit: buildCommit,
+    buildDate,
+  })
+})
 
 app.use('/.well-known/appspecific', (_req, res) => {
   res.status(204).end()

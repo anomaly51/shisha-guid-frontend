@@ -18,7 +18,12 @@ jobs:
       image-name: frontend
       build-args: |
         VITE_GOOGLE_CLIENT_ID=838081828286-6hn0jphbj636tf7p3q83c37dg9ltnfms.apps.googleusercontent.com
+        APP_VERSION=main-${{ github.run_number }}-${{ github.sha }}
       app-url: https://shisha-guid.api-api-api.com
+      health-url: https://shisha-guid.api-api-api.com/health
+      health-version-field: version
+      live-version-attempts: "180"
+      live-version-interval-seconds: "2"
     secrets:
       registry_username: ${{ secrets.HARBOR_USERNAME }}
       registry_password: ${{ secrets.HARBOR_PASSWORD }}
