@@ -9,7 +9,6 @@ const navItems = [
   { path: '/tobaccos', labelKey: 'nav.tobaccos', icon: 'tobacco' },
   { path: '/coals', labelKey: 'nav.coals', icon: 'coal' },
   { path: '/kalouds', labelKey: 'nav.kalouds', icon: 'kaloud' },
-  { path: '/ai-chat', labelKey: 'nav.aiChat', icon: 'setupType' },
 ] satisfies Array<{ path: string; labelKey: string; icon: CatalogIconName }>
 
 export const Sidebar = () => {

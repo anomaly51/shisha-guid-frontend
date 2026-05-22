@@ -944,9 +944,17 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                   <h1 tw="mt-0.5 text-lg font-semibold text-[rgb(var(--color-text))]">{isEdit ? t('setupForm.editSetup') : t('setupForm.newSetup')}</h1>
                 </div>
               </div>
-              <span tw="hidden rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] sm:inline-flex">
-                {isEdit ? t('common.editing') : t('common.new')}
-              </span>
+              <div tw="hidden shrink-0 items-center gap-2 sm:inline-flex">
+                {!isEdit && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => navigate('/ai-chat')}>
+                    <CatalogIcon name="setupType" size={14} />
+                    Chatbot
+                  </Button>
+                )}
+                <span tw="rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))]">
+                  {isEdit ? t('common.editing') : t('common.new')}
+                </span>
+              </div>
             </div>
 
             <div tw="grid grid-cols-3 gap-2">

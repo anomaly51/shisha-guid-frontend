@@ -9,6 +9,7 @@ import { CreateItem } from '../pages/CreateItem'
 import { EditItem } from '../pages/EditItem'
 import { SetupDetail } from '../pages/SetupDetail'
 import { EditSetup } from '../pages/EditSetup'
+import { SetupForm } from '../pages/SetupForm'
 import { Profile } from '../pages/Profile'
 import { AgentChat } from '../pages/AgentChat'
 import { PageTitle } from './PageTitle'
@@ -133,7 +134,7 @@ export const AppRoutes = () => {
         </AdminOnly>
       } />
 
-      <Route path="setups/create" element={<AgentChat />} />
+      <Route path="setups/create" element={<SetupForm />} />
       <Route path="setups/:id" element={<SetupDetail />} />
       <Route path="setups/:id/edit" element={<EditSetup />} />
       <Route path="ai-chat" element={<AgentChat />} />
