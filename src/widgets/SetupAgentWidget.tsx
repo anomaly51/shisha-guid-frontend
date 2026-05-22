@@ -187,6 +187,15 @@ const hasDraftValue = (draft: AgentSetupDraft | null | undefined) => Boolean(
   draft?.tobaccos?.length
 )
 
+const buildDraftReply = (draft: AgentSetupDraft | null, missing: string[], fallback: string) => {
+  if (!draft) return fallback
+  if (missing.length) {
+    return `Черновик обновлен. Не хватает: ${missing.join(', ')}. Напиши недостающие параметры сообщением.`
+  }
+
+  return 'Черновик готов. Проверь карточку ниже и можно публиковать.'
+}
+
 const explicitDraftFromResponse = (
   previousDraft: AgentSetupDraft | null,
   responseDraft: AgentSetupDraft | null | undefined,
@@ -498,7 +507,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       if (nextDraft) onDraftChange?.(nextDraft)
       setMessages([
         ...nextMessages,
-        { id: createMessageId(), role: 'assistant', content: response.reply },
+        { id: createMessageId(), role: 'assistant', content: buildDraftReply(nextDraft, nextMissing, response.reply) },
         ...(nextDraft
           ? [{
               id: createMessageId(),
