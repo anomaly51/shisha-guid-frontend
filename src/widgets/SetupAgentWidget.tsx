@@ -6,6 +6,12 @@ import {
   type AgentMessage,
   type AgentSetupDraft,
   useChatWithSetupAgentMutation,
+  useGetBowlsQuery,
+  useGetBowlSetupTypesQuery,
+  useGetCoalsQuery,
+  useGetCoalPlacementsQuery,
+  useGetKaloudsQuery,
+  useGetTobaccosQuery,
   useTranscribeSetupVoiceMutation,
 } from '../shared/api'
 import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, SendIcon } from '../shared/ui/Icons'
@@ -48,7 +54,7 @@ const Bubble = styled.div<{ $mine?: boolean }>`
   background: ${({ $mine }) => ($mine ? 'rgb(var(--color-surface-inverse))' : 'rgb(var(--color-surface-muted))')};
 `
 
-const ThinkingBox = tw.div`max-w-[92%] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] p-3`
+const TypingBubble = tw.div`max-w-[88%] self-start rounded-lg bg-[rgb(var(--color-surface-muted))] px-3 py-2 text-[13px] font-semibold leading-5 text-[rgb(var(--color-text-subtle))]`
 const MissingChips = tw.div`mt-2 flex flex-wrap gap-1.5`
 const MissingChip = tw.span`inline-flex h-7 items-center rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2 text-[11px] font-black text-[rgb(var(--color-text-muted))]`
 const DraftShell = tw.div`w-full max-w-[620px] self-start overflow-hidden rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-[var(--shadow-card)]`
@@ -66,38 +72,37 @@ const DetailValue = tw.div`truncate text-[12px] font-black text-[rgb(var(--color
 const PublishButton = tw.button`inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-accent))] px-4 text-[12px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_16px_28px_-22px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
 const MissingText = tw.div`text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
 const MissingPanel = tw.div`rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-2.5`
+const ChoiceShell = tw.div`w-full max-w-[620px] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-3 shadow-[var(--shadow-card)]`
+const ChoiceHeader = tw.div`mb-2 flex items-start justify-between gap-3`
+const ChoiceTitle = tw.div`text-[13px] font-black text-[rgb(var(--color-text))]`
+const ChoiceHint = tw.div`mt-0.5 text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
+const ChoiceGrid = tw.div`grid grid-cols-2 gap-2 sm:grid-cols-3`
+const ChoiceCard = tw.button`min-w-0 overflow-hidden rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] text-left transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] disabled:cursor-not-allowed disabled:opacity-60`
+const ChoicePhoto = tw.div`aspect-square bg-[rgb(var(--color-surface-muted))]`
+const ChoiceBody = tw.div`p-2`
+const ChoiceName = tw.div`truncate text-[12px] font-black text-[rgb(var(--color-text))]`
+const ChoiceMeta = tw.div`mt-0.5 line-clamp-2 text-[10px] font-semibold leading-3 text-[rgb(var(--color-text-subtle))]`
 
 type SetupAgentWidgetProps = {
   initialDraft?: AgentSetupDraft | null
   onDraftChange?: (draft: AgentSetupDraft) => void
 }
 
+type CatalogKind = 'tobacco' | 'bowl' | 'kaloud' | 'coal' | 'placement' | 'setupType'
+
+type CatalogChoiceSnapshot = {
+  kind: CatalogKind
+  title: string
+  hint: string
+  items: any[]
+}
+
 type TimelineMessage = AgentMessage & {
   id: string
   draftSnapshot?: AgentSetupDraft | null
   missingSnapshot?: string[]
+  choiceSnapshot?: CatalogChoiceSnapshot
 }
-
-const chatStages = [
-  'Читаю, какую забивку ты хочешь получить',
-  'Раскладываю запрос на табаки, оборудование и тип укладки',
-  'Сверяю найденное с каталогом',
-  'Обновляю черновик и отмечаю, чего ещё не хватает',
-]
-
-const voiceStages = [
-  'Готовлю запись',
-  'Распознаю голос',
-  'Очищаю текст',
-  'Передаю описание агенту',
-]
-
-const publishStages = [
-  'Проверяю обязательные поля',
-  'Фиксирую состав табаков',
-  'Создаю забивку',
-  'Открываю опубликованную карточку',
-]
 
 const initialMessages: AgentMessage[] = [
   {
@@ -117,8 +122,9 @@ const compactApiMessages = (messages: TimelineMessage[]): AgentMessage[] => (
   messages
     .filter((message) => message.role === 'user' || message.content.trim())
     .map(({ role, content }) => ({ role, content }))
-    .slice(-12)
 )
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
 const normalizeText = (value: string) => (
   value
@@ -190,10 +196,122 @@ const hasDraftValue = (draft: AgentSetupDraft | null | undefined) => Boolean(
 const buildDraftReply = (draft: AgentSetupDraft | null, missing: string[], fallback: string) => {
   if (!draft) return fallback
   if (missing.length) {
-    return `Черновик обновлен. Не хватает: ${missing.join(', ')}. Напиши недостающие параметры сообщением.`
+    return `Не хватает: ${missing.join(', ')}.`
   }
 
   return 'Черновик готов. Проверь карточку ниже и можно публиковать.'
+}
+
+const labelByKind: Record<CatalogKind, string> = {
+  tobacco: 'табак',
+  bowl: 'чашу',
+  kaloud: 'калауд',
+  coal: 'уголь',
+  placement: 'раскладку углей',
+  setupType: 'тип забивки',
+}
+
+const titleByKind: Record<CatalogKind, string> = {
+  tobacco: 'Табаки в базе',
+  bowl: 'Чаши в базе',
+  kaloud: 'Калауды в базе',
+  coal: 'Уголь в базе',
+  placement: 'Раскладки углей',
+  setupType: 'Типы забивки',
+}
+
+const questionPatterns: Array<{ kind: CatalogKind; words: string[] }> = [
+  { kind: 'tobacco', words: ['табак', 'табаки', 'тютюн', 'тютюни'] },
+  { kind: 'bowl', words: ['чаша', 'чаши', 'чашу'] },
+  { kind: 'kaloud', words: ['калауд', 'калауды', 'kaloud', 'lotus'] },
+  { kind: 'coal', words: ['уголь', 'угли', 'угольки', 'coal'] },
+  { kind: 'placement', words: ['раскладка', 'расположение', 'углей', 'cheburashka'] },
+  { kind: 'setupType', words: ['тип', 'забивки', 'compot', 'компот'] },
+]
+
+const catalogQuestionWords = ['какие', 'какой', 'какая', 'что есть', 'есть', 'покажи', 'показать', 'список', 'варианты', 'выбрать']
+
+const getKindFromText = (text: string) => {
+  const normalized = normalizeText(text)
+  return questionPatterns.find((entry) => entry.words.some((word) => normalized.includes(normalizeText(word))))?.kind || null
+}
+
+const isCatalogQuestion = (text: string) => {
+  const normalized = normalizeText(text)
+  const kind = getKindFromText(text)
+  if (!kind) return false
+  return catalogQuestionWords.some((word) => normalized.includes(normalizeText(word)))
+}
+
+const stripKindWords = (text: string, kind: CatalogKind) => {
+  const kindWords = questionPatterns.find((entry) => entry.kind === kind)?.words || []
+  const stopWords = [
+    ...kindWords,
+    ...catalogQuestionWords,
+    'я',
+    'мне',
+    'хочу',
+    'добавь',
+    'добавить',
+    'выбери',
+    'выбрать',
+    'надо',
+    'нужно',
+  ].map(normalizeText)
+
+  return normalizeText(text)
+    .split(' ')
+    .filter((token) => token.length > 2 && !stopWords.includes(token))
+    .join(' ')
+}
+
+const getItemText = (item: any) => normalizeText(`${item?.name || ''} ${item?.description || ''}`)
+
+const searchCatalog = (items: any[], query: string) => {
+  const tokens = normalizeText(query).split(' ').filter((token) => token.length > 2)
+  if (!tokens.length) return items.slice(0, 9)
+
+  return items
+    .map((item) => {
+      const text = getItemText(item)
+      const score = tokens.reduce((sum, token) => sum + (text.includes(token) ? 1 : 0), 0)
+      return { item, score }
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.item)
+    .slice(0, 9)
+}
+
+const buildChoiceSnapshot = (kind: CatalogKind, items: any[], hint?: string): CatalogChoiceSnapshot | null => {
+  if (!items.length) return null
+
+  return {
+    kind,
+    title: titleByKind[kind],
+    hint: hint || `Выбери ${labelByKind[kind]} из базы. Карточка останется в истории чата.`,
+    items: items.slice(0, 9),
+  }
+}
+
+const getCatalogItems = (kind: CatalogKind, catalogs: Record<CatalogKind, any[]>) => catalogs[kind] || []
+
+const buildMissingChoice = (missing: string[], catalogs: Record<CatalogKind, any[]>) => {
+  const missingKind = missing.includes('табак')
+    ? 'tobacco'
+    : missing.includes('чаша')
+      ? 'bowl'
+      : missing.includes('калауд')
+        ? 'kaloud'
+        : missing.includes('уголь')
+          ? 'coal'
+          : missing.includes('раскладка углей')
+            ? 'placement'
+            : missing.includes('тип забивки')
+              ? 'setupType'
+              : null
+
+  return missingKind ? buildChoiceSnapshot(missingKind, getCatalogItems(missingKind, catalogs)) : null
 }
 
 const explicitDraftFromResponse = (
@@ -288,42 +406,6 @@ const buildPreviewItems = (draft: AgentSetupDraft | null): MixBowlItem[] => (
     percentage: Number(item.percentage || 0),
     color: MIX_COLORS[index % MIX_COLORS.length],
   })) || []
-)
-
-const ThinkingMessage = ({ currentIndex, stages }: { currentIndex: number; stages: string[] }) => (
-  <ThinkingBox>
-    <div tw="mb-2 flex items-center justify-between gap-3">
-      <div tw="text-[12px] font-black text-[rgb(var(--color-text))]">ИИ думает по шагам</div>
-      <div tw="text-[11px] font-bold text-[rgb(var(--color-text-subtle))] tabular-nums">
-        {Math.min(currentIndex + 1, stages.length)}/{stages.length}
-      </div>
-    </div>
-    <div tw="grid gap-1.5">
-      {stages.map((stage, index) => {
-        const done = index < currentIndex
-        const active = index === currentIndex
-        return (
-          <div
-            key={stage}
-            tw="flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] font-semibold"
-            css={active ? { backgroundColor: 'rgb(var(--color-surface))', color: 'rgb(var(--color-text))' } : { color: 'rgb(var(--color-text-subtle))' }}
-          >
-            <span
-              tw="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[9px]"
-              css={done
-                ? { borderColor: 'rgb(var(--color-success-border))', backgroundColor: 'rgb(var(--color-success-surface))', color: 'rgb(var(--color-success))' }
-                : active
-                  ? { borderColor: 'rgb(var(--color-accent))', color: 'rgb(var(--color-accent))' }
-                  : { borderColor: 'rgb(var(--color-border-strong))' }}
-            >
-              {done ? <CheckIcon size={9} /> : index + 1}
-            </span>
-            <span tw="min-w-0 truncate">{stage}</span>
-          </div>
-        )
-      })}
-    </div>
-  </ThinkingBox>
 )
 
 const DraftPreview = ({
@@ -437,6 +519,58 @@ const DraftPreview = ({
   )
 }
 
+const ChoicePreview = ({
+  choice,
+  onSelect,
+  disabled,
+}: {
+  choice: CatalogChoiceSnapshot
+  onSelect: (kind: CatalogKind, item: any) => void
+  disabled: boolean
+}) => (
+  <ChoiceShell>
+    <ChoiceHeader>
+      <div tw="min-w-0">
+        <ChoiceTitle>{choice.title}</ChoiceTitle>
+        <ChoiceHint>{choice.hint}</ChoiceHint>
+      </div>
+      <span tw="shrink-0 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]">
+        {choice.items.length}
+      </span>
+    </ChoiceHeader>
+    <ChoiceGrid>
+      {choice.items.map((item) => {
+        const photo = item?.photo_urls?.[0]
+        const meta = [
+          item?.description,
+          typeof item?.price === 'number' ? `${item.price} ${item.price_currency || 'UAH'}` : null,
+          typeof item?.capacity_grams === 'number' ? `${item.capacity_grams} г` : null,
+          typeof item?.package_grams === 'number' ? `${item.package_grams} г` : null,
+          typeof item?.coal_count === 'number' ? `${item.coal_count} угля` : null,
+        ].filter(Boolean)[0]
+
+        return (
+          <ChoiceCard key={item.id || item.name} type="button" onClick={() => onSelect(choice.kind, item)} disabled={disabled}>
+            <ChoicePhoto>
+              {photo ? (
+                <img src={photo} alt={item.name || ''} tw="h-full w-full object-cover" />
+              ) : (
+                <div tw="flex h-full w-full items-center justify-center text-[22px] font-black text-[rgb(var(--color-text-subtle))]">
+                  <CatalogIcon name={choice.kind === 'setupType' ? 'setupType' : choice.kind} size={22} />
+                </div>
+              )}
+            </ChoicePhoto>
+            <ChoiceBody>
+              <ChoiceName>{item.name}</ChoiceName>
+              {meta && <ChoiceMeta>{meta}</ChoiceMeta>}
+            </ChoiceBody>
+          </ChoiceCard>
+        )
+      })}
+    </ChoiceGrid>
+  </ChoiceShell>
+)
+
 export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAgentWidgetProps) => {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
@@ -445,16 +579,30 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   const [draft, setDraft] = useState<AgentSetupDraft | null>(initialDraft)
   const [recording, setRecording] = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [stageIndex, setStageIndex] = useState(0)
+  const [typing, setTyping] = useState(false)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [chatWithAgent, chatState] = useChatWithSetupAgentMutation()
   const [transcribeVoice, transcribeState] = useTranscribeSetupVoiceMutation()
+  const { data: tobaccos = [] } = useGetTobaccosQuery()
+  const { data: bowls = [] } = useGetBowlsQuery()
+  const { data: kalouds = [] } = useGetKaloudsQuery()
+  const { data: coals = [] } = useGetCoalsQuery()
+  const { data: placements = [] } = useGetCoalPlacementsQuery()
+  const { data: setupTypes = [] } = useGetBowlSetupTypesQuery()
   const missing = useMemo(() => getMissingFields(draft), [draft])
+  const catalogs = useMemo<Record<CatalogKind, any[]>>(() => ({
+    tobacco: tobaccos,
+    bowl: bowls,
+    kaloud: kalouds,
+    coal: coals,
+    placement: placements,
+    setupType: setupTypes,
+  }), [bowls, coals, kalouds, placements, setupTypes, tobaccos])
 
-  const busy = chatState.isLoading || transcribeState.isLoading
-  const stages = transcribeState.isLoading ? voiceStages : publishing ? publishStages : chatStages
+  const loading = chatState.isLoading || transcribeState.isLoading
+  const busy = loading || typing
   const draftKey = JSON.stringify(initialDraft || null)
   const activeDraftMessageId = useMemo(
     () => [...messages].reverse().find((message) => message.draftSnapshot)?.id,
@@ -474,23 +622,154 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     })
   }, [messages, busy, draft, missing.length])
 
-  useEffect(() => {
-    if (!busy) {
-      setStageIndex(0)
-      return undefined
+  const typeAssistantText = async (content: string, trailingMessages: TimelineMessage[] = []) => {
+    const id = createMessageId()
+    const text = content.trim()
+
+    setTyping(true)
+    setMessages((current) => [...current, { id, role: 'assistant', content: '' }])
+
+    const chunkSize = text.length > 120 ? 4 : 2
+    for (let index = chunkSize; index <= text.length + chunkSize; index += chunkSize) {
+      const visible = text.slice(0, Math.min(index, text.length))
+      setMessages((current) => current.map((message) => (
+        message.id === id ? { ...message, content: visible } : message
+      )))
+      await wait(10)
     }
 
-    setStageIndex(0)
-    const interval = window.setInterval(() => {
-      setStageIndex((current) => Math.min(current + 1, stages.length - 1))
-    }, 850)
+    if (trailingMessages.length) {
+      setMessages((current) => [...current, ...trailingMessages])
+    }
+    setTyping(false)
+  }
 
-    return () => window.clearInterval(interval)
-  }, [busy, stages.length])
+  const makeDraftMessages = (nextDraft: AgentSetupDraft | null, nextMissing: string[]) => {
+    if (!nextDraft) return []
+
+    const draftMessage: TimelineMessage = {
+      id: createMessageId(),
+      role: 'assistant',
+      content: '',
+      draftSnapshot: nextDraft,
+      missingSnapshot: nextMissing,
+    }
+    const nextChoice = buildMissingChoice(nextMissing, catalogs)
+    return [
+      draftMessage,
+      ...(nextChoice
+        ? [{
+            id: createMessageId(),
+            role: 'assistant' as const,
+            content: '',
+            choiceSnapshot: nextChoice,
+          }]
+        : []),
+    ]
+  }
+
+  const handleCatalogMessage = async (text: string) => {
+    const kind = getKindFromText(text)
+    if (!kind) return false
+    const wordCount = normalizeText(text).split(' ').filter(Boolean).length
+    if (!isCatalogQuestion(text) && wordCount > 5) return false
+
+    const items = getCatalogItems(kind, catalogs)
+    if (!items.length) {
+      await typeAssistantText(`Каталог "${titleByKind[kind]}" пока не загрузился или пустой.`)
+      return true
+    }
+
+    const query = stripKindWords(text, kind)
+    const wantsList = isCatalogQuestion(text) || !query
+    const matches = wantsList ? items.slice(0, 9) : searchCatalog(items, query)
+    const choice = buildChoiceSnapshot(
+      kind,
+      matches.length ? matches : items,
+      matches.length
+        ? `Выбери ${labelByKind[kind]} из базы.`
+        : `Такого варианта не нашел в базе. Вот доступные ${titleByKind[kind].toLowerCase()}:`,
+    )
+
+    if (!choice) return false
+
+    await typeAssistantText(
+      matches.length
+        ? `${titleByKind[kind]}. Нажми на карточку, чтобы добавить в черновик.`
+        : `Не нашел точного совпадения по запросу "${query || text}". Показываю варианты из базы.`,
+      [{
+        id: createMessageId(),
+        role: 'assistant',
+        content: '',
+        choiceSnapshot: choice,
+      }],
+    )
+    return true
+  }
+
+  const updateDraftWithChoice = (kind: CatalogKind, item: any): AgentSetupDraft => {
+    const nextDraft: AgentSetupDraft = { ...(draft || {}) }
+    if (kind === 'tobacco') {
+      const current = nextDraft.tobaccos || []
+      const exists = current.some((entry) => (
+        entry.tobacco_id && item.id
+          ? entry.tobacco_id === item.id
+          : normalizeText(entry.tobacco_name || '') === normalizeText(item.name || '')
+      ))
+      nextDraft.tobaccos = exists
+        ? current
+        : [...current, { tobacco_id: item.id, tobacco_name: item.name, percentage: null }]
+      return nextDraft
+    }
+
+    if (kind === 'bowl') {
+      nextDraft.bowl_id = item.id
+      nextDraft.bowl_name = item.name
+    }
+    if (kind === 'kaloud') {
+      nextDraft.kaloud_id = item.id
+      nextDraft.kaloud_name = item.name
+    }
+    if (kind === 'coal') {
+      nextDraft.coal_id = item.id
+      nextDraft.coal_name = item.name
+    }
+    if (kind === 'placement') {
+      nextDraft.coal_placement_id = item.id
+      nextDraft.coal_placement_name = item.name
+    }
+    if (kind === 'setupType') {
+      nextDraft.bowl_setup_type_id = item.id
+      nextDraft.bowl_setup_type_name = item.name
+    }
+
+    return nextDraft
+  }
+
+  const selectCatalogItem = async (kind: CatalogKind, item: any) => {
+    if (busy) return
+
+    const selectedMessage: TimelineMessage = {
+      id: createMessageId(),
+      role: 'user',
+      content: `Выбрал: ${item.name}`,
+    }
+    setMessages((current) => [...current, selectedMessage])
+
+    const nextDraft = updateDraftWithChoice(kind, item)
+    const nextMissing = getMissingFields(nextDraft)
+    setDraft(nextDraft)
+    onDraftChange?.(nextDraft)
+
+    await typeAssistantText(
+      `${labelByKind[kind]} "${item.name}" добавлен. ${buildDraftReply(nextDraft, nextMissing, '')}`,
+      makeDraftMessages(nextDraft, nextMissing),
+    )
+  }
 
   const sendText = async (rawText: string) => {
     const text = rawText.trim()
-    if (!text || chatState.isLoading) return
+    if (!text || busy) return
 
     const nextMessages: TimelineMessage[] = [
       ...messages,
@@ -499,31 +778,21 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     setMessages(nextMessages)
     setInput('')
 
+    if (await handleCatalogMessage(text)) return
+
     try {
       const response = await chatWithAgent({ messages: compactApiMessages(nextMessages), draft }).unwrap()
       const nextDraft = explicitDraftFromResponse(draft, response.draft, nextMessages)
       const nextMissing = getMissingFields(nextDraft)
+      const draftChanged = JSON.stringify(nextDraft || null) !== JSON.stringify(draft || null)
       setDraft(nextDraft)
       if (nextDraft) onDraftChange?.(nextDraft)
-      setMessages([
-        ...nextMessages,
-        { id: createMessageId(), role: 'assistant', content: buildDraftReply(nextDraft, nextMissing, response.reply) },
-        ...(nextDraft
-          ? [{
-              id: createMessageId(),
-              role: 'assistant' as const,
-              content: '',
-              draftSnapshot: nextDraft,
-              missingSnapshot: nextMissing,
-            }]
-          : []),
-      ])
+      await typeAssistantText(
+        draftChanged ? buildDraftReply(nextDraft, nextMissing, response.reply) : response.reply,
+        draftChanged ? makeDraftMessages(nextDraft, nextMissing) : [],
+      )
     } catch {
-      setMessages([...nextMessages, {
-        id: createMessageId(),
-        role: 'assistant',
-        content: 'Не получилось обработать запрос. Проверь авторизацию и попробуй еще раз.',
-      }])
+      await typeAssistantText('Не получилось обработать запрос. Проверь авторизацию и попробуй еще раз.')
     }
   }
 
@@ -538,16 +807,12 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     try {
       const response = await chatWithAgent({ messages: compactApiMessages(nextMessages), draft, publish: true }).unwrap()
       setDraft(response.draft || draft)
-      setMessages([...nextMessages, { id: createMessageId(), role: 'assistant', content: response.reply }])
+      await typeAssistantText(response.reply)
       if (response.created_setup_id) {
         navigate(`/setups/${response.created_setup_id}`)
       }
     } catch {
-      setMessages([...nextMessages, {
-        id: createMessageId(),
-        role: 'assistant',
-        content: 'Не получилось опубликовать черновик. Проверь данные и попробуй еще раз.',
-      }])
+      await typeAssistantText('Не получилось опубликовать черновик. Проверь данные и попробуй еще раз.')
     } finally {
       setPublishing(false)
     }
@@ -581,11 +846,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
         const result = await transcribeVoice(blob).unwrap()
         if (result.text) await sendText(result.text)
       } catch {
-        setMessages([...messages, {
-          id: createMessageId(),
-          role: 'assistant',
-          content: 'Не получилось распознать голос. Попробуй текстом.',
-        }])
+        await typeAssistantText('Не получилось распознать голос. Попробуй текстом.')
       }
     }
 
@@ -633,21 +894,28 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
                     publishing={publishing}
                   />
                 )}
+                {message.choiceSnapshot && (
+                  <ChoicePreview
+                    choice={message.choiceSnapshot}
+                    onSelect={selectCatalogItem}
+                    disabled={busy}
+                  />
+                )}
               </Fragment>
             ))}
-            {busy && <ThinkingMessage currentIndex={stageIndex} stages={stages} />}
+            {loading && <TypingBubble>Печатает...</TypingBubble>}
           </Messages>
         </ScrollArea>
 
         <Composer onSubmit={handleSubmit}>
-          <ToolButton type="button" onClick={handleVoice} disabled={transcribeState.isLoading || chatState.isLoading} aria-label="Record voice">
+          <ToolButton type="button" onClick={handleVoice} disabled={busy} aria-label="Record voice">
             {recording ? <CloseIcon size={13} /> : <MicIcon size={16} />}
           </ToolButton>
           <Textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder="Например: хочу свежую ягодную забивку, 2-3 табака, легко по крепости..."
-            disabled={chatState.isLoading}
+            disabled={busy}
           />
           <SendButton type="submit" disabled={!input.trim() || busy} aria-label="Send setup details">
             <SendIcon size={16} />
