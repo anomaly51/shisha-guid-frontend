@@ -102,7 +102,7 @@ type TimelineMessage = AgentMessage & {
 const initialMessages: AgentMessage[] = [
   {
     role: 'assistant',
-    content: 'Расскажи, какую забивку хочешь. Можно коротко: вкус, табаки, чаша, калауд, уголь или раскладка углей. Я соберу черновик и потом спрошу только то, чего не хватает.',
+    content: 'Расскажи забивку обычным сообщением. Можно коротко: вкус, табаки, чаша, калауд, уголь или раскладка углей. Я сам покажу варианты из базы и спрошу только то, чего не хватает.',
   },
 ]
 
@@ -140,6 +140,46 @@ const transliterateRu = (value: string) => {
 }
 
 const searchableText = (value: string) => `${normalizeText(value)} ${transliterateRu(value)}`
+
+const phoneticTokenMap: Record<string, string> = {
+  blyu: 'blue',
+  bliu: 'blue',
+  blu: 'blue',
+  beri: 'berry',
+  berri: 'berry',
+  bery: 'berry',
+  melon: 'melon',
+  meloun: 'melon',
+  rosomaha: 'rosomaha',
+  rosamaha: 'rosomaha',
+  mango: 'mango',
+  apelsin: 'orange',
+  oranzh: 'orange',
+  granat: 'pomegranate',
+  moroz: 'frost',
+  frost: 'frost',
+}
+
+const applyPhoneticAliases = (value: string) => (
+  transliterateRu(value)
+    .split(' ')
+    .map((token) => phoneticTokenMap[token] || token)
+    .join(' ')
+)
+
+const searchForms = (value: string) => {
+  const base = normalizeText(value)
+  const transliterated = transliterateRu(value)
+  const aliased = applyPhoneticAliases(value)
+  return Array.from(new Set([
+    base,
+    transliterated,
+    aliased,
+    base.replace(/\s+/g, ''),
+    transliterated.replace(/\s+/g, ''),
+    aliased.replace(/\s+/g, ''),
+  ].filter(Boolean)))
+}
 
 const weakValueTokens = new Set([
   'the',
@@ -208,6 +248,16 @@ const buildDraftReply = (draft: AgentSetupDraft | null, missing: string[], fallb
   return 'Черновик готов. Проверь карточку ниже и можно публиковать.'
 }
 
+const sanitizeAssistantReply = (reply: string) => {
+  const clean = reply
+    .replace(/^Черновик обновлен\.\s*/i, '')
+    .replace(/\s*Напиши только это,? и я дополню\.?/i, '')
+    .replace(/\s*Напиши только эти пункты одним сообщением,? и агент обновит черновик\.?/i, '')
+    .trim()
+
+  return clean || 'Продолжай сообщением, я обновлю черновик.'
+}
+
 const labelByKind: Record<CatalogKind, string> = {
   tobacco: 'табак',
   bowl: 'чашу',
@@ -268,6 +318,19 @@ const isMetaQuestion = (text: string) => {
   return metaQuestionWords.some((word) => normalized.includes(normalizeText(word)))
 }
 
+const isPercentQuestion = (text: string) => {
+  const normalized = normalizeText(text)
+  return /(?:процент|проценты|%|доли|доля)/i.test(normalized) &&
+    ['какие', 'какой', 'как', 'что', 'сколько', 'есть'].some((word) => normalized.includes(word))
+}
+
+const isMissingQuestion = (text: string) => {
+  const normalized = normalizeText(text)
+  return ['чего не хватает', 'что не хватает', 'что осталось', 'что еще', 'дальше'].some((word) => (
+    normalized.includes(normalizeText(word))
+  ))
+}
+
 const isShortTobaccoSearch = (text: string) => {
   const normalized = normalizeText(text)
   const wordCount = normalized.split(' ').filter(Boolean).length
@@ -279,30 +342,89 @@ const isShortTobaccoSearch = (text: string) => {
 
 const getItemText = (item: any) => searchableText(`${item?.name || ''} ${item?.description || ''}`)
 
-const searchCatalog = (items: any[], query: string) => {
-  const tokens = searchableText(query).split(' ').filter((token) => token.length > 2)
-  if (!tokens.length) return items.slice(0, 9)
+const getItemPhoto = (item: any) => (
+  item?.photo_urls?.[0] ||
+  item?.photo_url ||
+  item?.image_url ||
+  item?.image ||
+  null
+)
 
+const scoreCatalogItem = (item: any, query: string) => {
+  const itemText = getItemText(item)
+  const itemJoined = itemText.replace(/\s+/g, '')
+
+  return searchForms(query).reduce((best, form) => {
+    const tokens = form.split(' ').filter((token) => token.length > 1)
+    const joined = form.replace(/\s+/g, '')
+    let score = 0
+
+    if (joined.length > 2 && itemJoined.includes(joined)) score += joined.length + 8
+    if (form.length > 2 && itemText.includes(form)) score += form.length + 6
+    tokens.forEach((token) => {
+      if (itemText.includes(token)) score += token.length
+    })
+
+    return Math.max(best, score)
+  }, 0)
+}
+
+const searchCatalog = (items: any[], query: string) => {
   return items
     .map((item) => {
-      const text = getItemText(item)
-      const score = tokens.reduce((sum, token) => sum + (text.includes(token) ? 1 : 0), 0)
-      return { item, score }
+      const score = scoreCatalogItem(item, query)
+      return { item, score, hasPhoto: Boolean(getItemPhoto(item)) }
     })
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => b.score - a.score || Number(b.hasPhoto) - Number(a.hasPhoto))
     .map((entry) => entry.item)
     .slice(0, 9)
+}
+
+const splitCatalogQueries = (text: string) => {
+  const normalized = normalizeText(text)
+  const phrases = normalized
+    .replace(/\b(?:добавь|добавить|возьми|выбери|хочу|табак|табаки)\b/g, ' ')
+    .split(/\s+(?:и|and|\+)\s+|[,;/]+/g)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 1)
+
+  return phrases.length ? phrases : [normalized].filter(Boolean)
+}
+
+const findMentionedCatalogItems = (items: any[], text: string) => {
+  const used = new Set<string>()
+  const matches = splitCatalogQueries(text)
+    .map((query) => {
+      const best = items
+        .map((item) => ({ item, score: scoreCatalogItem(item, query) }))
+        .filter((entry) => entry.score >= 4)
+        .sort((a, b) => b.score - a.score)[0]
+
+      return best
+    })
+    .filter(Boolean)
+    .map((entry) => entry!.item)
+    .filter((item) => {
+      const key = item.id || normalizeText(item.name || '')
+      if (used.has(key)) return false
+      used.add(key)
+      return true
+    })
+
+  return matches
 }
 
 const buildChoiceSnapshot = (kind: CatalogKind, items: any[], hint?: string, missing?: string[]): CatalogChoiceSnapshot | null => {
   if (!items.length) return null
 
+  const sortedItems = [...items].sort((a, b) => Number(Boolean(getItemPhoto(b))) - Number(Boolean(getItemPhoto(a))))
+
   return {
     kind,
     title: `Выбери ${labelByKind[kind]}`,
-    hint: hint || 'Нажми на вариант, я добавлю его в черновик.',
-    items: items.slice(0, 9),
+    hint: hint || 'Нажми на вариант.',
+    items: sortedItems.slice(0, 9),
     missing,
   }
 }
@@ -310,6 +432,8 @@ const buildChoiceSnapshot = (kind: CatalogKind, items: any[], hint?: string, mis
 const getCatalogItems = (kind: CatalogKind, catalogs: Record<CatalogKind, any[]>) => catalogs[kind] || []
 
 const buildMissingChoice = (missing: string[], catalogs: Record<CatalogKind, any[]>) => {
+  if (missing[0] === 'проценты табаков') return null
+
   const missingKind = missing.includes('табак')
     ? 'tobacco'
     : missing.includes('чаша')
@@ -325,11 +449,28 @@ const buildMissingChoice = (missing: string[], catalogs: Record<CatalogKind, any
               : null
 
   return missingKind
-    ? buildChoiceSnapshot(missingKind, getCatalogItems(missingKind, catalogs), 'Нажми на вариант, я добавлю его в черновик.', missing)
+    ? buildChoiceSnapshot(missingKind, getCatalogItems(missingKind, catalogs), 'Выбери ниже. Карточка останется в чате.', missing)
     : null
 }
 
 const chatIntro = 'Это чат для сборки забивки. Можешь писать обычным языком: "яблоко", "какие чаши есть", "добавь Rosomaha", "уголь Cocoloco". Я покажу варианты из базы, соберу черновик и буду коротко говорить, чего еще не хватает.'
+
+const cleanTitle = (text: string) => (
+  text
+    .replace(/^\s*(?:название|назови|имя)\s*[:\-]?\s*/i, '')
+    .replace(/^[«"“'`]+|[»"”'`]+$/g, '')
+    .trim()
+)
+
+const shouldUseAsTitle = (draft: AgentSetupDraft | null, missing: string[], text: string) => {
+  const normalized = normalizeText(text)
+  if (!draft || !missing.includes('название')) return false
+  if (isMetaQuestion(text) || isCatalogQuestion(text) || getKindFromText(text)) return false
+  if (isPercentQuestion(text) || isMissingQuestion(text)) return false
+  if (['какие', 'какой', 'какая', 'как', 'что', 'почему', 'зачем', 'сколько'].some((word) => normalized.includes(word))) return false
+  if (/^\d+%?$/.test(normalized)) return false
+  return cleanTitle(text).length > 0 && cleanTitle(text).length <= 80
+}
 
 const explicitDraftFromResponse = (
   previousDraft: AgentSetupDraft | null,
@@ -405,6 +546,20 @@ const explicitDraftFromResponse = (
 
 const applyPercentMessage = (draft: AgentSetupDraft | null, text: string): AgentSetupDraft | null => {
   if (!draft?.tobaccos?.length) return null
+  const normalized = normalizeText(text)
+
+  if (draft.tobaccos.length > 1 && ['поровну', 'ровно', 'равно', 'пополам'].some((word) => normalized.includes(word))) {
+    const base = Math.floor(100 / draft.tobaccos.length)
+    const remainder = 100 - base * draft.tobaccos.length
+    return {
+      ...draft,
+      tobaccos: draft.tobaccos.map((item, index) => ({
+        ...item,
+        percentage: base + (index === 0 ? remainder : 0),
+      })),
+    }
+  }
+
   const percentages = [...text.matchAll(/(\d{1,3})\s*%/g)].map((match) => Number(match[1]))
   if (!percentages.length) return null
 
@@ -530,7 +685,7 @@ const ChoicePreview = ({
     </ChoiceHeader>
     <ChoiceGrid>
       {choice.items.map((item) => {
-        const photo = item?.photo_urls?.[0]
+        const photo = getItemPhoto(item)
         const meta = [
           item?.description,
           typeof item?.price === 'number' ? `${item.price} ${item.price_currency || 'UAH'}` : null,
@@ -616,6 +771,13 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     const id = createMessageId()
     const text = content.trim()
 
+    if (!text) {
+      if (trailingMessages.length) {
+        setMessages((current) => [...current, ...trailingMessages])
+      }
+      return
+    }
+
     setTyping(true)
     setMessages((current) => [...current, { id, role: 'assistant', content: '' }])
 
@@ -676,16 +838,14 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       kind,
       matches.length ? matches : items,
       matches.length
-        ? 'Нажми на вариант, я добавлю его в черновик.'
-        : `Точного совпадения нет. Выбери ближайший вариант из базы.`,
+        ? 'Выбери ниже. Карточка останется в чате.'
+        : 'Точного совпадения нет. Выбери ближайший вариант из базы.',
     )
 
     if (!choice) return false
 
     await typeAssistantText(
-      matches.length
-        ? 'Выбери подходящий вариант.'
-        : `Не нашел "${query || text}" в базе. Показываю доступные варианты.`,
+      matches.length ? '' : `Не нашел "${query || text}" в базе. Показываю доступные варианты.`,
       [{
         id: createMessageId(),
         role: 'assistant',
@@ -696,8 +856,8 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     return true
   }
 
-  const updateDraftWithChoice = (kind: CatalogKind, item: any): AgentSetupDraft => {
-    const nextDraft: AgentSetupDraft = { ...(draft || {}) }
+  const updateDraftWithChoice = (baseDraft: AgentSetupDraft | null, kind: CatalogKind, item: any): AgentSetupDraft => {
+    const nextDraft: AgentSetupDraft = { ...(baseDraft || {}) }
     if (kind === 'tobacco') {
       const current = nextDraft.tobaccos || []
       const exists = current.some((entry) => (
@@ -738,6 +898,83 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     return nextDraft
   }
 
+  const applyCatalogItems = async (kind: CatalogKind, items: any[]) => {
+    if (!items.length) return false
+
+    const nextDraft = items.reduce(
+      (currentDraft, item) => updateDraftWithChoice(currentDraft, kind, item),
+      draft,
+    ) as AgentSetupDraft
+    const nextMissing = getMissingFields(nextDraft)
+    const names = items.map((item) => item.name).filter(Boolean).join(', ')
+    const tobaccoPercentNote = kind === 'tobacco' && nextDraft.tobaccos?.length === 1
+      ? ' Поставил 100%, потому что табак один.'
+      : kind === 'tobacco' && (nextDraft.tobaccos?.length || 0) > 1 && nextMissing.includes('проценты табаков')
+        ? ' Теперь укажи проценты или напиши "поровну".'
+        : ''
+
+    setDraft(nextDraft)
+    onDraftChange?.(nextDraft)
+    await typeAssistantText(
+      `Добавил: ${names}.${tobaccoPercentNote} ${buildDraftReply(nextDraft, nextMissing, '')}`.trim(),
+      makeDraftMessages(nextDraft, nextMissing),
+    )
+    return true
+  }
+
+  const handleMentionedCatalogItems = async (text: string) => {
+    const explicitKind = getKindFromText(text)
+    const kinds: CatalogKind[] = explicitKind
+      ? [explicitKind]
+      : ['tobacco', 'bowl', 'kaloud', 'coal', 'placement', 'setupType']
+
+    for (const kind of kinds) {
+      const items = getCatalogItems(kind, catalogs)
+      const matches = findMentionedCatalogItems(items, explicitKind ? stripKindWords(text, kind) || text : text)
+      if (matches.length) {
+        return applyCatalogItems(kind, matches)
+      }
+    }
+
+    return false
+  }
+
+  const applyTitleMessage = async (text: string) => {
+    if (!shouldUseAsTitle(draft, missing, text)) return false
+
+    const nextDraft: AgentSetupDraft = { ...(draft || {}), name: cleanTitle(text) }
+    const nextMissing = getMissingFields(nextDraft)
+    setDraft(nextDraft)
+    onDraftChange?.(nextDraft)
+    await typeAssistantText(
+      `Название: ${nextDraft.name}. ${buildDraftReply(nextDraft, nextMissing, '')}`,
+      makeDraftMessages(nextDraft, nextMissing),
+    )
+    return true
+  }
+
+  const handleDraftQuestion = async (text: string) => {
+    if (isMissingQuestion(text)) {
+      await typeAssistantText(
+        missing.length ? `Не хватает: ${missing.join(', ')}.` : 'Черновик готов. Можно публиковать.',
+        draft ? makeDraftMessages(draft, missing) : [],
+      )
+      return true
+    }
+
+    if (isPercentQuestion(text)) {
+      const tobaccoCount = draft?.tobaccos?.length || 0
+      const reply = tobaccoCount <= 1
+        ? 'Если табак один, ставлю 100% автоматически. Проценты нужны только для микса из двух и более табаков.'
+        : `Можно написать проценты сообщением, например "${draft!.tobaccos!.map((_, index) => index === 0 ? '60%' : `${Math.floor(40 / Math.max(1, tobaccoCount - 1))}%`).join(' ')}", или просто "поровну". Главное, чтобы сумма была 100%.`
+
+      await typeAssistantText(reply)
+      return true
+    }
+
+    return false
+  }
+
   const selectCatalogItem = async (kind: CatalogKind, item: any) => {
     if (busy) return
 
@@ -748,7 +985,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     }
     setMessages((current) => [...current, selectedMessage])
 
-    const nextDraft = updateDraftWithChoice(kind, item)
+    const nextDraft = updateDraftWithChoice(draft, kind, item)
     const nextMissing = getMissingFields(nextDraft)
     setDraft(nextDraft)
     onDraftChange?.(nextDraft)
@@ -784,6 +1021,12 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       return
     }
 
+    if (await handleDraftQuestion(text)) return
+
+    if (await handleMentionedCatalogItems(text)) return
+
+    if (await applyTitleMessage(text)) return
+
     if (await handleCatalogMessage(text)) return
 
     try {
@@ -794,7 +1037,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       setDraft(nextDraft)
       if (nextDraft) onDraftChange?.(nextDraft)
       await typeAssistantText(
-        draftChanged ? buildDraftReply(nextDraft, nextMissing, response.reply) : response.reply,
+        draftChanged ? buildDraftReply(nextDraft, nextMissing, sanitizeAssistantReply(response.reply)) : sanitizeAssistantReply(response.reply),
         draftChanged ? makeDraftMessages(nextDraft, nextMissing) : [],
       )
     } catch {
