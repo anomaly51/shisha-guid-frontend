@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import tw from 'twin.macro'
@@ -9,13 +9,7 @@ import {
   useTranscribeSetupVoiceMutation,
 } from '../shared/api'
 import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, SendIcon } from '../shared/ui/Icons'
-import {
-  MIX_COLORS,
-  MixBowlPreview,
-  detectBowlModel,
-  detectSetupKind,
-  type MixBowlItem,
-} from '../shared/ui/MixBowlPreview'
+import { MIX_COLORS, type MixBowlItem } from '../shared/ui/MixBowlPreview'
 
 const ChatPanel = styled.section<{ $expanded?: boolean }>`
   ${tw`flex overflow-hidden border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-2xl`}
@@ -40,7 +34,7 @@ const Title = tw.h2`text-[15px] font-black leading-snug text-[rgb(var(--color-te
 const Subtitle = tw.div`mt-0.5 text-[11px] font-semibold text-[rgb(var(--color-text-subtle))]`
 const PanelBody = tw.div`flex min-h-0 flex-1 flex-col`
 const ScrollArea = tw.div`min-h-0 flex-1 overflow-y-auto`
-const Messages = tw.div`flex min-h-full flex-col justify-end gap-2 px-4 py-3`
+const Messages = tw.div`flex min-h-full flex-col justify-end gap-2 px-3 py-3 sm:px-4`
 const Composer = tw.form`flex items-end gap-2 border-t border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-3`
 const Textarea = tw.textarea`min-h-[2.75rem] max-h-28 flex-1 resize-none rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-3 py-2 text-[13px] font-semibold leading-5 text-[rgb(var(--color-text))] outline-none transition placeholder:text-[rgb(var(--color-text-subtle))] focus:border-[rgb(var(--color-accent))] focus:shadow-[0_0_0_2px_rgba(139,74,43,0.1)] disabled:opacity-60`
 const IconButton = tw.button`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] hover:text-[rgb(var(--color-accent))]`
@@ -55,27 +49,33 @@ const Bubble = styled.div<{ $mine?: boolean }>`
 `
 
 const ThinkingBox = tw.div`max-w-[92%] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] p-3`
-const GuidanceShell = tw.div`mx-3 mb-3 rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-raised))] p-3`
 const MissingChips = tw.div`mt-2 flex flex-wrap gap-1.5`
 const MissingChip = tw.span`inline-flex h-7 items-center rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2 text-[11px] font-black text-[rgb(var(--color-text-muted))]`
-const DraftShell = tw.div`mx-3 mb-3 overflow-hidden rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-[var(--shadow-card)]`
-const DraftHeader = tw.div`flex items-start justify-between gap-3 border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-raised))] px-3 py-3`
+const DraftShell = tw.div`w-full max-w-[620px] self-start overflow-hidden rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-[var(--shadow-card)]`
+const DraftHeader = tw.div`flex items-start justify-between gap-3 border-b border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-3 py-2.5`
 const DraftTitle = tw.div`min-w-0`
 const DraftName = tw.div`truncate text-[14px] font-black text-[rgb(var(--color-text))]`
 const DraftLabel = tw.div`mt-0.5 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]`
 const DraftBadge = tw.span`inline-flex shrink-0 items-center gap-1 rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]`
-const DraftContent = tw.div`grid gap-3 p-3`
+const DraftContent = tw.div`grid gap-2.5 p-3`
 const TobaccoList = tw.div`grid gap-1.5`
-const DetailGrid = tw.div`grid grid-cols-1 gap-2 sm:grid-cols-2`
-const DetailItem = tw.div`rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-2`
+const DetailGrid = tw.div`grid grid-cols-1 gap-1.5 sm:grid-cols-2`
+const DetailItem = tw.div`grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-2 py-1.5`
 const DetailLabel = tw.div`mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]`
 const DetailValue = tw.div`truncate text-[12px] font-black text-[rgb(var(--color-text))]`
-const PublishButton = tw.button`inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-accent))] px-4 text-[13px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_16px_28px_-22px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
+const PublishButton = tw.button`inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-accent))] px-4 text-[12px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_16px_28px_-22px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
 const MissingText = tw.div`text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
+const MissingPanel = tw.div`rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-2.5`
 
 type SetupAgentWidgetProps = {
   initialDraft?: AgentSetupDraft | null
   onDraftChange?: (draft: AgentSetupDraft) => void
+}
+
+type TimelineMessage = AgentMessage & {
+  id: string
+  draftSnapshot?: AgentSetupDraft | null
+  missingSnapshot?: string[]
 }
 
 const chatStages = [
@@ -106,45 +106,170 @@ const initialMessages: AgentMessage[] = [
   },
 ]
 
-const compactMessages = (messages: AgentMessage[]) => messages.slice(-10)
+const initialTimelineMessages: TimelineMessage[] = initialMessages.map((message, index) => ({
+  ...message,
+  id: `initial-${index}`,
+}))
+
+const createMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+const compactApiMessages = (messages: TimelineMessage[]): AgentMessage[] => (
+  messages
+    .filter((message) => message.role === 'user' || message.content.trim())
+    .map(({ role, content }) => ({ role, content }))
+    .slice(-12)
+)
+
+const normalizeText = (value: string) => (
+  value
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^\p{L}\p{N}%]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+)
+
+const weakValueTokens = new Set([
+  'the',
+  'and',
+  'with',
+  'для',
+  'без',
+  'или',
+  '100',
+  '1',
+  'кг',
+  'г',
+  'гр',
+  'medium',
+  'light',
+  'strong',
+])
+
+const isExplicitValue = (value: string | null | undefined, userCorpus: string) => {
+  const normalizedValue = normalizeText(value || '')
+  if (!normalizedValue) return false
+  if (userCorpus.includes(normalizedValue)) return true
+
+  const tokens = normalizedValue
+    .split(' ')
+    .filter((token) => token.length >= 3 && !weakValueTokens.has(token))
+
+  return tokens.some((token) => userCorpus.includes(token))
+}
+
+const hasExplicitPercent = (messages: TimelineMessage[]) => (
+  messages
+    .filter((message) => message.role === 'user')
+    .some((message) => /%|\bпроцент|\bpercent|\bдол[яи]\b/i.test(message.content))
+)
+
+const userCorpusFrom = (messages: TimelineMessage[]) => normalizeText(
+  messages
+    .filter((message) => message.role === 'user')
+    .map((message) => message.content)
+    .join(' ')
+)
+
+const hasDraftValue = (draft: AgentSetupDraft | null | undefined) => Boolean(
+  draft?.name ||
+  draft?.description ||
+  draft?.bowl_name ||
+  draft?.bowl_id ||
+  draft?.kaloud_name ||
+  draft?.kaloud_id ||
+  draft?.coal_name ||
+  draft?.coal_id ||
+  draft?.coal_placement_name ||
+  draft?.coal_placement_id ||
+  draft?.bowl_setup_type_name ||
+  draft?.bowl_setup_type_id ||
+  draft?.tobaccos?.length
+)
+
+const explicitDraftFromResponse = (
+  previousDraft: AgentSetupDraft | null,
+  responseDraft: AgentSetupDraft | null | undefined,
+  messages: TimelineMessage[],
+): AgentSetupDraft | null => {
+  if (!responseDraft) return previousDraft
+
+  const userCorpus = userCorpusFrom(messages)
+  const nextDraft: AgentSetupDraft = { ...(previousDraft || {}) }
+  const percentWasExplicit = hasExplicitPercent(messages)
+
+  const copyNamedField = (
+    nameKey: keyof AgentSetupDraft,
+    idKey: keyof AgentSetupDraft,
+  ) => {
+    const responseName = responseDraft[nameKey] as string | null | undefined
+    if (!isExplicitValue(responseName, userCorpus)) return
+    ;(nextDraft[nameKey] as string | null | undefined) = responseName || null
+    ;(nextDraft[idKey] as string | null | undefined) = (responseDraft[idKey] as string | null | undefined) || null
+  }
+
+  if (isExplicitValue(responseDraft.name, userCorpus) && normalizeText(responseDraft.name || '') !== normalizeText('Новая забивка')) {
+    nextDraft.name = responseDraft.name || null
+  }
+
+  if (responseDraft.description && isExplicitValue(responseDraft.description, userCorpus)) {
+    nextDraft.description = responseDraft.description
+  }
+
+  copyNamedField('bowl_name', 'bowl_id')
+  copyNamedField('kaloud_name', 'kaloud_id')
+  copyNamedField('coal_name', 'coal_id')
+  copyNamedField('coal_placement_name', 'coal_placement_id')
+  copyNamedField('bowl_setup_type_name', 'bowl_setup_type_id')
+
+  const previousTobaccos = previousDraft?.tobaccos || []
+  const explicitTobaccos = (responseDraft.tobaccos || [])
+    .filter((item) => isExplicitValue(item.tobacco_name, userCorpus))
+    .map((item) => ({
+      ...item,
+      percentage: percentWasExplicit ? item.percentage : null,
+    }))
+
+  const mergedTobaccos = [...previousTobaccos]
+  explicitTobaccos.forEach((item) => {
+    const existingIndex = mergedTobaccos.findIndex((existing) => (
+      existing.tobacco_id && item.tobacco_id
+        ? existing.tobacco_id === item.tobacco_id
+        : normalizeText(existing.tobacco_name || '') === normalizeText(item.tobacco_name || '')
+    ))
+
+    if (existingIndex >= 0) {
+      mergedTobaccos[existingIndex] = {
+        ...mergedTobaccos[existingIndex],
+        ...item,
+        percentage: percentWasExplicit ? item.percentage : mergedTobaccos[existingIndex].percentage,
+      }
+      return
+    }
+
+    mergedTobaccos.push(item)
+  })
+
+  if (mergedTobaccos.length) nextDraft.tobaccos = mergedTobaccos
+
+  return hasDraftValue(nextDraft) ? nextDraft : null
+}
 
 const getMissingFields = (draft: AgentSetupDraft | null) => {
   if (!draft) return []
 
+  const tobaccoTotal = draft.tobaccos?.reduce((sum, item) => sum + Number(item.percentage || 0), 0) || 0
+
   return [
     draft.name ? null : 'название',
     draft.tobaccos?.length ? null : 'табак',
+    draft.tobaccos?.length && tobaccoTotal === 100 ? null : 'проценты табаков',
     draft.bowl_name || draft.bowl_id ? null : 'чаша',
     draft.kaloud_name || draft.kaloud_id ? null : 'калауд',
     draft.coal_name || draft.coal_id ? null : 'уголь',
     draft.coal_placement_name || draft.coal_placement_id ? null : 'раскладка углей',
     draft.bowl_setup_type_name || draft.bowl_setup_type_id ? null : 'тип забивки',
   ].filter(Boolean) as string[]
-}
-
-const MissingGuidance = ({ missing }: { missing: string[] }) => {
-  if (!missing.length) return null
-
-  return (
-    <GuidanceShell>
-      <div tw="flex items-start justify-between gap-3">
-        <div tw="min-w-0">
-          <div tw="text-[12px] font-black text-[rgb(var(--color-text))]">Нужно уточнить</div>
-          <div tw="mt-0.5 text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]">
-            Напиши только эти пункты одним сообщением, и агент обновит черновик.
-          </div>
-        </div>
-        <span tw="shrink-0 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]">
-          {missing.length}
-        </span>
-      </div>
-      <MissingChips>
-        {missing.map((field) => (
-          <MissingChip key={field}>{field}</MissingChip>
-        ))}
-      </MissingChips>
-    </GuidanceShell>
-  )
 }
 
 const buildPreviewItems = (draft: AgentSetupDraft | null): MixBowlItem[] => (
@@ -206,8 +331,6 @@ const DraftPreview = ({
   const items = useMemo(() => buildPreviewItems(draft), [draft])
   const total = items.reduce((sum, item) => sum + item.percentage, 0)
   const ready = missing.length === 0
-  const kind = detectSetupKind(draft.bowl_setup_type_name)
-  const bowlModel = detectBowlModel({ name: draft.bowl_name })
 
   const details = [
     { icon: 'bowl' as const, label: 'Чаша', value: draft.bowl_name },
@@ -221,7 +344,7 @@ const DraftPreview = ({
     <DraftShell>
       <DraftHeader>
         <DraftTitle>
-          <DraftName>{draft.name || 'Новая забивка'}</DraftName>
+          <DraftName>{draft.name || 'Название не указано'}</DraftName>
           <DraftLabel>Черновик, не опубликовано</DraftLabel>
         </DraftTitle>
         <DraftBadge>
@@ -230,34 +353,21 @@ const DraftPreview = ({
         </DraftBadge>
       </DraftHeader>
 
-      <div tw="relative border-b border-[rgb(var(--color-border))]">
-        <MixBowlPreview
-          autoRotate={false}
-          bowlModel={bowlModel}
-          interactive={false}
-          items={items}
-          kind={kind}
-          renderMode="snapshot"
-          sceneScale={1}
-        />
-        <div tw="pointer-events-none absolute left-2.5 top-2.5 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur">
-          {draft.bowl_setup_type_name || 'Тип забивки'}
-        </div>
-        <div tw="pointer-events-none absolute bottom-2.5 right-2.5 rounded-md border border-white/60 bg-[rgb(var(--color-surface-inverse))]/90 px-2 py-1.5 text-[11px] font-black text-white shadow-[0_14px_30px_-18px_rgba(0,0,0,0.75)] backdrop-blur">
-          {total || 0}%
-        </div>
-      </div>
-
       <DraftContent>
         <div>
-          <div tw="mb-1.5 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]">Состав</div>
+          <div tw="mb-1.5 flex items-center justify-between gap-2">
+            <div tw="text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]">Состав</div>
+            <span tw="text-[10px] font-black text-[rgb(var(--color-text-muted))] tabular-nums">{total || 0}%</span>
+          </div>
           {items.length ? (
             <TobaccoList>
               {items.map((item) => (
-                <div key={item.id} tw="flex items-center gap-2 rounded-lg bg-[rgb(var(--color-surface-muted))] px-2 py-2">
+                <div key={item.id} tw="flex items-center gap-2 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1.5">
                   <span tw="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
                   <span tw="min-w-0 flex-1 truncate text-[12px] font-black text-[rgb(var(--color-text))]">{item.name}</span>
-                  <span tw="shrink-0 text-[12px] font-black text-[rgb(var(--color-accent))] tabular-nums">{item.percentage || '?'}%</span>
+                  <span tw="shrink-0 text-[12px] font-black text-[rgb(var(--color-accent))] tabular-nums">
+                    {item.percentage ? `${item.percentage}%` : '?'}
+                  </span>
                 </div>
               ))}
             </TobaccoList>
@@ -285,9 +395,22 @@ const DraftPreview = ({
         </DetailGrid>
 
         {!ready && (
-          <MissingText>
-            Не хватает: {missing.join(', ')}. Напиши это в чат, агент обновит черновик.
-          </MissingText>
+          <MissingPanel>
+            <div tw="flex items-start justify-between gap-3">
+              <div tw="min-w-0">
+                <div tw="text-[12px] font-black text-[rgb(var(--color-text))]">Нужно уточнить</div>
+                <MissingText>Напиши недостающие параметры сообщением. Я обновлю черновик новым виджетом в истории.</MissingText>
+              </div>
+              <span tw="shrink-0 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]">
+                {missing.length}
+              </span>
+            </div>
+            <MissingChips>
+              {missing.map((field) => (
+                <MissingChip key={field}>{field}</MissingChip>
+              ))}
+            </MissingChips>
+          </MissingPanel>
         )}
 
         {onPublish ? (
@@ -309,7 +432,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
   const [input, setInput] = useState('')
-  const [messages, setMessages] = useState<AgentMessage[]>(initialMessages)
+  const [messages, setMessages] = useState<TimelineMessage[]>(initialTimelineMessages)
   const [draft, setDraft] = useState<AgentSetupDraft | null>(initialDraft)
   const [recording, setRecording] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -324,6 +447,10 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   const busy = chatState.isLoading || transcribeState.isLoading
   const stages = transcribeState.isLoading ? voiceStages : publishing ? publishStages : chatStages
   const draftKey = JSON.stringify(initialDraft || null)
+  const activeDraftMessageId = useMemo(
+    () => [...messages].reverse().find((message) => message.draftSnapshot)?.id,
+    [messages],
+  )
 
   useEffect(() => {
     if (!initialDraft) return
@@ -356,21 +483,38 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     const text = rawText.trim()
     if (!text || chatState.isLoading) return
 
-    const nextMessages = compactMessages([...messages, { role: 'user' as const, content: text }])
+    const nextMessages: TimelineMessage[] = [
+      ...messages,
+      { id: createMessageId(), role: 'user' as const, content: text },
+    ]
     setMessages(nextMessages)
     setInput('')
 
     try {
-      const response = await chatWithAgent({ messages: nextMessages, draft }).unwrap()
-      const nextDraft = response.draft || null
+      const response = await chatWithAgent({ messages: compactApiMessages(nextMessages), draft }).unwrap()
+      const nextDraft = explicitDraftFromResponse(draft, response.draft, nextMessages)
+      const nextMissing = getMissingFields(nextDraft)
       setDraft(nextDraft)
       if (nextDraft) onDraftChange?.(nextDraft)
-      setMessages(compactMessages([...nextMessages, { role: 'assistant', content: response.reply }]))
+      setMessages([
+        ...nextMessages,
+        { id: createMessageId(), role: 'assistant', content: response.reply },
+        ...(nextDraft
+          ? [{
+              id: createMessageId(),
+              role: 'assistant' as const,
+              content: '',
+              draftSnapshot: nextDraft,
+              missingSnapshot: nextMissing,
+            }]
+          : []),
+      ])
     } catch {
-      setMessages(compactMessages([...nextMessages, {
+      setMessages([...nextMessages, {
+        id: createMessageId(),
         role: 'assistant',
         content: 'Не получилось обработать запрос. Проверь авторизацию и попробуй еще раз.',
-      }]))
+      }])
     }
   }
 
@@ -378,22 +522,23 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     if (!draft || missing.length || busy) return
 
     setPublishing(true)
-    const publishMessage = { role: 'user' as const, content: 'Опубликовать черновик' }
-    const nextMessages = compactMessages([...messages, publishMessage])
+    const publishMessage = { id: createMessageId(), role: 'user' as const, content: 'Опубликовать черновик' }
+    const nextMessages = [...messages, publishMessage]
     setMessages(nextMessages)
 
     try {
-      const response = await chatWithAgent({ messages: nextMessages, draft, publish: true }).unwrap()
+      const response = await chatWithAgent({ messages: compactApiMessages(nextMessages), draft, publish: true }).unwrap()
       setDraft(response.draft || draft)
-      setMessages(compactMessages([...nextMessages, { role: 'assistant', content: response.reply }]))
+      setMessages([...nextMessages, { id: createMessageId(), role: 'assistant', content: response.reply }])
       if (response.created_setup_id) {
         navigate(`/setups/${response.created_setup_id}`)
       }
     } catch {
-      setMessages(compactMessages([...nextMessages, {
+      setMessages([...nextMessages, {
+        id: createMessageId(),
         role: 'assistant',
         content: 'Не получилось опубликовать черновик. Проверь данные и попробуй еще раз.',
-      }]))
+      }])
     } finally {
       setPublishing(false)
     }
@@ -427,10 +572,11 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
         const result = await transcribeVoice(blob).unwrap()
         if (result.text) await sendText(result.text)
       } catch {
-        setMessages(compactMessages([...messages, {
+        setMessages([...messages, {
+          id: createMessageId(),
           role: 'assistant',
           content: 'Не получилось распознать голос. Попробуй текстом.',
-        }]))
+        }])
       }
     }
 
@@ -463,24 +609,25 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
 
         <ScrollArea ref={scrollRef}>
           <Messages>
-            {messages.map((message, index) => (
-              <Bubble key={`${message.role}-${index}`} $mine={message.role === 'user'}>
-                {message.content}
-              </Bubble>
+            {messages.map((message) => (
+              <Fragment key={message.id}>
+                {message.content && (
+                  <Bubble $mine={message.role === 'user'}>
+                    {message.content}
+                  </Bubble>
+                )}
+                {message.draftSnapshot && (
+                  <DraftPreview
+                    draft={message.draftSnapshot}
+                    missing={message.missingSnapshot || getMissingFields(message.draftSnapshot)}
+                    onPublish={message.id === activeDraftMessageId ? publishDraft : undefined}
+                    publishing={publishing}
+                  />
+                )}
+              </Fragment>
             ))}
             {busy && <ThinkingMessage currentIndex={stageIndex} stages={stages} />}
           </Messages>
-
-          {draft && <MissingGuidance missing={missing} />}
-
-          {draft && (
-            <DraftPreview
-              draft={draft}
-              missing={missing}
-              onPublish={publishDraft}
-              publishing={publishing}
-            />
-          )}
         </ScrollArea>
 
         <Composer onSubmit={handleSubmit}>
