@@ -15,7 +15,6 @@ import {
   useTranscribeSetupVoiceMutation,
 } from '../shared/api'
 import { CatalogIcon, CheckIcon, CloseIcon, ExpandIcon, MicIcon, SendIcon } from '../shared/ui/Icons'
-import { MIX_COLORS, type MixBowlItem } from '../shared/ui/MixBowlPreview'
 
 const ChatPanel = styled.section<{ $expanded?: boolean }>`
   ${tw`flex overflow-hidden border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-2xl`}
@@ -56,32 +55,27 @@ const Bubble = styled.div<{ $mine?: boolean }>`
 
 const TypingBubble = tw.div`max-w-[88%] self-start rounded-lg bg-[rgb(var(--color-surface-muted))] px-3 py-2 text-[13px] font-semibold leading-5 text-[rgb(var(--color-text-subtle))]`
 const MissingChips = tw.div`mt-2 flex flex-wrap gap-1.5`
-const MissingChip = tw.span`inline-flex h-7 items-center rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2 text-[11px] font-black text-[rgb(var(--color-text-muted))]`
-const DraftShell = tw.div`w-full max-w-[620px] self-start overflow-hidden rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-[var(--shadow-card)]`
-const DraftHeader = tw.div`flex items-start justify-between gap-3 border-b border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-3 py-2.5`
+const MissingChip = tw.span`inline-flex h-6 items-center rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2 text-[10px] font-black text-[rgb(var(--color-text-muted))]`
+const DraftShell = tw.div`w-full max-w-[620px] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-2.5 shadow-[var(--shadow-card)]`
+const DraftHeader = tw.div`flex items-start justify-between gap-3`
 const DraftTitle = tw.div`min-w-0`
 const DraftName = tw.div`truncate text-[14px] font-black text-[rgb(var(--color-text))]`
 const DraftLabel = tw.div`mt-0.5 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]`
 const DraftBadge = tw.span`inline-flex shrink-0 items-center gap-1 rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]`
-const DraftContent = tw.div`grid gap-2.5 p-3`
-const TobaccoList = tw.div`grid gap-1.5`
-const DetailGrid = tw.div`grid grid-cols-1 gap-1.5 sm:grid-cols-2`
-const DetailItem = tw.div`grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-2 py-1.5`
-const DetailLabel = tw.div`mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]`
-const DetailValue = tw.div`truncate text-[12px] font-black text-[rgb(var(--color-text))]`
+const DraftLine = tw.div`mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-[rgb(var(--color-text-muted))]`
+const DraftToken = tw.span`inline-flex max-w-full items-center gap-1 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1`
 const PublishButton = tw.button`inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-accent))] px-4 text-[12px] font-black text-[rgb(var(--color-text-inverse))] shadow-[0_16px_28px_-22px_rgba(83,48,31,0.95)] transition hover:bg-[rgb(var(--color-accent-hover))] disabled:cursor-not-allowed disabled:opacity-50`
 const MissingText = tw.div`text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
-const MissingPanel = tw.div`rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-2.5`
-const ChoiceShell = tw.div`w-full max-w-[620px] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-3 shadow-[var(--shadow-card)]`
+const ChoiceShell = tw.div`w-full max-w-[620px] self-start rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-2.5 shadow-[var(--shadow-card)]`
 const ChoiceHeader = tw.div`mb-2 flex items-start justify-between gap-3`
 const ChoiceTitle = tw.div`text-[13px] font-black text-[rgb(var(--color-text))]`
 const ChoiceHint = tw.div`mt-0.5 text-[11px] font-semibold leading-4 text-[rgb(var(--color-text-subtle))]`
-const ChoiceGrid = tw.div`grid grid-cols-2 gap-2 sm:grid-cols-3`
-const ChoiceCard = tw.button`min-w-0 overflow-hidden rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] text-left transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] disabled:cursor-not-allowed disabled:opacity-60`
-const ChoicePhoto = tw.div`aspect-square bg-[rgb(var(--color-surface-muted))]`
-const ChoiceBody = tw.div`p-2`
+const ChoiceGrid = tw.div`grid gap-1.5`
+const ChoiceCard = tw.button`grid min-w-0 grid-cols-[42px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-1.5 text-left transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] disabled:cursor-not-allowed disabled:opacity-60`
+const ChoicePhoto = tw.div`h-[42px] w-[42px] overflow-hidden rounded-md bg-[rgb(var(--color-surface-muted))]`
+const ChoiceBody = tw.div`min-w-0`
 const ChoiceName = tw.div`truncate text-[12px] font-black text-[rgb(var(--color-text))]`
-const ChoiceMeta = tw.div`mt-0.5 line-clamp-2 text-[10px] font-semibold leading-3 text-[rgb(var(--color-text-subtle))]`
+const ChoiceMeta = tw.div`mt-0.5 truncate text-[10px] font-semibold leading-3 text-[rgb(var(--color-text-subtle))]`
 
 type SetupAgentWidgetProps = {
   initialDraft?: AgentSetupDraft | null
@@ -95,6 +89,7 @@ type CatalogChoiceSnapshot = {
   title: string
   hint: string
   items: any[]
+  missing?: string[]
 }
 
 type TimelineMessage = AgentMessage & {
@@ -134,6 +129,17 @@ const normalizeText = (value: string) => (
     .replace(/\s+/g, ' ')
     .trim()
 )
+
+const transliterateRu = (value: string) => {
+  const map: Record<string, string> = {
+    а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y',
+    к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u',
+    ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ы: 'y', э: 'e', ю: 'yu', я: 'ya',
+  }
+  return normalizeText(value).split('').map((char) => map[char] || char).join('')
+}
+
+const searchableText = (value: string) => `${normalizeText(value)} ${transliterateRu(value)}`
 
 const weakValueTokens = new Set([
   'the',
@@ -230,6 +236,7 @@ const questionPatterns: Array<{ kind: CatalogKind; words: string[] }> = [
 ]
 
 const catalogQuestionWords = ['какие', 'какой', 'какая', 'что есть', 'есть', 'покажи', 'показать', 'список', 'варианты', 'выбрать']
+const metaQuestionWords = ['что это', 'че это', 'зачем', 'кто ты', 'что умеешь', 'как работает', 'помоги', 'help']
 
 const getKindFromText = (text: string) => {
   const normalized = normalizeText(text)
@@ -265,10 +272,24 @@ const stripKindWords = (text: string, kind: CatalogKind) => {
     .join(' ')
 }
 
-const getItemText = (item: any) => normalizeText(`${item?.name || ''} ${item?.description || ''}`)
+const isMetaQuestion = (text: string) => {
+  const normalized = normalizeText(text)
+  return metaQuestionWords.some((word) => normalized.includes(normalizeText(word)))
+}
+
+const isShortTobaccoSearch = (text: string) => {
+  const normalized = normalizeText(text)
+  const wordCount = normalized.split(' ').filter(Boolean).length
+  if (!normalized || wordCount > 3) return false
+  if (isMetaQuestion(text) || getKindFromText(text)) return false
+  if (/^\d+%?$/.test(normalized)) return false
+  return true
+}
+
+const getItemText = (item: any) => searchableText(`${item?.name || ''} ${item?.description || ''}`)
 
 const searchCatalog = (items: any[], query: string) => {
-  const tokens = normalizeText(query).split(' ').filter((token) => token.length > 2)
+  const tokens = searchableText(query).split(' ').filter((token) => token.length > 2)
   if (!tokens.length) return items.slice(0, 9)
 
   return items
@@ -283,14 +304,15 @@ const searchCatalog = (items: any[], query: string) => {
     .slice(0, 9)
 }
 
-const buildChoiceSnapshot = (kind: CatalogKind, items: any[], hint?: string): CatalogChoiceSnapshot | null => {
+const buildChoiceSnapshot = (kind: CatalogKind, items: any[], hint?: string, missing?: string[]): CatalogChoiceSnapshot | null => {
   if (!items.length) return null
 
   return {
     kind,
-    title: titleByKind[kind],
-    hint: hint || `Выбери ${labelByKind[kind]} из базы. Карточка останется в истории чата.`,
+    title: `Выбери ${labelByKind[kind]}`,
+    hint: hint || 'Нажми на вариант, я добавлю его в черновик.',
     items: items.slice(0, 9),
+    missing,
   }
 }
 
@@ -311,8 +333,12 @@ const buildMissingChoice = (missing: string[], catalogs: Record<CatalogKind, any
               ? 'setupType'
               : null
 
-  return missingKind ? buildChoiceSnapshot(missingKind, getCatalogItems(missingKind, catalogs)) : null
+  return missingKind
+    ? buildChoiceSnapshot(missingKind, getCatalogItems(missingKind, catalogs), 'Нажми на вариант, я добавлю его в черновик.', missing)
+    : null
 }
+
+const chatIntro = 'Это чат для сборки забивки. Можешь писать обычным языком: "яблоко", "какие чаши есть", "добавь Rosomaha", "уголь Cocoloco". Я покажу варианты из базы, соберу черновик и буду коротко говорить, чего еще не хватает.'
 
 const explicitDraftFromResponse = (
   previousDraft: AgentSetupDraft | null,
@@ -377,9 +403,33 @@ const explicitDraftFromResponse = (
     mergedTobaccos.push(item)
   })
 
-  if (mergedTobaccos.length) nextDraft.tobaccos = mergedTobaccos
+  if (mergedTobaccos.length) {
+    nextDraft.tobaccos = mergedTobaccos.length === 1
+      ? [{ ...mergedTobaccos[0], percentage: 100 }]
+      : mergedTobaccos
+  }
 
   return hasDraftValue(nextDraft) ? nextDraft : null
+}
+
+const applyPercentMessage = (draft: AgentSetupDraft | null, text: string): AgentSetupDraft | null => {
+  if (!draft?.tobaccos?.length) return null
+  const percentages = [...text.matchAll(/(\d{1,3})\s*%/g)].map((match) => Number(match[1]))
+  if (!percentages.length) return null
+
+  if (draft.tobaccos.length === 1) {
+    const value = Math.min(100, Math.max(1, percentages[0]))
+    return { ...draft, tobaccos: [{ ...draft.tobaccos[0], percentage: value }] }
+  }
+
+  if (percentages.length !== draft.tobaccos.length) return null
+  const total = percentages.reduce((sum, value) => sum + value, 0)
+  if (total !== 100) return null
+
+  return {
+    ...draft,
+    tobaccos: draft.tobaccos.map((item, index) => ({ ...item, percentage: percentages[index] })),
+  }
 }
 
 const getMissingFields = (draft: AgentSetupDraft | null) => {
@@ -390,7 +440,7 @@ const getMissingFields = (draft: AgentSetupDraft | null) => {
   return [
     draft.name ? null : 'название',
     draft.tobaccos?.length ? null : 'табак',
-    draft.tobaccos?.length && tobaccoTotal === 100 ? null : 'проценты табаков',
+    !draft.tobaccos?.length || draft.tobaccos.length === 1 || tobaccoTotal === 100 ? null : 'проценты табаков',
     draft.bowl_name || draft.bowl_id ? null : 'чаша',
     draft.kaloud_name || draft.kaloud_id ? null : 'калауд',
     draft.coal_name || draft.coal_id ? null : 'уголь',
@@ -399,14 +449,20 @@ const getMissingFields = (draft: AgentSetupDraft | null) => {
   ].filter(Boolean) as string[]
 }
 
-const buildPreviewItems = (draft: AgentSetupDraft | null): MixBowlItem[] => (
-  draft?.tobaccos?.map((item, index) => ({
-    id: item.tobacco_id || `${item.tobacco_name || 'tobacco'}-${index}`,
-    name: item.tobacco_name || `Табак ${index + 1}`,
-    percentage: Number(item.percentage || 0),
-    color: MIX_COLORS[index % MIX_COLORS.length],
-  })) || []
-)
+const compactSummary = (draft: AgentSetupDraft) => {
+  const tobaccos = draft.tobaccos?.map((item) => (
+    item.percentage ? `${item.tobacco_name} ${item.percentage}%` : item.tobacco_name
+  )).filter(Boolean).join(', ')
+
+  return [
+    tobaccos || null,
+    draft.bowl_name || null,
+    draft.kaloud_name || null,
+    draft.coal_name || null,
+    draft.coal_placement_name || null,
+    draft.bowl_setup_type_name || null,
+  ].filter(Boolean) as string[]
+}
 
 const DraftPreview = ({
   draft,
@@ -419,17 +475,8 @@ const DraftPreview = ({
   onPublish?: () => void
   publishing: boolean
 }) => {
-  const items = useMemo(() => buildPreviewItems(draft), [draft])
-  const total = items.reduce((sum, item) => sum + item.percentage, 0)
   const ready = missing.length === 0
-
-  const details = [
-    { icon: 'bowl' as const, label: 'Чаша', value: draft.bowl_name },
-    { icon: 'kaloud' as const, label: 'Калауд', value: draft.kaloud_name },
-    { icon: 'coal' as const, label: 'Уголь', value: draft.coal_name },
-    { icon: 'placement' as const, label: 'Расположение углей', value: draft.coal_placement_name },
-    { icon: 'setupType' as const, label: 'Тип', value: draft.bowl_setup_type_name },
-  ]
+  const summary = compactSummary(draft)
 
   return (
     <DraftShell>
@@ -444,77 +491,22 @@ const DraftPreview = ({
         </DraftBadge>
       </DraftHeader>
 
-      <DraftContent>
-        <div>
-          <div tw="mb-1.5 flex items-center justify-between gap-2">
-            <div tw="text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]">Состав</div>
-            <span tw="text-[10px] font-black text-[rgb(var(--color-text-muted))] tabular-nums">{total || 0}%</span>
-          </div>
-          {items.length ? (
-            <TobaccoList>
-              {items.map((item) => (
-                <div key={item.id} tw="flex items-center gap-2 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1.5">
-                  <span tw="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
-                  <span tw="min-w-0 flex-1 truncate text-[12px] font-black text-[rgb(var(--color-text))]">{item.name}</span>
-                  <span tw="shrink-0 text-[12px] font-black text-[rgb(var(--color-accent))] tabular-nums">
-                    {item.percentage ? `${item.percentage}%` : '?'}
-                  </span>
-                </div>
-              ))}
-            </TobaccoList>
-          ) : (
-            <MissingText>Добавь хотя бы один табак сообщением или голосом.</MissingText>
-          )}
-        </div>
-
-        {draft.description && (
-          <div tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-2 text-[12px] font-semibold leading-5 text-[rgb(var(--color-text-muted))]">
-            {draft.description}
-          </div>
+      <DraftLine>
+        {summary.length ? summary.map((item) => (
+          <DraftToken key={item}>{item}</DraftToken>
+        )) : (
+          <span>Пока ничего не выбрано</span>
         )}
+      </DraftLine>
 
-        <DetailGrid>
-          {details.map((detail) => (
-            <DetailItem key={detail.label}>
-              <DetailLabel>
-                <CatalogIcon name={detail.icon} size={12} />
-                {detail.label}
-              </DetailLabel>
-              <DetailValue>{detail.value || 'Не выбрано'}</DetailValue>
-            </DetailItem>
-          ))}
-        </DetailGrid>
+      {!ready && <MissingText tw="mt-2">Не хватает: {missing.join(', ')}.</MissingText>}
 
-        {!ready && (
-          <MissingPanel>
-            <div tw="flex items-start justify-between gap-3">
-              <div tw="min-w-0">
-                <div tw="text-[12px] font-black text-[rgb(var(--color-text))]">Нужно уточнить</div>
-                <MissingText>Напиши недостающие параметры сообщением. Я обновлю черновик новым виджетом в истории.</MissingText>
-              </div>
-              <span tw="shrink-0 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]">
-                {missing.length}
-              </span>
-            </div>
-            <MissingChips>
-              {missing.map((field) => (
-                <MissingChip key={field}>{field}</MissingChip>
-              ))}
-            </MissingChips>
-          </MissingPanel>
-        )}
-
-        {onPublish ? (
-          <PublishButton type="button" onClick={onPublish} disabled={!ready || publishing}>
-            <CheckIcon size={14} />
-            {publishing ? 'Публикую' : 'Опубликовать'}
-          </PublishButton>
-        ) : (
-          <MissingText>
-            Черновик применен к форме. Проверь выбранные поля и опубликуй забивку кнопкой формы.
-          </MissingText>
-        )}
-      </DraftContent>
+      {onPublish && (
+        <PublishButton type="button" onClick={onPublish} disabled={!ready || publishing} tw="mt-2">
+          <CheckIcon size={14} />
+          {publishing ? 'Публикую' : 'Опубликовать'}
+        </PublishButton>
+      )}
     </DraftShell>
   )
 }
@@ -533,6 +525,13 @@ const ChoicePreview = ({
       <div tw="min-w-0">
         <ChoiceTitle>{choice.title}</ChoiceTitle>
         <ChoiceHint>{choice.hint}</ChoiceHint>
+        {choice.missing?.length ? (
+          <MissingChips>
+            {choice.missing.map((field) => (
+              <MissingChip key={field}>{field}</MissingChip>
+            ))}
+          </MissingChips>
+        ) : null}
       </div>
       <span tw="shrink-0 rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-text-muted))]">
         {choice.items.length}
@@ -647,6 +646,16 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   const makeDraftMessages = (nextDraft: AgentSetupDraft | null, nextMissing: string[]) => {
     if (!nextDraft) return []
 
+    const nextChoice = buildMissingChoice(nextMissing, catalogs)
+    if (nextChoice) {
+      return [{
+        id: createMessageId(),
+        role: 'assistant' as const,
+        content: '',
+        choiceSnapshot: nextChoice,
+      }]
+    }
+
     const draftMessage: TimelineMessage = {
       id: createMessageId(),
       role: 'assistant',
@@ -654,22 +663,11 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       draftSnapshot: nextDraft,
       missingSnapshot: nextMissing,
     }
-    const nextChoice = buildMissingChoice(nextMissing, catalogs)
-    return [
-      draftMessage,
-      ...(nextChoice
-        ? [{
-            id: createMessageId(),
-            role: 'assistant' as const,
-            content: '',
-            choiceSnapshot: nextChoice,
-          }]
-        : []),
-    ]
+    return [draftMessage]
   }
 
   const handleCatalogMessage = async (text: string) => {
-    const kind = getKindFromText(text)
+    const kind = getKindFromText(text) || (isShortTobaccoSearch(text) ? 'tobacco' : null)
     if (!kind) return false
     const wordCount = normalizeText(text).split(' ').filter(Boolean).length
     if (!isCatalogQuestion(text) && wordCount > 5) return false
@@ -687,16 +685,16 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       kind,
       matches.length ? matches : items,
       matches.length
-        ? `Выбери ${labelByKind[kind]} из базы.`
-        : `Такого варианта не нашел в базе. Вот доступные ${titleByKind[kind].toLowerCase()}:`,
+        ? 'Нажми на вариант, я добавлю его в черновик.'
+        : `Точного совпадения нет. Выбери ближайший вариант из базы.`,
     )
 
     if (!choice) return false
 
     await typeAssistantText(
       matches.length
-        ? `${titleByKind[kind]}. Нажми на карточку, чтобы добавить в черновик.`
-        : `Не нашел точного совпадения по запросу "${query || text}". Показываю варианты из базы.`,
+        ? `${titleByKind[kind]}: выбери подходящий вариант.`
+        : `Не нашел "${query || text}" в базе. Показываю доступные варианты.`,
       [{
         id: createMessageId(),
         role: 'assistant',
@@ -716,9 +714,12 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
           ? entry.tobacco_id === item.id
           : normalizeText(entry.tobacco_name || '') === normalizeText(item.name || '')
       ))
-      nextDraft.tobaccos = exists
+      const nextTobaccos = exists
         ? current
-        : [...current, { tobacco_id: item.id, tobacco_name: item.name, percentage: null }]
+        : [...current, { tobacco_id: item.id, tobacco_name: item.name, percentage: current.length === 0 ? 100 : null }]
+      nextDraft.tobaccos = nextTobaccos.length === 1
+        ? [{ ...nextTobaccos[0], percentage: 100 }]
+        : nextTobaccos.map((entry) => ({ ...entry, percentage: nextTobaccos.length > 1 ? null : entry.percentage }))
       return nextDraft
     }
 
@@ -762,7 +763,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     onDraftChange?.(nextDraft)
 
     await typeAssistantText(
-      `${labelByKind[kind]} "${item.name}" добавлен. ${buildDraftReply(nextDraft, nextMissing, '')}`,
+      `${item.name} добавлен. ${kind === 'tobacco' && nextDraft.tobaccos?.length === 1 ? 'Поставил 100%, потому что табак один. ' : ''}${buildDraftReply(nextDraft, nextMissing, '')}`,
       makeDraftMessages(nextDraft, nextMissing),
     )
   }
@@ -777,6 +778,20 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     ]
     setMessages(nextMessages)
     setInput('')
+
+    if (isMetaQuestion(text)) {
+      await typeAssistantText(chatIntro)
+      return
+    }
+
+    const percentDraft = applyPercentMessage(draft, text)
+    if (percentDraft) {
+      const nextMissing = getMissingFields(percentDraft)
+      setDraft(percentDraft)
+      onDraftChange?.(percentDraft)
+      await typeAssistantText(buildDraftReply(percentDraft, nextMissing, ''), makeDraftMessages(percentDraft, nextMissing))
+      return
+    }
 
     if (await handleCatalogMessage(text)) return
 
