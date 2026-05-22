@@ -158,6 +158,10 @@ const phoneticTokenMap: Record<string, string> = {
   meloun: 'melon',
   rosomaha: 'rosomaha',
   rosamaha: 'rosomaha',
+  rosomahuy: 'rosomaha',
+  rosomahuya: 'rosomaha',
+  rasmah: 'rosomaha',
+  rasmaha: 'rosomaha',
   mango: 'mango',
   apelsin: 'orange',
   oranzh: 'orange',
@@ -289,6 +293,18 @@ const questionPatterns: Array<{ kind: CatalogKind; words: string[] }> = [
 
 const catalogQuestionWords = ['какие', 'какой', 'какая', 'что есть', 'есть', 'покажи', 'показать', 'список', 'варианты', 'выбрать']
 const metaQuestionWords = ['что это', 'че это', 'зачем', 'кто ты', 'что умеешь', 'как работает', 'помоги', 'help']
+const stateQuestionWords = [
+  'что я уже выбрал',
+  'что уже выбрано',
+  'что выбрано',
+  'мой выбор',
+  'покажи выбор',
+  'покажи черновик',
+  'что в черновике',
+  'скинь json',
+  'покажи json',
+  'json',
+]
 
 const getKindFromText = (text: string) => {
   const normalized = normalizeText(text)
@@ -340,6 +356,11 @@ const isMissingQuestion = (text: string) => {
   return ['чего не хватает', 'что не хватает', 'что осталось', 'что еще', 'дальше'].some((word) => (
     normalized.includes(normalizeText(word))
   ))
+}
+
+const isStateQuestion = (text: string) => {
+  const normalized = normalizeText(text)
+  return stateQuestionWords.some((word) => normalized.includes(normalizeText(word)))
 }
 
 const isShortTobaccoSearch = (text: string) => {
@@ -395,7 +416,7 @@ const searchCatalog = (items: any[], query: string) => {
 const splitCatalogQueries = (text: string) => {
   const normalized = normalizeText(text)
   const phrases = normalized
-    .replace(/\b(?:добавь|добавить|возьми|выбери|хочу|табак|табаки)\b/g, ' ')
+    .replace(/\b(?:давай|давй|добавь|добавить|возьми|выбери|хочу|табак|табаки)\b/g, ' ')
     .split(/\s+(?:и|and|\+)\s+|[,;/]+/g)
     .map((part) => part.trim())
     .filter((part) => part.length > 1)
@@ -468,6 +489,53 @@ const buildMissingChoice = (missing: string[], catalogs: Record<CatalogKind, any
     : null
 }
 
+const compactCatalogForAgent = (items: any[]) => (
+  items.slice(0, 20).map((item) => ({
+    id: item?.id || null,
+    name: item?.name || null,
+    price: typeof item?.price === 'number' ? item.price : null,
+    currency: item?.price_currency || null,
+    description: item?.description || null,
+    has_photo: Boolean(getItemPhoto(item)),
+  }))
+)
+
+const buildAgentContextMessage = (
+  nextDraft: AgentSetupDraft | null,
+  nextMissing: string[],
+  catalogs: Record<CatalogKind, any[]>,
+): AgentMessage => {
+  const autoName = buildAutoDraftName(nextDraft)
+  const context = {
+    current_draft: nextDraft || null,
+    auto_name: autoName,
+    missing_fields: nextMissing,
+    catalogs: {
+      tobaccos: compactCatalogForAgent(catalogs.tobacco),
+      bowls: compactCatalogForAgent(catalogs.bowl),
+      kalouds: compactCatalogForAgent(catalogs.kaloud),
+      coals: compactCatalogForAgent(catalogs.coal),
+      coal_placements: compactCatalogForAgent(catalogs.placement),
+      setup_types: compactCatalogForAgent(catalogs.setupType),
+    },
+  }
+
+  return {
+    role: 'assistant',
+    content: [
+      'Скрытый контекст интерфейса ShishaGuid для следующего ответа.',
+      'Веди себя как гибкий агент, а не форма: отвечай на вопрос пользователя, учитывай всю историю и текущий черновик.',
+      'Не отвечай одним шаблоном "Не хватает ..."; сначала коротко скажи, что понял или что уже выбрано, потом один следующий шаг.',
+      'Если пользователь спрашивает, что уже выбрал, перечисли current_draft и при просьбе JSON покажи компактный JSON.',
+      'Если пользователь пишет мусор или один непонятный символ, скажи, что не понял ввод, и попроси уточнить; не делай вид, что это параметр забивки.',
+      'Название забивки не требуй, если выбраны табаки: оно автогенерируется из названий табаков через " + ".',
+      'Используй только варианты из catalogs. Исправляй опечатки по смыслу: "росомахуй/расмах" -> Unity Rosomaha, "морс" -> 420 Pomegranate Mors, "фунел" -> Phunnel.',
+      'Фронт после твоего текста покажет карточку черновика и варианты выбора, если они нужны.',
+      `STATE_JSON: ${JSON.stringify(context)}`,
+    ].join('\n'),
+  }
+}
+
 const cleanTitle = (text: string) => (
   text
     .replace(/^\s*(?:название|назови|имя)\s*[:\-]?\s*/i, '')
@@ -475,9 +543,11 @@ const cleanTitle = (text: string) => (
     .trim()
 )
 
+const isTitleCommand = (text: string) => /^\s*(?:название|назови|имя)\b/i.test(text)
+
 const shouldUseAsTitle = (draft: AgentSetupDraft | null, missing: string[], text: string) => {
   const normalized = normalizeText(text)
-  if (!draft || !missing.includes('название')) return false
+  if (!draft || (!missing.includes('название') && !isTitleCommand(text))) return false
   if (isMetaQuestion(text) || isCatalogQuestion(text) || getKindFromText(text)) return false
   if (isPercentQuestion(text) || isMissingQuestion(text)) return false
   if (['какие', 'какой', 'какая', 'как', 'что', 'почему', 'зачем', 'сколько'].some((word) => normalized.includes(word))) return false
@@ -554,7 +624,7 @@ const explicitDraftFromResponse = (
       : mergedTobaccos
   }
 
-  return hasDraftValue(nextDraft) ? nextDraft : null
+  return hasDraftValue(nextDraft) ? withAutoDraftName(nextDraft, previousDraft) : null
 }
 
 const applyPercentMessage = (draft: AgentSetupDraft | null, text: string): AgentSetupDraft | null => {
@@ -606,6 +676,29 @@ const getMissingFields = (draft: AgentSetupDraft | null) => {
     draft.coal_placement_name || draft.coal_placement_id ? null : 'раскладка углей',
     draft.bowl_setup_type_name || draft.bowl_setup_type_id ? null : 'тип забивки',
   ].filter(Boolean) as string[]
+}
+
+const buildAutoDraftName = (draft: AgentSetupDraft | null | undefined) => {
+  const names = draft?.tobaccos?.map((item) => item.tobacco_name).filter(Boolean) || []
+  return names.length ? names.join(' + ') : null
+}
+
+const withAutoDraftName = (
+  nextDraft: AgentSetupDraft | null,
+  previousDraft?: AgentSetupDraft | null,
+): AgentSetupDraft | null => {
+  if (!nextDraft?.tobaccos?.length) return nextDraft
+
+  const autoName = buildAutoDraftName(nextDraft)
+  if (!autoName) return nextDraft
+
+  const previousAutoName = buildAutoDraftName(previousDraft)
+  const currentName = normalizeText(nextDraft.name || '')
+  const canReplaceName = !currentName ||
+    currentName === normalizeText('Новая забивка') ||
+    (!!previousAutoName && currentName === normalizeText(previousAutoName))
+
+  return canReplaceName ? { ...nextDraft, name: autoName } : nextDraft
 }
 
 const compactSummary = (draft: AgentSetupDraft) => {
@@ -809,18 +902,15 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     setTyping(false)
   }
 
-  const makeDraftMessages = (nextDraft: AgentSetupDraft | null, nextMissing: string[]) => {
-    if (!nextDraft) return []
+  const createChoiceMessage = (choice: CatalogChoiceSnapshot): TimelineMessage => ({
+    id: createMessageId(),
+    role: 'assistant',
+    content: '',
+    choiceSnapshot: choice,
+  })
 
-    const nextChoice = buildMissingChoice(nextMissing, catalogs)
-    if (nextChoice) {
-      return [{
-        id: createMessageId(),
-        role: 'assistant' as const,
-        content: '',
-        choiceSnapshot: nextChoice,
-      }]
-    }
+  const makeDraftMessages = (nextDraft: AgentSetupDraft | null, nextMissing: string[], includeChoice = true) => {
+    if (!nextDraft) return []
 
     const draftMessage: TimelineMessage = {
       id: createMessageId(),
@@ -829,15 +919,19 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       draftSnapshot: nextDraft,
       missingSnapshot: nextMissing,
     }
+
+    const nextChoice = includeChoice ? buildMissingChoice(nextMissing, catalogs) : null
+    if (nextChoice) {
+      return [draftMessage, createChoiceMessage(nextChoice)]
+    }
+
     return [draftMessage]
   }
 
-  const createChoiceMessage = (choice: CatalogChoiceSnapshot): TimelineMessage => ({
-    id: createMessageId(),
-    role: 'assistant',
-    content: '',
-    choiceSnapshot: choice,
-  })
+  const buildAgentMessages = (nextMessages: TimelineMessage[], nextDraft: AgentSetupDraft | null) => [
+    buildAgentContextMessage(nextDraft, getMissingFields(nextDraft), catalogs),
+    ...compactApiMessages(nextMessages),
+  ]
 
   const resolveCatalogChoice = (text: string, preferredKind?: CatalogKind | null) => {
     const kind = getKindFromText(text) || (isShortTobaccoSearch(text) ? 'tobacco' : null)
@@ -915,7 +1009,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       baseDraft,
     ) as AgentSetupDraft
 
-    return nextDraft
+    return withAutoDraftName(nextDraft, baseDraft)
   }
 
   const resolveMentionedCatalogItems = (text: string, baseDraft: AgentSetupDraft | null) => {
@@ -961,6 +1055,10 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   }
 
   const resolveLocalUpdate = (text: string): LocalChatResolution => {
+    if (isStateQuestion(text)) {
+      return draft ? { trailingMessages: makeDraftMessages(draft, missing, false) } : {}
+    }
+
     const percentDraft = applyPercentMessage(draft, text)
     if (percentDraft) return { draft: percentDraft }
 
@@ -1004,12 +1102,12 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     const nextMessages = [...messages, selectedMessage]
     setMessages(nextMessages)
 
-    const nextDraft = updateDraftWithChoice(draft, kind, item)
+    const nextDraft = withAutoDraftName(updateDraftWithChoice(draft, kind, item), draft)!
     setDraft(nextDraft)
     onDraftChange?.(nextDraft)
 
     try {
-      const response = await chatWithAgent({ messages: compactApiMessages(nextMessages), draft: nextDraft }).unwrap()
+      const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, nextDraft), draft: nextDraft }).unwrap()
       const responseDraft = explicitDraftFromResponse(nextDraft, response.draft, nextMessages)
       const finalDraft = responseDraft || nextDraft
       const nextMissing = getMissingFields(finalDraft)
@@ -1033,10 +1131,10 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     setInput('')
 
     const localResolution = resolveLocalUpdate(text)
-    const draftForAgent = localResolution.draft !== undefined ? localResolution.draft : draft
+    const draftForAgent = localResolution.draft !== undefined ? withAutoDraftName(localResolution.draft, draft) : draft
 
     try {
-      const response = await chatWithAgent({ messages: compactApiMessages(nextMessages), draft: draftForAgent }).unwrap()
+      const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, draftForAgent || null), draft: draftForAgent }).unwrap()
       const nextDraft = explicitDraftFromResponse(draftForAgent || null, response.draft, nextMessages)
       const nextMissing = getMissingFields(nextDraft)
       const draftChanged = JSON.stringify(nextDraft || null) !== JSON.stringify(draft || null)
@@ -1065,7 +1163,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     setMessages(nextMessages)
 
     try {
-      const response = await chatWithAgent({ messages: compactApiMessages(nextMessages), draft, publish: true }).unwrap()
+      const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, draft), draft, publish: true }).unwrap()
       setDraft(response.draft || draft)
       await typeAssistantText(response.reply)
       if (response.created_setup_id) {
