@@ -38,6 +38,68 @@ docker compose -f docker-compose.telegram.yml run --rm telegram-uploader login
 
 The session is stored in `tools/telegram-uploader/data/telegram-user.session`.
 
+## Session Without QR Every Time
+
+The uploader works from a Telegram user account through a persistent Telethon session file. To run without scanning QR codes every time, keep this file in `tools/telegram-uploader/data/` and mount that folder into Docker.
+
+What you need from the account owner:
+
+1. `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`
+   - Get them from `https://my.telegram.org/apps`.
+   - These are app credentials for the Telegram API.
+   - Store them in `tools/telegram-uploader/.env`.
+
+2. `TELEGRAM_PHONE`
+   - Phone number of the Telegram user account.
+   - Store it in `.env`.
+
+3. One reusable user session
+   - Preferred Docker format: `tools/telegram-uploader/data/telegram-user.session`.
+   - This file is enough for future runs; no QR/code prompt is needed while the session remains valid.
+   - Never commit it. `tools/telegram-uploader/data/` is ignored by git.
+
+4. Target chat/channel
+   - Username, for example `photochi43322`, or numeric Telegram ID.
+   - Store it as `TELEGRAM_TARGET` in `.env`, or pass `--target`.
+
+5. Source photo directory
+   - Default host path is `/Users/nekoneki/Desktop/map23-prod`.
+   - Override with `HOST_PHOTOS_DIR=/path/to/photos`.
+
+### Create Session Once
+
+If there is no session file yet, run this once in your own terminal and enter the login code/password there:
+
+```bash
+docker compose -f docker-compose.telegram.yml run --rm telegram-uploader login
+```
+
+Do not paste Telegram codes, 2FA passwords, or session files into chat.
+
+After login, verify the session:
+
+```bash
+docker compose -f docker-compose.telegram.yml run --rm telegram-uploader dialogs --filter photochi
+```
+
+The output must show the expected user-owned dialogs. If Telegram asks for a code again, the `.session` file is missing, invalid, or was created for a different API app/account.
+
+### Reuse Existing Session
+
+If a valid Telethon session already exists, copy it into:
+
+```bash
+tools/telegram-uploader/data/telegram-user.session
+```
+
+Then verify:
+
+```bash
+docker compose -f docker-compose.telegram.yml run --rm telegram-uploader dialogs --filter photochi
+```
+
+This is the cleanest way to run Docker without QR/login prompts. The container only needs `.env`, the mounted photos folder, and `data/telegram-user.session`.
+
 ## Check Target
 
 ```bash
