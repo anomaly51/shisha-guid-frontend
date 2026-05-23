@@ -3,3 +3,7 @@ dist/
 logs/
 .env
 *.local
+__pycache__/
+*.py[cod]
+tools/telegram-uploader/data/
+tools/telegram-uploader/.env

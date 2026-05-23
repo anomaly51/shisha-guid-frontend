@@ -1,0 +1,12 @@
+services:
+  telegram-uploader:
+    build:
+      context: .
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ${HOST_PHOTOS_DIR:-/Users/nekoneki/Desktop/map23-prod}:/photos:ro
+      - ./data:/data
+    stdin_open: true
+    tty: true
