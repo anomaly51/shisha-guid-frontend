@@ -100,6 +100,47 @@ docker compose -f docker-compose.telegram.yml run --rm telegram-uploader dialogs
 
 This is the cleanest way to run Docker without QR/login prompts. The container only needs `.env`, the mounted photos folder, and `data/telegram-user.session`.
 
+### Concrete Paths On This Mac
+
+AyuGram/Telegram Desktop do not store a ready Telethon `.session` file. They store a `tdata` directory. That directory must be imported into a Telethon `.session` file first.
+
+Local `tdata` locations:
+
+```bash
+/Users/nekoneki/Library/Application Support/AyuGram Desktop/tdata
+/Users/nekoneki/Library/Application Support/Telegram Desktop/tdata
+```
+
+For the `@nekocata` account, the working source was:
+
+```bash
+/Users/nekoneki/Library/Application Support/Telegram Desktop/tdata
+```
+
+The AyuGram path existed too, but at the time of setup it only exposed `@ollinyk`, not `@nekocata`.
+
+The already imported working Telethon session was created here:
+
+```bash
+/Users/nekoneki/.codex/tmp/telegram-upload/nekocata_tdata_resume.session
+```
+
+To reuse it with Docker, put it here:
+
+```bash
+mkdir -p tools/telegram-uploader/data
+cp /Users/nekoneki/.codex/tmp/telegram-upload/nekocata_tdata_resume.session \
+  tools/telegram-uploader/data/telegram-user.session
+```
+
+Then verify Docker sees the same account:
+
+```bash
+docker compose -f docker-compose.telegram.yml run --rm telegram-uploader dialogs --filter photochi
+```
+
+Expected account: `@nekocata`. Expected target channel: `photochi43322` / `фоточки 😼📸`.
+
 ## Check Target
 
 ```bash
