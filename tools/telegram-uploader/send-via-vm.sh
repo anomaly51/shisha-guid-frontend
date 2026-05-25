@@ -17,7 +17,8 @@ cd "$(dirname "$0")"
 rsync -az --delete --exclude data --exclude .env ./ "$VM_USER@$VM_HOST:$REMOTE_ROOT/app/" -e "ssh -i $SSH_KEY"
 
 file_list="$(mktemp "${TMPDIR:-/tmp}/telegram-uploader-list.XXXXXX")"
-trap 'rm -f "$file_list"' EXIT
+current_file_list="$(mktemp "${TMPDIR:-/tmp}/telegram-uploader-current.XXXXXX")"
+trap 'rm -f "$file_list" "$current_file_list"' EXIT
 
 find "$LOCAL_SOURCE" -maxdepth 1 -type f \( \
   -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.heic' \
@@ -37,12 +38,16 @@ while IFS= read -r name; do
   [[ -n "$name" ]] || continue
 
   echo "[$index/$total] staging $name"
+  printf '%s\n' "$name" > "$current_file_list"
   "${SSH[@]}" "rm -rf '$REMOTE_ROOT/input' && mkdir -p '$REMOTE_ROOT/input'"
   "${RSYNC[@]}" "$LOCAL_SOURCE/$name" "$VM_USER@$VM_HOST:$REMOTE_ROOT/input/$name"
+  rsync -az "$current_file_list" \
+    "$VM_USER@$VM_HOST:$REMOTE_ROOT/data/current-file-list.txt" \
+    -e "ssh -i $SSH_KEY"
 
   echo "[$index/$total] uploading $name"
   "${SSH[@]}" "cd '$REMOTE_ROOT/app' && docker compose -f docker-compose.telegram.yml run --rm \
     -v '$REMOTE_ROOT/input:/input:ro' \
     -v '$REMOTE_ROOT/data:/data' \
-    telegram-uploader send-list --target '$TARGET' --limit 1"
+    telegram-uploader send-list --target '$TARGET' --file-list /data/current-file-list.txt --limit 1"
 done < "$file_list"
