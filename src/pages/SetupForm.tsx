@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import * as THREE from 'three'
 import tw from 'twin.macro'
 import { Card } from '../shared/ui/Card'
-import { Input, Textarea } from '../shared/ui/Input'
+import { Input, Select, Textarea } from '../shared/ui/Input'
 import { Button } from '../shared/ui/Button'
 import {
   useGetBowlsQuery, useGetTobaccosQuery, useGetCoalsQuery, useGetKaloudsQuery,
@@ -18,6 +19,7 @@ import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { BowlPreviewFallback, detectBowlModel, useIsomorphicLayoutEffect, type BowlModel } from '../shared/ui/mixBowlModel'
 import { calculateSetupCost, formatMoney } from '../shared/setupCost'
 import { hasAuthToken } from '../shared/authToken'
+import { filterCatalogItems, getBrandOptions, getCatalogBrand } from '../shared/catalogSearch'
 
 const Label = tw.label`text-[10px] font-semibold text-[rgb(var(--color-text-muted))] uppercase tracking-wide`
 const Muted = tw.span`text-[11px] font-medium text-[rgb(var(--color-text-subtle))]`
@@ -47,6 +49,7 @@ interface ChoiceProps {
   onChange: (value: string) => void
   options?: any[]
   icon: CatalogIconName
+  loading?: boolean
 }
 
 interface EquipmentItem {
@@ -55,6 +58,7 @@ interface EquipmentItem {
   onChange: (value: string) => void
   options?: any[]
   icon: CatalogIconName
+  loading?: boolean
 }
 
 interface StepButtonProps {
@@ -73,6 +77,14 @@ interface MixPreviewItem {
   name: string
   percentage: number
   color: string
+}
+
+interface VirtualCatalogListProps<T> {
+  items: T[]
+  estimateSize: number
+  renderItem: (item: T, index: number) => ReactNode
+  empty?: ReactNode
+  maxRows?: number
 }
 
 const SETUP_TYPE_PRESETS: Array<{ name: string; kind: SetupKind; description: string }> = [
@@ -240,6 +252,54 @@ const equalized = (items: TobaccoMixRow[]) => {
     ...item,
     percentage: base + (index === 0 ? remainder : 0),
   }))
+}
+
+const VirtualCatalogList = <T extends { id?: string },>({
+  empty,
+  estimateSize,
+  items,
+  maxRows = 5,
+  renderItem,
+}: VirtualCatalogListProps<T>) => {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
+    count: items.length,
+    estimateSize: () => estimateSize,
+    getScrollElement: () => scrollRef.current,
+    overscan: 4,
+  })
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+  }, [items])
+
+  if (!items.length) return <>{empty}</>
+
+  return (
+    <div
+      ref={scrollRef}
+      tw="overflow-y-auto pr-1"
+      style={{ height: Math.min(items.length, maxRows) * estimateSize }}
+    >
+      <div tw="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const item = items[virtualItem.index]
+
+          return (
+            <div
+              key={item?.id || virtualItem.key}
+              ref={virtualizer.measureElement}
+              data-index={virtualItem.index}
+              tw="absolute left-0 top-0 w-full pb-2"
+              style={{ transform: `translateY(${virtualItem.start}px)` }}
+            >
+              {renderItem(item, virtualItem.index)}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 const BowlScene = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: SetupKind; items: MixPreviewItem[] }) => {
@@ -600,19 +660,24 @@ const StepButton = ({ index, title, active, complete, disabled, onClick }: StepB
   </button>
 )
 
-const Choice = ({ label, value, onChange, options, icon }: ChoiceProps) => {
+const Choice = ({ label, value, onChange, options, icon, loading }: ChoiceProps) => {
   const selectedName = getName(options, value)
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
-  const normalizedSearch = search.trim().toLowerCase()
-  const filteredOptions = useMemo(() => (
-    normalizedSearch
-      ? (options || []).filter((option: any) => `${option.name || ''} ${option.description || ''}`.toLowerCase().includes(normalizedSearch))
-      : options || []
-  ), [normalizedSearch, options])
+  const [brand, setBrand] = useState('')
+  const brandOptions = useMemo(() => getBrandOptions(options), [options])
+  const filteredOptions = useMemo(() => {
+    const matched = filterCatalogItems(options, search, brand)
+    const selectedItem = (options || []).find((option: any) => option.id === value)
+    if (selectedItem && !matched.some((option: any) => option.id === selectedItem.id)) {
+      return [selectedItem, ...matched]
+    }
+    return matched
+  }, [brand, options, search, value])
 
   useEffect(() => {
     setSearch('')
+    setBrand('')
   }, [label])
 
   return (
@@ -635,20 +700,52 @@ const Choice = ({ label, value, onChange, options, icon }: ChoiceProps) => {
           </div>
         </div>
       </div>
-      {(options?.length || 0) > 3 && (
-        <div tw="mb-2">
+      {((options?.length || 0) > 3 || brandOptions.length > 1) && (
+        <div tw="mb-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={t('setupForm.searchEquipment', { name: label.toLowerCase() })}
           />
+          {brandOptions.length > 1 && (
+            <Select
+              value={brand}
+              onChange={(event) => setBrand(event.target.value)}
+              aria-label={t('setupForm.brandFilter')}
+            >
+              <option value="">{t('setupForm.allBrands')}</option>
+              {brandOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label} ({option.count})</option>
+              ))}
+            </Select>
+          )}
         </div>
       )}
-      <div tw="max-h-[460px] overflow-y-auto pr-1">
-        <div tw="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {filteredOptions.map((option: any) => {
+      <div tw="mb-2 flex items-center justify-between gap-3 text-[11px] font-semibold text-[rgb(var(--color-text-subtle))]">
+        <span>{t('setupForm.visibleMatches', { shown: filteredOptions.length, total: options?.length || 0 })}</span>
+        <span>{t('setupForm.maxRowsHint')}</span>
+      </div>
+      {loading && !options?.length ? (
+        <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] px-3 py-4 text-[13px] text-[rgb(var(--color-text-subtle))]">
+          {t('setupForm.catalogLoading')}
+        </div>
+      ) : (
+        <VirtualCatalogList
+          items={filteredOptions}
+          estimateSize={78}
+          empty={Boolean(options?.length) ? (
+            <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] px-3 py-4 text-[13px] text-[rgb(var(--color-text-subtle))]">
+              {t('setupForm.noEquipmentMatches')}
+            </div>
+          ) : (
+            <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] px-3 py-4 text-[13px] text-[rgb(var(--color-text-subtle))]">
+              {t('common.noOptions')}
+            </div>
+          )}
+          renderItem={(option: any) => {
             const selected = option.id === value
             const photo = option.photo_urls?.[0]
+            const optionBrand = getCatalogBrand(option)
 
             return (
               <button
@@ -658,40 +755,42 @@ const Choice = ({ label, value, onChange, options, icon }: ChoiceProps) => {
                 aria-pressed={selected}
                 className="group"
                 css={[
-                  tw`relative min-w-0 overflow-hidden rounded-lg border bg-[rgb(var(--color-surface))] text-left transition-all duration-150`,
+                  tw`grid min-h-[70px] w-full min-w-0 grid-cols-[56px_minmax(0,1fr)_24px] items-center gap-2 overflow-hidden rounded-lg border bg-[rgb(var(--color-surface))] p-2 text-left transition-all duration-150`,
                   selected
                     ? tw`border-[rgb(var(--color-accent))] bg-[rgb(var(--color-accent-muted))] shadow-[0_12px_24px_-18px_rgba(83,48,31,0.75)]`
                     : tw`border-[rgb(var(--color-border-muted))] hover:border-[rgb(var(--color-accent-border))] hover:bg-[rgb(var(--color-surface-raised))]`,
                 ]}
               >
-                <span tw="absolute right-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-[rgb(var(--color-surface))] text-[11px] font-semibold text-[rgb(var(--color-text-subtle))] shadow-sm">
-                  {selected ? '✓' : ''}
-                </span>
-                <span tw="flex aspect-square w-full items-center justify-center overflow-hidden bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-subtle))]">
+                <span tw="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-subtle))]">
                   {photo ? (
-                    <img src={photo} alt="" tw="h-full w-full object-contain p-2 transition-transform duration-200 group-hover:scale-[1.03]" />
+                    <img src={photo} alt="" loading="lazy" tw="h-full w-full object-contain p-1.5 transition-transform duration-200 group-hover:scale-[1.03]" />
                   ) : (
-                    <CatalogIcon name={icon} size={34} />
+                    <CatalogIcon name={icon} size={26} />
                   )}
                 </span>
-                <span tw="block min-h-[45px] px-2.5 py-2 text-[12px] font-semibold leading-snug text-[rgb(var(--color-text))] line-clamp-2">
-                  {option.name}
+                <span tw="min-w-0">
+                  {optionBrand && (
+                    <span tw="mb-1 block truncate text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">
+                      {optionBrand}
+                    </span>
+                  )}
+                  <span tw="block text-[12px] font-semibold leading-snug text-[rgb(var(--color-text))] line-clamp-2">
+                    {option.name}
+                  </span>
+                </span>
+                <span
+                  css={[
+                    tw`flex h-6 w-6 items-center justify-center rounded-full border text-[11px] font-semibold shadow-sm`,
+                    selected ? tw`border-[rgb(var(--color-accent))] bg-[rgb(var(--color-accent))] text-white` : tw`border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] text-transparent`,
+                  ]}
+                >
+                  ✓
                 </span>
               </button>
             )
-          })}
-          {Boolean(options?.length) && !filteredOptions.length && (
-            <div tw="col-span-full rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] px-3 py-4 text-[13px] text-[rgb(var(--color-text-subtle))]">
-              {t('setupForm.noEquipmentMatches')}
-            </div>
-          )}
-          {!options?.length && (
-            <div tw="col-span-full rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] px-3 py-4 text-[13px] text-[rgb(var(--color-text-subtle))]">
-              {t('common.noOptions')}
-            </div>
-          )}
-        </div>
-      </div>
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -700,12 +799,12 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
-  const { data: bowls } = useGetBowlsQuery()
-  const { data: tobaccos } = useGetTobaccosQuery()
-  const { data: coals } = useGetCoalsQuery()
-  const { data: kalouds } = useGetKaloudsQuery()
-  const { data: placements } = useGetCoalPlacementsQuery()
-  const { data: types } = useGetBowlSetupTypesQuery()
+  const { data: bowls, isFetching: bowlsLoading } = useGetBowlsQuery()
+  const { data: tobaccos, isFetching: tobaccosLoading } = useGetTobaccosQuery()
+  const { data: coals, isFetching: coalsLoading } = useGetCoalsQuery()
+  const { data: kalouds, isFetching: kaloudsLoading } = useGetKaloudsQuery()
+  const { data: placements, isFetching: placementsLoading } = useGetCoalPlacementsQuery()
+  const { data: types, isFetching: typesLoading } = useGetBowlSetupTypesQuery()
   const [createSetup, { isLoading: creating }] = useCreateSetupMutation()
   const [updateSetup, { isLoading: updating }] = useUpdateSetupMutation()
 
@@ -720,6 +819,8 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const [typeId, setTypeId] = useState(initialValues?.bowl_setup_type_id || '')
   const [activeEquipmentIndex, setActiveEquipmentIndex] = useState(0)
   const [error, setError] = useState('')
+  const [tobaccoSearch, setTobaccoSearch] = useState('')
+  const [tobaccoBrand, setTobaccoBrand] = useState('')
   const [tobaccoMix, setTobaccoMix] = useState<TobaccoMixRow[]>(
     initialValues?.tobaccos?.length
       ? initialValues.tobaccos.map((item: any, index: number) => ({
@@ -771,14 +872,32 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
     placement: placements?.find((item: any) => item.id === placementId),
     tobaccos,
   }), [coalId, coals, placementId, placements, selectedBowl, tobaccoMix, tobaccos])
+  const selectedTobaccoIds = useMemo(() => new Set(tobaccoMix.map((item) => item.tobacco_id)), [tobaccoMix])
+  const tobaccoBrandOptions = useMemo(() => getBrandOptions(tobaccos), [tobaccos])
+  const matchingTobaccos = useMemo(() => (
+    filterCatalogItems(tobaccos, tobaccoSearch, tobaccoBrand)
+  ), [tobaccoBrand, tobaccoSearch, tobaccos])
+  const availableTobaccos = useMemo(() => (
+    matchingTobaccos.filter((tobacco: any) => !selectedTobaccoIds.has(tobacco.id))
+  ), [matchingTobaccos, selectedTobaccoIds])
+  const selectedTobaccoRows = useMemo(() => (
+    tobaccoMix.map((mix, index) => {
+      const catalogItem = (tobaccos || []).find((tobacco: any) => tobacco.id === mix.tobacco_id)
+      return catalogItem || {
+        id: mix.tobacco_id,
+        name: t('common.tobaccoFallback', { number: index + 1 }),
+        photo_urls: [],
+      }
+    })
+  ), [t, tobaccoMix, tobaccos])
   const canSubmit = Boolean(name.trim() && equipmentReady && mixReady)
   const isSaving = creating || updating
   const equipmentItems: EquipmentItem[] = [
-    { label: t('setupDetail.bowl'), value: bowlId, onChange: setBowlId, options: bowls, icon: 'bowl' },
-    { label: t('setupDetail.kaloud'), value: kaloudId, onChange: setKaloudId, options: kalouds, icon: 'kaloud' },
-    { label: t('setupDetail.coal'), value: coalId, onChange: setCoalId, options: coals, icon: 'coal' },
-    { label: t('setupDetail.coalPlacement'), value: placementId, onChange: setPlacementId, options: placements, icon: 'placement' },
-    { label: t('itemForm.setupType'), value: typeId, onChange: setTypeId, options: setupTypeOptions, icon: 'setupType' },
+    { label: t('setupDetail.bowl'), value: bowlId, onChange: setBowlId, options: bowls, icon: 'bowl', loading: bowlsLoading },
+    { label: t('setupDetail.kaloud'), value: kaloudId, onChange: setKaloudId, options: kalouds, icon: 'kaloud', loading: kaloudsLoading },
+    { label: t('setupDetail.coal'), value: coalId, onChange: setCoalId, options: coals, icon: 'coal', loading: coalsLoading },
+    { label: t('setupDetail.coalPlacement'), value: placementId, onChange: setPlacementId, options: placements, icon: 'placement', loading: placementsLoading },
+    { label: t('itemForm.setupType'), value: typeId, onChange: setTypeId, options: setupTypeOptions, icon: 'setupType', loading: typesLoading },
   ]
   const activeEquipment = equipmentItems[activeEquipmentIndex] || equipmentItems[0]
   const selectedEquipmentCount = equipmentItems.filter((item) => item.value).length
@@ -1055,6 +1174,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                   onChange={handleEquipmentChange}
                   options={activeEquipment.options}
                   icon={activeEquipment.icon}
+                  loading={activeEquipment.loading}
                 />
               </section>
             )}
@@ -1133,130 +1253,218 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                   </div>
                 </div>
 
-                <div tw="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {(() => {
-                    const tobaccoCatalog = tobaccos || []
-                    const layerOrderedTobaccos = selectedSetupKind === 'layers'
-                      ? [
-                        ...tobaccoMix
-                          .map((mix) => tobaccoCatalog.find((tobacco: any) => tobacco.id === mix.tobacco_id))
-                          .filter(Boolean),
-                        ...tobaccoCatalog.filter((tobacco: any) => !tobaccoMix.some((mix) => mix.tobacco_id === tobacco.id)),
-                      ]
-                      : tobaccoCatalog
-
-                    return layerOrderedTobaccos.map((tobacco: any) => {
-                    const selectedMixIndex = tobaccoMix.findIndex((item) => item.tobacco_id === tobacco.id)
-                    const selectedMix = selectedMixIndex >= 0 ? tobaccoMix[selectedMixIndex] : undefined
-                    const selected = Boolean(selectedMix)
-                    const photo = tobacco.photo_urls?.[0]
-                    const showLayerControls = selectedSetupKind === 'layers' && selected && tobaccoMix.length > 1
-                    const isBottomLayer = selectedMixIndex === 0
-                    const isTopLayer = selectedMixIndex === tobaccoMix.length - 1
-                    const strength = getTobaccoStrength(tobacco)
-
-                    return (
-                      <div
-                        key={tobacco.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => toggleTobacco(tobacco.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault()
-                            toggleTobacco(tobacco.id)
-                          }
-                        }}
-                        css={[
-                          tw`grid min-h-[86px] cursor-pointer items-center gap-2 rounded-lg border bg-[rgb(var(--color-surface))] p-2 text-left transition-all duration-150`,
-                          showLayerControls
-                            ? tw`grid-cols-[72px_minmax(0,1fr)_32px] sm:grid-cols-[82px_minmax(0,1fr)_32px]`
-                            : tw`grid-cols-[72px_minmax(0,1fr)] sm:grid-cols-[82px_minmax(0,1fr)]`,
-                          selected
-                            ? tw`border-[rgb(var(--color-accent))] bg-[rgb(var(--color-accent-muted))] shadow-[0_10px_22px_-20px_rgba(83,48,31,0.8)]`
-                            : tw`border-[rgb(var(--color-border-muted))] hover:border-[rgb(var(--color-accent-border))]`,
-                        ]}
+                <div tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-3">
+                  <div tw="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
+                    <Input
+                      value={tobaccoSearch}
+                      onChange={(event) => setTobaccoSearch(event.target.value)}
+                      placeholder={t('setupForm.searchTobacco')}
+                    />
+                    {tobaccoBrandOptions.length > 1 && (
+                      <Select
+                        value={tobaccoBrand}
+                        onChange={(event) => setTobaccoBrand(event.target.value)}
+                        aria-label={t('setupForm.brandFilter')}
                       >
-                        <span tw="flex aspect-square w-[72px] items-center justify-center overflow-hidden rounded-md bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-subtle))] sm:w-[82px]">
-                          {photo ? (
-                            <img src={photo} alt="" tw="h-full w-full object-cover" />
-                          ) : (
-                            <CatalogIcon name="tobacco" size={30} />
-                          )}
-                        </span>
-                        <span tw="min-w-0">
-                          <span tw="block text-[12px] font-semibold leading-snug text-[rgb(var(--color-text))] line-clamp-2">
-                            {tobacco.name}
-                          </span>
-                          <span tw="mt-1.5 block">
-                            <StrengthIndicator value={strength} compact />
-                          </span>
-                          {selectedMix && (
-                            <span tw="mt-1.5 block" onClick={(event) => event.stopPropagation()}>
-                              <span tw="mb-1.5 flex items-center gap-1.5">
-                                <span
-                                  tw="flex h-5 min-w-5 items-center justify-center rounded text-[10px] font-bold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24)]"
-                                  style={{ backgroundColor: selectedMix.color || MIX_COLORS[selectedMixIndex % MIX_COLORS.length] }}
-                                >
-                                  {selectedSetupKind === 'layers' ? selectedMixIndex + 1 : ''}
+                        <option value="">{t('setupForm.allBrands')}</option>
+                        {tobaccoBrandOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label} ({option.count})</option>
+                        ))}
+                      </Select>
+                    )}
+                  </div>
+                  <div tw="mt-2 flex flex-col gap-1 text-[11px] font-semibold text-[rgb(var(--color-text-subtle))] sm:flex-row sm:items-center sm:justify-between">
+                    <span>{t('setupForm.smartSearchHint')}</span>
+                    <span>{t('setupForm.visibleMatches', { shown: availableTobaccos.length, total: tobaccos?.length || 0 })}</span>
+                  </div>
+                </div>
+
+                {selectedTobaccoRows.length > 0 && (
+                  <div tw="flex flex-col gap-2">
+                    <div tw="flex items-center justify-between gap-3">
+                      <Label>{t('setupForm.selectedTobaccos')}</Label>
+                      <Muted>{t('setupForm.tobaccoCount', { count: selectedTobaccoRows.length })}</Muted>
+                    </div>
+                    <div tw="grid grid-cols-1 gap-2">
+                      {selectedTobaccoRows.map((tobacco: any) => {
+                        const selectedMixIndex = tobaccoMix.findIndex((item) => item.tobacco_id === tobacco.id)
+                        const selectedMix = selectedMixIndex >= 0 ? tobaccoMix[selectedMixIndex] : undefined
+                        if (!selectedMix) return null
+
+                        const photo = tobacco.photo_urls?.[0]
+                        const showLayerControls = selectedSetupKind === 'layers' && tobaccoMix.length > 1
+                        const isBottomLayer = selectedMixIndex === 0
+                        const isTopLayer = selectedMixIndex === tobaccoMix.length - 1
+                        const strength = getTobaccoStrength(tobacco)
+                        const tobaccoBrandName = getCatalogBrand(tobacco)
+
+                        return (
+                          <div
+                            key={tobacco.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => toggleTobacco(tobacco.id)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault()
+                                toggleTobacco(tobacco.id)
+                              }
+                            }}
+                            css={[
+                              tw`grid min-h-[104px] cursor-pointer items-center gap-2 rounded-lg border border-[rgb(var(--color-accent))] bg-[rgb(var(--color-accent-muted))] p-2 text-left shadow-[0_10px_22px_-20px_rgba(83,48,31,0.8)] transition-all duration-150`,
+                              showLayerControls
+                                ? tw`grid-cols-[72px_minmax(0,1fr)_32px] sm:grid-cols-[82px_minmax(0,1fr)_32px]`
+                                : tw`grid-cols-[72px_minmax(0,1fr)] sm:grid-cols-[82px_minmax(0,1fr)]`,
+                            ]}
+                          >
+                            <span tw="flex aspect-square w-[72px] items-center justify-center overflow-hidden rounded-md bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-subtle))] sm:w-[82px]">
+                              {photo ? (
+                                <img src={photo} alt="" loading="lazy" tw="h-full w-full object-cover" />
+                              ) : (
+                                <CatalogIcon name="tobacco" size={30} />
+                              )}
+                            </span>
+                            <span tw="min-w-0">
+                              {tobaccoBrandName && (
+                                <span tw="mb-1 block truncate text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">
+                                  {tobaccoBrandName}
                                 </span>
-                                <span tw="min-w-0 truncate text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))]">
-                                  {selectedSetupKind === 'layers'
-                                    ? isTopLayer ? t('setupForm.topLayer') : isBottomLayer ? t('setupForm.bottomLayer') : t('setupForm.layer', { number: selectedMixIndex + 1 })
-                                    : t('setupForm.selectedLabel')}
-                                </span>
-                                <span tw="ml-auto text-[11px] font-bold tabular-nums text-[rgb(var(--color-text))]">
-                                  {selectedMix.percentage}%
-                                </span>
+                              )}
+                              <span tw="block text-[12px] font-semibold leading-snug text-[rgb(var(--color-text))] line-clamp-2">
+                                {tobacco.name}
                               </span>
-                              <span tw="grid grid-cols-[1fr_58px] items-center gap-2">
-                                <input
-                                  type="range"
-                                  min={1}
-                                  max={100}
-                                  value={selectedMix.percentage}
-                                  onChange={(event) => updateTobaccoPercent(tobacco.id, Number(event.target.value))}
-                                  tw="w-full accent-[rgb(var(--color-accent))]"
-                                  aria-label={t('setupForm.percentageAria', { name: tobacco.name })}
-                                />
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  max={100}
-                                  value={selectedMix.percentage}
-                                  onChange={(event) => updateTobaccoPercent(tobacco.id, Number(event.target.value))}
-                                />
+                              <span tw="mt-1.5 block">
+                                <StrengthIndicator value={strength} compact />
+                              </span>
+                              <span tw="mt-1.5 block" onClick={(event) => event.stopPropagation()}>
+                                <span tw="mb-1.5 flex items-center gap-1.5">
+                                  <span
+                                    tw="flex h-5 min-w-5 items-center justify-center rounded text-[10px] font-bold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24)]"
+                                    style={{ backgroundColor: selectedMix.color || MIX_COLORS[selectedMixIndex % MIX_COLORS.length] }}
+                                  >
+                                    {selectedSetupKind === 'layers' ? selectedMixIndex + 1 : '✓'}
+                                  </span>
+                                  <span tw="min-w-0 truncate text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))]">
+                                    {selectedSetupKind === 'layers'
+                                      ? isTopLayer ? t('setupForm.topLayer') : isBottomLayer ? t('setupForm.bottomLayer') : t('setupForm.layer', { number: selectedMixIndex + 1 })
+                                      : t('setupForm.selectedLabel')}
+                                  </span>
+                                  <span tw="ml-auto text-[11px] font-bold tabular-nums text-[rgb(var(--color-text))]">
+                                    {selectedMix.percentage}%
+                                  </span>
+                                </span>
+                                <span tw="grid grid-cols-[1fr_58px] items-center gap-2">
+                                  <input
+                                    type="range"
+                                    min={1}
+                                    max={100}
+                                    value={selectedMix.percentage}
+                                    onChange={(event) => updateTobaccoPercent(tobacco.id, Number(event.target.value))}
+                                    tw="w-full accent-[rgb(var(--color-accent))]"
+                                    aria-label={t('setupForm.percentageAria', { name: tobacco.name })}
+                                  />
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={100}
+                                    value={selectedMix.percentage}
+                                    onChange={(event) => updateTobaccoPercent(tobacco.id, Number(event.target.value))}
+                                  />
+                                </span>
                               </span>
                             </span>
-                          )}
-                        </span>
-                        {showLayerControls && (
-                          <span tw="flex flex-col items-center gap-1" onClick={(event) => event.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => moveTobaccoLayer(selectedMixIndex, 1)}
-                              disabled={isTopLayer}
-                              title={t('setupForm.moveLayerUp')}
-                              tw="flex h-7 w-7 items-center justify-center rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] transition-colors hover:border-[rgb(var(--color-accent-border))] disabled:cursor-not-allowed disabled:opacity-30"
-                            >
-                              <VoteUpIcon size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => moveTobaccoLayer(selectedMixIndex, -1)}
-                              disabled={isBottomLayer}
-                              title={t('setupForm.moveLayerDown')}
-                              tw="flex h-7 w-7 items-center justify-center rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] transition-colors hover:border-[rgb(var(--color-accent-border))] disabled:cursor-not-allowed disabled:opacity-30"
-                            >
-                              <VoteDownIcon size={13} />
-                            </button>
-                          </span>
-                        )}
+                            {showLayerControls && (
+                              <span tw="flex flex-col items-center gap-1" onClick={(event) => event.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => moveTobaccoLayer(selectedMixIndex, 1)}
+                                  disabled={isTopLayer}
+                                  title={t('setupForm.moveLayerUp')}
+                                  tw="flex h-7 w-7 items-center justify-center rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] transition-colors hover:border-[rgb(var(--color-accent-border))] disabled:cursor-not-allowed disabled:opacity-30"
+                                >
+                                  <VoteUpIcon size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveTobaccoLayer(selectedMixIndex, -1)}
+                                  disabled={isBottomLayer}
+                                  title={t('setupForm.moveLayerDown')}
+                                  tw="flex h-7 w-7 items-center justify-center rounded-md border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] transition-colors hover:border-[rgb(var(--color-accent-border))] disabled:cursor-not-allowed disabled:opacity-30"
+                                >
+                                  <VoteDownIcon size={13} />
+                                </button>
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {tobaccosLoading && !tobaccos?.length ? (
+                  <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] px-3 py-4 text-[13px] text-[rgb(var(--color-text-subtle))]">
+                    {t('setupForm.catalogLoading')}
+                  </div>
+                ) : (
+                  <VirtualCatalogList
+                    items={availableTobaccos}
+                    estimateSize={98}
+                    empty={Boolean(tobaccos?.length) ? (
+                      <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] px-3 py-4 text-[13px] text-[rgb(var(--color-text-subtle))]">
+                        {t('setupForm.noTobaccoMatches')}
                       </div>
-                    )
-                    })
-                  })()}
-                </div>
+                    ) : (
+                      <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] px-3 py-4 text-[13px] text-[rgb(var(--color-text-subtle))]">
+                        {t('common.noOptions')}
+                      </div>
+                    )}
+                    renderItem={(tobacco: any) => {
+                      const photo = tobacco.photo_urls?.[0]
+                      const strength = getTobaccoStrength(tobacco)
+                      const tobaccoBrandName = getCatalogBrand(tobacco)
+
+                      return (
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleTobacco(tobacco.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              toggleTobacco(tobacco.id)
+                            }
+                          }}
+                          tw="grid min-h-[90px] cursor-pointer grid-cols-[72px_minmax(0,1fr)_24px] items-center gap-2 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-2 text-left transition-all duration-150 hover:border-[rgb(var(--color-accent-border))] sm:grid-cols-[82px_minmax(0,1fr)_24px]"
+                        >
+                          <span tw="flex aspect-square w-[72px] items-center justify-center overflow-hidden rounded-md bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-subtle))] sm:w-[82px]">
+                            {photo ? (
+                              <img src={photo} alt="" loading="lazy" tw="h-full w-full object-cover" />
+                            ) : (
+                              <CatalogIcon name="tobacco" size={30} />
+                            )}
+                          </span>
+                          <span tw="min-w-0">
+                            {tobaccoBrandName && (
+                              <span tw="mb-1 block truncate text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">
+                                {tobaccoBrandName}
+                              </span>
+                            )}
+                            <span tw="block text-[12px] font-semibold leading-snug text-[rgb(var(--color-text))] line-clamp-2">
+                              {tobacco.name}
+                            </span>
+                            <span tw="mt-1.5 block">
+                              <StrengthIndicator value={strength} compact />
+                            </span>
+                          </span>
+                          <span tw="flex h-6 w-6 items-center justify-center rounded-full border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] text-[11px] font-semibold text-[rgb(var(--color-text-subtle))]">
+                            +
+                          </span>
+                        </div>
+                      )
+                    }}
+                  />
+                )}
               </section>
             )}
 

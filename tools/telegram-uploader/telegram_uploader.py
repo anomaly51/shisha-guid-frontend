@@ -46,6 +46,16 @@ def find_files(source: Path) -> list[Path]:
     )
 
 
+def read_file_list(path: Path) -> list[str]:
+    if not path.exists():
+        raise SystemExit(f"File list does not exist: {path}")
+    return [
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
 def read_state(path: Path) -> tuple[set[str], set[str]]:
     if not path.exists():
         return set(), set()
@@ -277,6 +287,73 @@ async def send(args: argparse.Namespace) -> None:
         await client.disconnect()
 
 
+async def send_list(args: argparse.Namespace) -> None:
+    names = read_file_list(args.file_list)
+    document_sent, photo_sent = read_state(args.state_file)
+    pending = [name for name in names if name not in document_sent or name not in photo_sent]
+    if args.limit:
+        pending = pending[: args.limit]
+
+    print(f"Listed files: {len(names)}", flush=True)
+    print(f"Document sent: {len(document_sent)}/{len(names)}", flush=True)
+    print(f"Photo sent: {len(photo_sent)}/{len(names)}", flush=True)
+    print(f"Pending any step: {len(pending)}", flush=True)
+    if not pending:
+        return
+
+    client = build_client(args.session)
+    await start_client(client)
+    me = await client.get_me()
+    print(f"Logged in as @{me.username or me.id}", flush=True)
+    entity = await resolve_target(client, args.target)
+    print(
+        f"Target: {getattr(entity, 'title', None) or getattr(entity, 'username', None)}",
+        flush=True,
+    )
+
+    try:
+        for name in pending:
+            file = args.input_dir / name
+            if not file.exists():
+                raise SystemExit(f"Missing mounted input file: {file}")
+
+            if name not in document_sent:
+                await send_one(
+                    client,
+                    entity,
+                    file,
+                    as_document=True,
+                    dry_run=args.dry_run,
+                    with_caption=args.with_caption,
+                    max_retries=args.max_retries,
+                )
+                if not args.dry_run:
+                    document_sent.add(name)
+                    write_state(args.state_file, document_sent, photo_sent)
+                    print(f"Document sent: {len(document_sent)}/{len(names)}", flush=True)
+                if args.sleep:
+                    await asyncio.sleep(args.sleep)
+
+            if name not in photo_sent:
+                await send_one(
+                    client,
+                    entity,
+                    file,
+                    as_document=False,
+                    dry_run=args.dry_run,
+                    with_caption=args.with_caption,
+                    max_retries=args.max_retries,
+                )
+                if not args.dry_run:
+                    photo_sent.add(name)
+                    write_state(args.state_file, document_sent, photo_sent)
+                    print(f"Photo sent: {len(photo_sent)}/{len(names)}", flush=True)
+                if args.sleep:
+                    await asyncio.sleep(args.sleep)
+    finally:
+        await client.disconnect()
+
+
 def add_common_io_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--session",
@@ -327,6 +404,23 @@ async def async_main() -> None:
     send_parser.add_argument("--limit", type=int)
     send_parser.add_argument("--max-retries", type=int, default=5)
     send_parser.set_defaults(func=send)
+
+    send_list_parser = subparsers.add_parser("send-list", help="Send files from a mounted single-file input directory")
+    add_common_io_args(send_list_parser)
+    send_list_parser.add_argument("--target", default=env_value("TELEGRAM_TARGET", "photochi43322"))
+    send_list_parser.add_argument(
+        "--state-file",
+        type=Path,
+        default=Path(env_value("TELEGRAM_STATE", "/data/photochi43322.state.json")),
+    )
+    send_list_parser.add_argument("--file-list", type=Path, default=Path("/data/file-list.txt"))
+    send_list_parser.add_argument("--input-dir", type=Path, default=Path("/input"))
+    send_list_parser.add_argument("--sleep", type=float, default=float(env_value("TELEGRAM_SLEEP", "0.5")))
+    send_list_parser.add_argument("--with-caption", action="store_true")
+    send_list_parser.add_argument("--dry-run", action="store_true")
+    send_list_parser.add_argument("--limit", type=int)
+    send_list_parser.add_argument("--max-retries", type=int, default=5)
+    send_list_parser.set_defaults(func=send_list)
 
     args = parser.parse_args()
     await args.func(args)
