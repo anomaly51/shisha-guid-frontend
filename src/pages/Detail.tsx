@@ -42,7 +42,8 @@ const formatIntegerValue = (value: unknown, t: (key: string, options?: any) => s
 const getImageStyle = (itemKind: DetailProps['itemKind']) => (
   itemKind === 'coal'
     ? {
-        filter: 'brightness(1.28) contrast(0.96) saturate(1.08)',
+        filter: 'brightness(1.08) contrast(1.02) saturate(1.06)',
+        mixBlendMode: 'multiply' as const,
         objectFit: 'contain' as const,
         padding: '1rem',
       }
@@ -51,8 +52,8 @@ const getImageStyle = (itemKind: DetailProps['itemKind']) => (
 
 const coalImageSurfaceStyle = {
   background: [
-    'radial-gradient(circle at 50% 38%, rgba(255,248,241,0.34), rgba(222,139,87,0.16) 46%, rgba(31,27,25,0.08) 100%)',
-    'linear-gradient(180deg, rgb(var(--color-surface-subtle)) 0%, rgb(var(--color-surface-muted)) 100%)',
+    'radial-gradient(circle at 50% 38%, rgba(255,248,241,0.56), rgba(222,139,87,0.22) 48%, rgba(31,27,25,0.10) 100%)',
+    'linear-gradient(180deg, rgb(var(--color-surface-muted)) 0%, rgb(var(--color-surface-subtle)) 100%)',
   ].join(', '),
 }
 
