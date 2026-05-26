@@ -35,7 +35,7 @@ export const calculateSetupCost = ({
   let tobaccoCost = 0
   let tobaccoGrams = 0
   const tobaccoLines = (mix || []).map((item) => {
-    const tobacco = tobaccos?.find((entry) => entry.id === item.tobacco_id)
+    const tobacco = (item as any).tobacco || tobaccos?.find((entry) => entry.id === item.tobacco_id)
     const percentage = Number(item.percentage || 0)
     const grams = capacityGrams ? capacityGrams * percentage / totalPercent : null
     const packageGrams = positiveNumberOrNull(tobacco?.package_grams)

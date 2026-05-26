@@ -12,7 +12,6 @@ import {
   useGetProfileQuery,
   useGetSetupReviewsQuery,
   useGetSetupQuery,
-  useGetTobaccosQuery,
   useDeleteSetupMutation,
   useRecordSetupViewMutation,
   useUpdateSetupReviewMutation,
@@ -50,7 +49,7 @@ const getItem = (items: any[] | undefined, id: string | undefined) => (
 
 const buildMixItems = (setup: any, tobaccos: any[] | undefined, fallbackName: (index: number) => string): MixBowlItem[] => (
   setup.tobaccos?.map((item: any, index: number) => {
-    const tobacco = getItem(tobaccos, item.tobacco_id)
+    const tobacco = item.tobacco || getItem(tobaccos, item.tobacco_id)
 
     return {
       id: item.tobacco_id || item.id || `${setup.id}-${index}`,
@@ -479,7 +478,6 @@ export const SetupDetail = () => {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const { data: bowls } = useGetBowlsQuery()
-  const { data: tobaccos } = useGetTobaccosQuery()
   const { data: coals } = useGetCoalsQuery()
   const { data: kalouds } = useGetKaloudsQuery()
   const { data: placements } = useGetCoalPlacementsQuery()
@@ -493,15 +491,14 @@ export const SetupDetail = () => {
   const typeName = setupType?.name || 'Compot'
   const kind = detectSetupKind(typeName)
   const bowlModel = detectBowlModel(bowl)
-  const mixItems = useMemo(() => (item ? buildMixItems(item, tobaccos, (index) => t('common.tobaccoFallback', { number: index + 1 })) : []), [item, t, tobaccos])
-  const heaviness = useMemo(() => (item ? getSetupHeaviness(item, tobaccos) : 0), [item, tobaccos])
+  const mixItems = useMemo(() => (item ? buildMixItems(item, undefined, (index) => t('common.tobaccoFallback', { number: index + 1 })) : []), [item, t])
+  const heaviness = useMemo(() => (item ? getSetupHeaviness(item, undefined) : 0), [item])
   const setupCost = useMemo(() => calculateSetupCost({
     bowl,
     coal,
     mix: item?.tobaccos,
     placement,
-    tobaccos,
-  }), [bowl, coal, item?.tobaccos, placement, tobaccos])
+  }), [bowl, coal, item?.tobaccos, placement])
   const isAdmin = profile?.role === 'admin'
   const canManageSetup = isAdmin || isSetupAuthor(item, profile)
 

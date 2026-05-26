@@ -34,7 +34,7 @@ const catalogRoutes: Record<string, { list: EndpointName; detail: EndpointName }
   'bowl-setup-types': { list: 'getBowlSetupTypes', detail: 'getBowlSetupType' },
 }
 
-const setupDetailPrefetch: PrefetchRequest[] = [
+const setupFormPrefetch: PrefetchRequest[] = [
   { endpoint: 'getBowls' },
   { endpoint: 'getTobaccos' },
   { endpoint: 'getCoals' },
@@ -57,6 +57,8 @@ export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
     min_price: searchParams.get('minPrice') || undefined,
     max_price: searchParams.get('maxPrice') || undefined,
     strength: searchParams.get('strength') || undefined,
+    limit: feedPageSize * 2,
+    offset: Math.max(0, (Number(searchParams.get('page')) || 1) - 1) * feedPageSize * 2,
   }
 
   if (segments.length === 0) {
@@ -71,19 +73,30 @@ export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
           sort: setupFilters.sort || 'newest',
         },
       },
-      { endpoint: 'getTobaccos' },
     ]
   }
 
   if (segments[0] === 'setups' && segments[1] === 'create') {
-    return setupDetailPrefetch
+    return setupFormPrefetch
   }
 
-  if (segments[0] === 'setups' && segments[1] && (segments.length === 2 || segments[2] === 'edit')) {
+  if (segments[0] === 'setups' && segments[1] && segments[2] === 'edit') {
     return [
       { endpoint: 'getSetup', arg: segments[1] },
       { endpoint: 'getSetupReviews', arg: segments[1] },
-      ...setupDetailPrefetch,
+      ...setupFormPrefetch,
+    ]
+  }
+
+  if (segments[0] === 'setups' && segments[1] && segments.length === 2) {
+    return [
+      { endpoint: 'getSetup', arg: segments[1] },
+      { endpoint: 'getSetupReviews', arg: segments[1] },
+      { endpoint: 'getBowls' },
+      { endpoint: 'getCoals' },
+      { endpoint: 'getKalouds' },
+      { endpoint: 'getCoalPlacements' },
+      { endpoint: 'getBowlSetupTypes' },
     ]
   }
 

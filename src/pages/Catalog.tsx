@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import 'twin.macro'
@@ -26,10 +26,56 @@ interface CatalogProps {
 }
 
 const strengthOptions: StrengthFilter[] = ['all', 'light', 'medium', 'strong', 'heavy']
+const TOBACCO_PAGE_SIZE = 24
 
 const getSearchStrength = (value: string | null): StrengthFilter => (
   strengthOptions.includes(value as StrengthFilter) ? value as StrengthFilter : 'all'
 )
+
+const getSearchPage = (value: string | null) => {
+  const page = Number(value)
+  return Number.isInteger(page) && page > 0 ? page : 1
+}
+
+const normalizePageData = (data: any, fallbackLimit: number) => {
+  if (!data) {
+    return {
+      hasMore: false,
+      items: [] as any[],
+      limit: fallbackLimit,
+      offset: 0,
+      total: 0,
+    }
+  }
+
+  if (Array.isArray(data)) {
+    return {
+      hasMore: false,
+      items: data,
+      limit: data.length || fallbackLimit,
+      offset: 0,
+      total: data.length,
+    }
+  }
+
+  return {
+    hasMore: Boolean(data.has_more),
+    items: Array.isArray(data.items) ? data.items : [],
+    limit: Number(data.limit) || fallbackLimit,
+    offset: Number(data.offset) || 0,
+    total: Number(data.total) || 0,
+  }
+}
+
+const getVisiblePageNumbers = (currentPage: number, totalPages: number) => {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_item, index) => index + 1)
+
+  const pages = new Set([1, totalPages])
+  for (let page = currentPage - 2; page <= currentPage + 2; page += 1) {
+    if (page > 1 && page < totalPages) pages.add(page)
+  }
+  return [...pages].sort((a, b) => a - b)
+}
 
 const GridSkeleton = () => (
   <div tw="bg-[rgb(var(--color-surface))] rounded-xl border border-[rgb(var(--color-border-muted))] shadow-sm overflow-hidden">
@@ -137,15 +183,20 @@ export const Catalog = ({
 }: CatalogProps) => {
   const [searchParams, setSearchParams] = useSearchParams()
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [appendTobaccos, setAppendTobaccos] = useState(false)
+  const [loadedTobaccos, setLoadedTobaccos] = useState<any[]>([])
   const strength = getSearchStrength(searchParams.get('strength'))
   const minPrice = searchParams.get('minPrice') || ''
   const maxPrice = searchParams.get('maxPrice') || ''
+  const currentPage = itemKind === 'tobacco' ? getSearchPage(searchParams.get('page')) : 1
   const tobaccoQueryParams = itemKind === 'tobacco' ? {
+    limit: TOBACCO_PAGE_SIZE,
     min_price: minPrice || undefined,
     max_price: maxPrice || undefined,
+    offset: (currentPage - 1) * TOBACCO_PAGE_SIZE,
     strength,
   } : undefined
-  const { data, isLoading } = listHook(tobaccoQueryParams)
+  const { data: rawData, isFetching, isLoading } = listHook(tobaccoQueryParams)
   const { data: setupsForRatings } = useGetSetupsQuery(
     itemKind === 'tobacco' ? { limit: 1000, sort: 'rating' } : undefined,
     { skip: itemKind !== 'tobacco' },
@@ -156,8 +207,22 @@ export const Catalog = ({
   const { t } = useTranslation()
   const isAdmin = profile?.role === 'admin'
   const hasActiveFilters = strength !== 'all' || minPrice.trim() !== '' || maxPrice.trim() !== ''
-  const showTobaccoFilters = itemKind === 'tobacco' && (Boolean(data?.length) || hasActiveFilters)
+  const pageData = useMemo(
+    () => normalizePageData(rawData, itemKind === 'tobacco' ? TOBACCO_PAGE_SIZE : 0),
+    [itemKind, rawData],
+  )
+  const data = itemKind === 'tobacco'
+    ? (loadedTobaccos.length ? loadedTobaccos : pageData.items)
+    : pageData.items
+  const totalCount = itemKind === 'tobacco' ? pageData.total : data.length
+  const totalPages = itemKind === 'tobacco' ? Math.max(1, Math.ceil(totalCount / TOBACCO_PAGE_SIZE)) : 1
+  const canShowMoreTobaccos = itemKind === 'tobacco' && currentPage < totalPages
+  const showTobaccoFilters = itemKind === 'tobacco' && (Boolean(data.length) || hasActiveFilters)
   const tobaccoRatings = useMemo(() => getTobaccoRatingMap(setupsForRatings), [setupsForRatings])
+  const visiblePageNumbers = useMemo(
+    () => getVisiblePageNumbers(currentPage, totalPages),
+    [currentPage, totalPages],
+  )
 
   const updateSearch = useCallback((updater: (next: URLSearchParams) => void) => {
     setSearchParams((current) => {
@@ -168,26 +233,61 @@ export const Catalog = ({
   }, [setSearchParams])
 
   const setStrengthFilter = (value: StrengthFilter) => {
+    setAppendTobaccos(false)
+    setLoadedTobaccos([])
     updateSearch((next) => {
       if (value === 'all') next.delete('strength')
       else next.set('strength', value)
+      next.delete('page')
     })
   }
 
   const setPriceFilter = (key: 'minPrice' | 'maxPrice', value: string) => {
+    setAppendTobaccos(false)
+    setLoadedTobaccos([])
     updateSearch((next) => {
       if (value.trim() === '') next.delete(key)
       else next.set(key, value)
+      next.delete('page')
     })
   }
 
   const resetFilters = () => {
+    setAppendTobaccos(false)
+    setLoadedTobaccos([])
     updateSearch((next) => {
       next.delete('strength')
       next.delete('minPrice')
       next.delete('maxPrice')
+      next.delete('page')
     })
   }
+
+  const setCatalogPage = (page: number, append = false) => {
+    setAppendTobaccos(append)
+    if (!append) setLoadedTobaccos([])
+    updateSearch((next) => {
+      if (page <= 1) next.delete('page')
+      else next.set('page', String(page))
+    })
+  }
+
+  const showMoreTobaccos = () => {
+    if (!canShowMoreTobaccos) return
+    setCatalogPage(currentPage + 1, true)
+  }
+
+  useEffect(() => {
+    if (itemKind !== 'tobacco' || !rawData) return
+    setLoadedTobaccos((current) => {
+      if (!appendTobaccos) return pageData.items
+      const seen = new Set(current.map((item) => item.id))
+      return [
+        ...current,
+        ...pageData.items.filter((item: any) => !seen.has(item.id)),
+      ]
+    })
+  }, [appendTobaccos, itemKind, pageData.items, rawData])
 
   const confirmDelete = async () => {
     if (!deleteTarget?.id) return
@@ -205,9 +305,9 @@ export const Catalog = ({
         <div>
           <h1 tw="text-xl font-semibold text-[rgb(var(--color-text))]">{title}</h1>
           <p tw="text-sm text-[rgb(var(--color-text-subtle))] mt-0.5">
-            {data?.length
+            {data.length
               ? showTobaccoFilters
-                ? t('catalog.filterCount', { shown: data.length, total: data.length })
+                ? t('catalog.filterCount', { shown: data.length, total: totalCount })
                 : t('catalog.count', { count: data.length })
               : t('common.browseItems')}
           </p>
@@ -224,7 +324,7 @@ export const Catalog = ({
         <div tw="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((n) => <GridSkeleton key={n} />)}
         </div>
-      ) : !data?.length && !showTobaccoFilters ? (
+      ) : !data.length && !showTobaccoFilters ? (
         <div tw="flex flex-col items-center justify-center py-20 text-center">
           <div tw="w-16 h-16 bg-[rgb(var(--color-surface-muted))] rounded-2xl flex items-center justify-center mb-5">
             <EmptyIcon tw="text-[rgb(var(--color-text-subtle))]" />
@@ -290,7 +390,7 @@ export const Catalog = ({
             </div>
           )}
 
-          {!data?.length && showTobaccoFilters ? (
+          {!data.length && showTobaccoFilters ? (
             <div tw="mb-5 rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface-muted))] px-4 py-8 text-center">
               <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">{t('catalog.filters.empty')}</h2>
               <p tw="mt-1 text-sm text-[rgb(var(--color-text-subtle))]">{t('catalog.filters.emptyHint')}</p>
@@ -300,7 +400,7 @@ export const Catalog = ({
             </div>
           ) : (
             <div tw="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {(data || []).map((item: any) => {
+              {data.map((item: any) => {
                 const facts = getCatalogFacts(item, itemKind, t)
                 const tobaccoRating = itemKind === 'tobacco' ? tobaccoRatings.get(item.id) : undefined
                 const heroMetric = itemKind === 'tobacco'
@@ -404,6 +504,48 @@ export const Catalog = ({
                   </Card>
                 )
               })}
+            </div>
+          )}
+          {itemKind === 'tobacco' && totalPages > 1 && data.length > 0 && (
+            <div tw="mt-6 flex flex-col items-center gap-3">
+              {canShowMoreTobaccos && (
+                <Button type="button" variant="secondary" onClick={showMoreTobaccos} disabled={isFetching}>
+                  {isFetching ? t('common.saving') : t('catalog.showMore')}
+                </Button>
+              )}
+              <div tw="flex max-w-full flex-wrap items-center justify-center gap-1.5">
+                {visiblePageNumbers.map((page, index) => {
+                  const previous = visiblePageNumbers[index - 1]
+                  const showGap = previous !== undefined && page - previous > 1
+                  return (
+                    <div key={page} tw="inline-flex items-center gap-1.5">
+                      {showGap && (
+                        <span tw="px-1 text-[12px] font-bold text-[rgb(var(--color-text-subtle))]">...</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setCatalogPage(page)}
+                        aria-label={t('catalog.pageLabel', { page })}
+                        aria-current={page === currentPage ? 'page' : undefined}
+                        tw="h-9 min-w-9 rounded-lg border px-3 text-[12px] font-black transition-all"
+                        css={page === currentPage
+                          ? {
+                            backgroundColor: 'rgb(var(--color-surface-inverse))',
+                            borderColor: 'rgb(var(--color-surface-inverse))',
+                            color: 'rgb(var(--color-text-inverse))',
+                          }
+                          : {
+                            backgroundColor: 'rgb(var(--color-surface))',
+                            borderColor: 'rgb(var(--color-border-strong))',
+                            color: 'rgb(var(--color-text-muted))',
+                          }}
+                      >
+                        {page}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </>

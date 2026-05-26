@@ -102,7 +102,7 @@ const getSearchSort = (value: string | null): SortValue => (
 
 const buildMixItems = (setup: any, tobaccos: any[] | undefined, fallbackName: (index: number) => string): MixBowlItem[] => (
   setup.tobaccos?.map((item: any, index: number) => {
-    const tobacco = getItem(tobaccos, item.tobacco_id)
+    const tobacco = item.tobacco || getItem(tobaccos, item.tobacco_id)
 
     return {
       id: item.tobacco_id || item.id || `${setup.id}-${index}`,
@@ -253,7 +253,10 @@ export const Feed = () => {
     refetch: refetchSetups,
   } = useGetSetupsQuery(setupQueryParams, { refetchOnMountOrArgChange: false })
   const normalizedSetupsPage = useMemo(() => normalizeSetupsPage(setupsPage), [setupsPage])
-  const { data: tobaccos } = useGetTobaccosQuery(undefined, { refetchOnMountOrArgChange: false })
+  const { data: tobaccos } = useGetTobaccosQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    skip: selectedTobaccos.length === 0,
+  })
   const tobaccoPickerQueryParams = useMemo(() => ({
     search: tobaccoSearch.trim() || undefined,
     limit: 18,
