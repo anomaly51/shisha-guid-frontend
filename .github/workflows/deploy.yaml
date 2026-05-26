@@ -68,41 +68,230 @@ jobs:
     runs-on: anomaly51-runner
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init
+          git remote remove origin 2>/dev/null || true
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "${GITHUB_SHA}"
+          git checkout --force FETCH_HEAD
+          git clean -ffdx
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-          cache: npm
-
-      - name: Check lockfile
-        run: npm ci
-
-      - name: Check production build
-        run: npm run build
+      - name: Check Docker build stage
+        env:
+          DOCKER_BUILDKIT: "1"
+        run: |
+          docker build \
+            --pull=false \
+            --progress=plain \
+            --target builder \
+            --build-arg "VITE_GOOGLE_CLIENT_ID=838081828286-6hn0jphbj636tf7p3q83c37dg9ltnfms.apps.googleusercontent.com" \
+            --build-arg "APP_VERSION=validate-${GITHUB_SHA}" \
+            --build-arg "BUILD_DATE=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            --build-arg "VCS_REF=${GITHUB_SHA}" \
+            .
 
   build:
     needs: validate
     if: ${{ needs.validate.result == 'success' }}
-    uses: anomaly51/github-actions-toolkit/.github/workflows/fluxcd-image-release.yml@v11
-    with:
-      app-name: Shisha Guide Frontend
-      runner: anomaly51-runner
-      concurrency-group: shisha-frontend
-      registry: harbor.api-api-api.com
-      registry-resolve-host: traefik.kube-system.svc.cluster.local
-      image-project: shisha
-      image-name: frontend
-      build-args: |
-        VITE_GOOGLE_CLIENT_ID=838081828286-6hn0jphbj636tf7p3q83c37dg9ltnfms.apps.googleusercontent.com
-        APP_VERSION=main-${{ github.run_number }}-${{ github.sha }}
-      app-url: https://shisha-guid.api-api-api.com
-      health-url: https://shisha-guid.api-api-api.com/health
-      health-version-field: version
-      live-version-attempts: "300"
-      live-version-interval-seconds: "2"
-    secrets:
-      registry_username: ${{ secrets.HARBOR_USERNAME }}
-      registry_password: ${{ secrets.HARBOR_PASSWORD }}
-      telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      telegram_chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+    name: Build, push, and verify
+    runs-on: anomaly51-runner
+    timeout-minutes: 25
+    env:
+      APP_NAME: Shisha Guide Frontend
+      APP_URL: https://shisha-guid.api-api-api.com
+      HEALTH_URL: https://shisha-guid.api-api-api.com/health
+      REGISTRY: harbor.api-api-api.com
+      REGISTRY_RESOLVE_HOST: traefik.kube-system.svc.cluster.local
+      IMAGE_PROJECT: shisha
+      IMAGE_NAME: frontend
+      LIVE_VERSION_ATTEMPTS: "300"
+      LIVE_VERSION_INTERVAL_SECONDS: "2"
+      DOCKER_BUILDKIT: "1"
+    steps:
+      - name: Checkout repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init
+          git remote remove origin 2>/dev/null || true
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "${GITHUB_SHA}"
+          git checkout --force FETCH_HEAD
+          git clean -ffdx
+
+      - name: Prepare release metadata
+        id: meta
+        run: |
+          started_at="$(date +%s)"
+          started_at_iso="$(date -u -d "@${started_at}" '+%Y-%m-%dT%H:%M:%SZ')"
+          image_tag="main-${GITHUB_RUN_NUMBER}-${GITHUB_SHA}"
+          image_ref="${REGISTRY}/${IMAGE_PROJECT}/${IMAGE_NAME}:${image_tag}"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo "started_at=${started_at}"
+            echo "started_at_iso=${started_at_iso}"
+            echo "image_tag=${image_tag}"
+            echo "image_ref=${image_ref}"
+            echo "run_url=${run_url}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Notify release started
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+          RUN_URL: ${{ steps.meta.outputs.run_url }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Telegram token/chat id are not available; skipping notification."
+            exit 0
+          fi
+
+          python3 - <<'PY'
+          import os
+          import urllib.parse
+          import urllib.request
+
+          text = "\n".join([
+              f"{os.environ['APP_NAME']} release started",
+              f"Version {os.environ['IMAGE_TAG']}",
+              os.environ["APP_URL"],
+              os.environ["RUN_URL"],
+          ])
+          payload = urllib.parse.urlencode({
+              "chat_id": os.environ["TELEGRAM_CHAT_ID"],
+              "text": text,
+              "disable_web_page_preview": "true",
+          }).encode()
+          url = f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage"
+          with urllib.request.urlopen(url, data=payload, timeout=15) as response:
+              response.read()
+              if response.status >= 300:
+                  raise SystemExit(f"Telegram notification failed: {response.status}")
+          PY
+
+      - name: Resolve registry directly
+        run: |
+          registry_ip="$(getent ahostsv4 "${REGISTRY_RESOLVE_HOST}" | awk '{ print $1; exit }')"
+          if [ -z "${registry_ip}" ]; then
+            echo "Could not resolve ${REGISTRY_RESOLVE_HOST}"
+            exit 1
+          fi
+          echo "${registry_ip} ${REGISTRY}" | sudo tee -a /etc/hosts
+
+      - name: Login to registry
+        env:
+          REGISTRY_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+        run: |
+          if [ -z "${REGISTRY_USERNAME:-}" ] || [ -z "${REGISTRY_PASSWORD:-}" ]; then
+            echo "Registry credentials are not configured."
+            exit 1
+          fi
+          printf '%s' "${REGISTRY_PASSWORD}" | docker login "${REGISTRY}" --username "${REGISTRY_USERNAME}" --password-stdin
+
+      - name: Build and push image
+        id: image
+        env:
+          IMAGE_REF: ${{ steps.meta.outputs.image_ref }}
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+        run: |
+          started_at="$(date +%s)"
+          docker buildx build \
+            --push \
+            --pull=false \
+            --progress=plain \
+            -t "${IMAGE_REF}" \
+            --build-arg "VITE_GOOGLE_CLIENT_ID=838081828286-6hn0jphbj636tf7p3q83c37dg9ltnfms.apps.googleusercontent.com" \
+            --build-arg "APP_VERSION=${IMAGE_TAG}" \
+            --build-arg "BUILD_DATE=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            --build-arg "VCS_REF=${GITHUB_SHA}" \
+            .
+          finished_at="$(date +%s)"
+          echo "duration_seconds=$((finished_at - started_at))" >> "${GITHUB_OUTPUT}"
+
+      - name: Await live version
+        id: live
+        env:
+          EXPECTED_VERSION: ${{ steps.meta.outputs.image_tag }}
+        run: |
+          started_at="$(date +%s)"
+          for attempt in $(seq 1 "${LIVE_VERSION_ATTEMPTS}"); do
+            payload="$(curl -fsS --max-time 10 "${HEALTH_URL}" 2>/dev/null || true)"
+            live_version="$(PAYLOAD="${payload}" python3 - <<'PY'
+          import json
+          import os
+
+          try:
+              print(json.loads(os.environ["PAYLOAD"]).get("version", ""))
+          except Exception:
+              print("")
+          PY
+          )"
+
+            if [ "${live_version}" = "${EXPECTED_VERSION}" ]; then
+              finished_at="$(date +%s)"
+              echo "Live version ${EXPECTED_VERSION} is active."
+              echo "duration_seconds=$((finished_at - started_at))" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+
+            echo "Attempt ${attempt}/${LIVE_VERSION_ATTEMPTS}: live version ${live_version:-unknown}; waiting for ${EXPECTED_VERSION}."
+            sleep "${LIVE_VERSION_INTERVAL_SECONDS}"
+          done
+
+          echo "Timed out waiting for live version ${EXPECTED_VERSION}."
+          exit 1
+
+      - name: Notify release finished
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STATUS: ${{ job.status }}
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+          RUN_URL: ${{ steps.meta.outputs.run_url }}
+          BUILD_DURATION_SECONDS: ${{ steps.image.outputs.duration_seconds }}
+          VERIFY_DURATION_SECONDS: ${{ steps.live.outputs.duration_seconds }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Telegram token/chat id are not available; skipping notification."
+            exit 0
+          fi
+
+          python3 - <<'PY'
+          import os
+          import urllib.parse
+          import urllib.request
+
+          details = []
+          if os.environ.get("BUILD_DURATION_SECONDS"):
+              details.append(f"Build {os.environ['BUILD_DURATION_SECONDS']}s")
+          if os.environ.get("VERIFY_DURATION_SECONDS"):
+              details.append(f"Verify {os.environ['VERIFY_DURATION_SECONDS']}s")
+
+          text = "\n".join([
+              f"{os.environ['APP_NAME']} release {os.environ['STATUS']}",
+              f"Version {os.environ.get('IMAGE_TAG') or 'unknown'}",
+              " / ".join(details),
+              os.environ["APP_URL"],
+              os.environ.get("RUN_URL") or "",
+          ]).strip()
+          payload = urllib.parse.urlencode({
+              "chat_id": os.environ["TELEGRAM_CHAT_ID"],
+              "text": text,
+              "disable_web_page_preview": "true",
+          }).encode()
+          url = f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage"
+          with urllib.request.urlopen(url, data=payload, timeout=15) as response:
+              response.read()
+              if response.status >= 300:
+                  raise SystemExit(f"Telegram notification failed: {response.status}")
+          PY
+
+      - name: Logout from registry
+        if: always()
+        run: docker logout "${REGISTRY}" || true
