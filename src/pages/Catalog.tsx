@@ -122,6 +122,16 @@ const getHeroMetric = (item: any, itemKind: CatalogItemKind, t: any) => {
   return formatPrice(item.price, item.price_currency)
 }
 
+const getCatalogImageStyle = (itemKind: CatalogItemKind) => (
+  itemKind === 'coal'
+    ? {
+        objectFit: 'contain' as const,
+        padding: '0.875rem',
+        mixBlendMode: 'multiply' as const,
+      }
+    : undefined
+)
+
 export const Catalog = ({
   title, listHook, deleteHook, onCreatePath, onEditPath, itemKind = 'default',
 }: CatalogProps) => {
@@ -304,7 +314,12 @@ export const Catalog = ({
                     <div tw="flex h-full flex-col bg-[rgb(var(--color-surface))]">
                       <div tw="relative aspect-square overflow-hidden border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))]">
                         {item.photo_urls?.length > 0 ? (
-                          <img src={item.photo_urls[0]} alt={item.name} tw="h-full w-full object-cover transition-transform duration-200" />
+                          <img
+                            src={item.photo_urls[0]}
+                            alt={item.name}
+                            style={getCatalogImageStyle(itemKind)}
+                            tw="h-full w-full object-cover transition-transform duration-200"
+                          />
                         ) : (
                           <div tw="flex h-full w-full items-center justify-center">
                             <div tw="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(255,255,255,0.82),transparent_40%),linear-gradient(180deg,rgba(255,248,241,0.72),rgba(229,218,207,0.42))]" />

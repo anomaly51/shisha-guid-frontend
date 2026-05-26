@@ -38,6 +38,16 @@ const formatIntegerValue = (value: unknown, t: (key: string, options?: any) => s
     : null
 )
 
+const getImageStyle = (itemKind: DetailProps['itemKind']) => (
+  itemKind === 'coal'
+    ? {
+        objectFit: 'contain' as const,
+        padding: '1rem',
+        mixBlendMode: 'multiply' as const,
+      }
+    : undefined
+)
+
 export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, itemKind = 'default' }: DetailProps) => {
   const { id } = useParams<{ id: string }>()
   const { data: item, isLoading } = detailHook(id!)
@@ -89,13 +99,13 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
         {item.photo_urls?.length > 0 && (
           <div tw="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-muted))]">
             <div tw="mx-auto aspect-square w-full max-w-[520px] overflow-hidden bg-[rgb(var(--color-surface-muted))]">
-              <img src={item.photo_urls[0]} alt={item.name} tw="h-full w-full object-cover" />
+              <img src={item.photo_urls[0]} alt={item.name} style={getImageStyle(itemKind)} tw="h-full w-full object-cover" />
             </div>
             {item.photo_urls.length > 1 && (
               <div tw="grid grid-cols-4 sm:grid-cols-6 gap-2 p-3 bg-[rgb(var(--color-surface))]">
                 {item.photo_urls.slice(1).map((url: string, index: number) => (
                   <div key={`${url}-${index}`} tw="aspect-square rounded-lg overflow-hidden bg-[rgb(var(--color-surface-muted))]">
-                    <img src={url} alt="" tw="w-full h-full object-cover" />
+                    <img src={url} alt="" style={getImageStyle(itemKind)} tw="w-full h-full object-cover" />
                   </div>
                 ))}
               </div>
