@@ -1,12 +1,31 @@
 name: Build and Push
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
 
 jobs:
+  validate:
+    name: Validate frontend
+    runs-on: anomaly51-runner
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Check lockfile
+        run: npm ci
+
+      - name: Check production build
+        run: npm run build
+
   build:
+    needs: validate
     uses: anomaly51/github-actions-toolkit/.github/workflows/fluxcd-image-release.yml@v11
     with:
       app-name: Shisha Guide Frontend
@@ -22,7 +41,7 @@ jobs:
       app-url: https://shisha-guid.api-api-api.com
       health-url: https://shisha-guid.api-api-api.com/health
       health-version-field: version
-      live-version-attempts: "180"
+      live-version-attempts: "300"
       live-version-interval-seconds: "2"
     secrets:
       registry_username: ${{ secrets.HARBOR_USERNAME }}
