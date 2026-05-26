@@ -2,6 +2,8 @@ name: Build and Push
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
   push:
     branches:
       - main
@@ -14,8 +16,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  deploy_check:
+    name: Check deploy drift
+    runs-on: anomaly51-runner
+    timeout-minutes: 5
+    outputs:
+      should_deploy: ${{ steps.decision.outputs.should_deploy }}
+    steps:
+      - name: Decide whether release is needed
+        id: decision
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+          HEALTH_URL: https://shisha-guid.api-api-api.com/health
+        run: |
+          if [ "${EVENT_NAME}" != "schedule" ]; then
+            echo "should_deploy=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if ! payload="$(curl -fsS --retry 3 --max-time 10 "${HEALTH_URL}")"; then
+            echo "Health check is unavailable; running release."
+            echo "should_deploy=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          live_commit="$(PAYLOAD="${payload}" python3 - <<'PY'
+          import json
+          import os
+
+          try:
+              print(json.loads(os.environ["PAYLOAD"]).get("commit", ""))
+          except Exception:
+              print("")
+          PY
+          )"
+
+          if [ "${live_commit}" = "${EXPECTED_COMMIT}" ]; then
+            echo "Live commit already matches ${EXPECTED_COMMIT}; skipping release."
+            echo "should_deploy=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "Live commit ${live_commit:-unknown} differs from ${EXPECTED_COMMIT}; running release."
+            echo "should_deploy=true" >> "${GITHUB_OUTPUT}"
+          fi
+
   validate:
     name: Validate frontend
+    needs: deploy_check
+    if: ${{ needs.deploy_check.outputs.should_deploy == 'true' }}
     runs-on: anomaly51-runner
     timeout-minutes: 15
     steps:
@@ -34,6 +83,7 @@ jobs:
 
   build:
     needs: validate
+    if: ${{ needs.validate.result == 'success' }}
     uses: anomaly51/github-actions-toolkit/.github/workflows/fluxcd-image-release.yml@v11
     with:
       app-name: Shisha Guide Frontend
