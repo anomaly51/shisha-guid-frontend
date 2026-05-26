@@ -69,6 +69,20 @@ const normalizePageData = (data: any, fallbackLimit: number) => {
   }
 }
 
+const hasOwn = (item: any, key: string) => Object.prototype.hasOwnProperty.call(item || {}, key)
+
+const itemMatchesCatalogKind = (item: any, itemKind: CatalogItemKind) => {
+  if (itemKind === 'coal') return hasOwn(item, 'coals_per_package')
+  if (itemKind === 'tobacco') return hasOwn(item, 'package_grams') || hasOwn(item, 'strength')
+  return true
+}
+
+const filterItemsByCatalogKind = (items: any[], itemKind: CatalogItemKind) => (
+  itemKind === 'coal' || itemKind === 'tobacco'
+    ? items.filter((item) => itemMatchesCatalogKind(item, itemKind))
+    : items
+)
+
 const getVisiblePageNumbers = (currentPage: number, totalPages: number) => {
   if (totalPages <= 7) return Array.from({ length: totalPages }, (_item, index) => index + 1)
 
@@ -187,6 +201,7 @@ export const Catalog = ({
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [appendTobaccos, setAppendTobaccos] = useState(false)
   const [loadedTobaccos, setLoadedTobaccos] = useState<any[]>([])
+  const [loadedCatalogKind, setLoadedCatalogKind] = useState<CatalogItemKind>(itemKind)
   const strength = getSearchStrength(searchParams.get('strength'))
   const minPrice = searchParams.get('minPrice') || ''
   const maxPrice = searchParams.get('maxPrice') || ''
@@ -219,12 +234,19 @@ export const Catalog = ({
     () => normalizePageData(rawData, isPagedCatalog ? pageSize : 0),
     [isPagedCatalog, pageSize, rawData],
   )
+  const pageItems = useMemo(
+    () => filterItemsByCatalogKind(pageData.items, itemKind),
+    [itemKind, pageData.items],
+  )
+  const pageDataMatchesCatalog = pageData.items.length === pageItems.length
+  const canUseLoadedItems = loadedCatalogKind === itemKind && loadedTobaccos.length > 0
   const data = isPagedCatalog
-    ? (loadedTobaccos.length ? loadedTobaccos : pageData.items)
+    ? (canUseLoadedItems ? loadedTobaccos : pageItems)
     : pageData.items
-  const totalCount = isPagedCatalog ? pageData.total : data.length
+  const totalCount = isPagedCatalog && pageDataMatchesCatalog ? pageData.total : data.length
   const totalPages = isPagedCatalog ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1
   const canShowMoreTobaccos = isPagedCatalog && currentPage < totalPages
+  const showInitialCatalogLoading = isPagedCatalog && isFetching && !data.length && !pageDataMatchesCatalog
   const showTobaccoFilters = itemKind === 'tobacco' && (Boolean(data.length) || hasActiveFilters)
   const tobaccoRatings = useMemo(() => getTobaccoRatingMap(setupsForRatings), [setupsForRatings])
   const visiblePageNumbers = useMemo(
@@ -286,16 +308,24 @@ export const Catalog = ({
   }
 
   useEffect(() => {
-    if (!isPagedCatalog || !rawData) return
+    setAppendTobaccos(false)
+    setLoadedTobaccos([])
+    setLoadedCatalogKind(itemKind)
+  }, [itemKind])
+
+  useEffect(() => {
+    if (!isPagedCatalog || !rawData || !pageDataMatchesCatalog) return
+    const shouldAppend = appendTobaccos && loadedCatalogKind === itemKind
+    setLoadedCatalogKind(itemKind)
     setLoadedTobaccos((current) => {
-      if (!appendTobaccos) return pageData.items
+      if (!shouldAppend) return pageItems
       const seen = new Set(current.map((item) => item.id))
       return [
         ...current,
-        ...pageData.items.filter((item: any) => !seen.has(item.id)),
+        ...pageItems.filter((item: any) => !seen.has(item.id)),
       ]
     })
-  }, [appendTobaccos, isPagedCatalog, pageData.items, rawData])
+  }, [appendTobaccos, isPagedCatalog, itemKind, loadedCatalogKind, pageDataMatchesCatalog, pageItems, rawData])
 
   const confirmDelete = async () => {
     if (!deleteTarget?.id) return
@@ -328,7 +358,7 @@ export const Catalog = ({
         )}
       </div>
 
-      {isLoading ? (
+      {isLoading || showInitialCatalogLoading ? (
         <div tw="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((n) => <GridSkeleton key={n} />)}
         </div>
