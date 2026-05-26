@@ -763,7 +763,7 @@ const Choice = ({ label, value, onChange, options, icon, loading }: ChoiceProps)
               >
                 <span tw="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-subtle))]">
                   {photo ? (
-                    <img src={photo} alt="" loading="lazy" tw="h-full w-full object-contain p-1.5 transition-transform duration-200 group-hover:scale-[1.03]" />
+                    <img src={photo} alt="" loading="lazy" decoding="async" tw="h-full w-full object-contain p-1.5 transition-transform duration-200 group-hover:scale-[1.03]" />
                   ) : (
                     <CatalogIcon name={icon} size={26} />
                   )}
@@ -1319,7 +1319,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                           >
                             <span tw="flex aspect-square w-[72px] items-center justify-center overflow-hidden rounded-md bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-subtle))] sm:w-[82px]">
                               {photo ? (
-                                <img src={photo} alt="" loading="lazy" tw="h-full w-full object-cover" />
+                                <img src={photo} alt="" loading="lazy" decoding="async" tw="h-full w-full object-cover" />
                               ) : (
                                 <CatalogIcon name="tobacco" size={30} />
                               )}
@@ -1439,7 +1439,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                         >
                           <span tw="flex aspect-square w-[72px] items-center justify-center overflow-hidden rounded-md bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-subtle))] sm:w-[82px]">
                             {photo ? (
-                              <img src={photo} alt="" loading="lazy" tw="h-full w-full object-cover" />
+                              <img src={photo} alt="" loading="lazy" decoding="async" tw="h-full w-full object-cover" />
                             ) : (
                               <CatalogIcon name="tobacco" size={30} />
                             )}

@@ -19,6 +19,16 @@ type QueryState = {
   status?: string
 }
 
+const listEndpoints = new Set([
+  'getSetups',
+  'getTobaccos',
+  'getBowls',
+  'getCoals',
+  'getKalouds',
+  'getCoalPlacements',
+  'getBowlSetupTypes',
+])
+
 const themeScript = `
 (() => {
   try {
@@ -90,11 +100,40 @@ const isEmptySetupsQuery = (query: QueryState) => {
   return !tobaccoIds?.length && (!strength || strength === 'all') && (!sort || sort === 'newest')
 }
 
+const compactCatalogItem = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(compactCatalogItem)
+  if (!value || typeof value !== 'object') return value
+
+  const item = value as Record<string, unknown>
+  const next = { ...item }
+  if ('description' in next) delete next.description
+  if (Array.isArray(next.photo_urls)) next.photo_urls = next.photo_urls.slice(0, 1)
+  return next
+}
+
+const compactListData = (data: unknown): unknown => {
+  if (Array.isArray(data)) return data.map(compactCatalogItem)
+  if (data && typeof data === 'object' && 'items' in data) {
+    const page = data as Record<string, unknown>
+    return {
+      ...page,
+      items: Array.isArray(page.items) ? page.items.map(compactCatalogItem) : [],
+    }
+  }
+  return data
+}
+
+const compactQuery = (query: QueryState): QueryState => (
+  query.endpointName && listEndpoints.has(query.endpointName)
+    ? { ...query, data: compactListData(query.data) }
+    : query
+)
+
 const getSerializableState = (state: ReturnType<ReturnType<typeof createAppStore>['getState']>) => {
   const queries = Object.fromEntries(
-    Object.entries(state.api.queries).filter(([, query]) => (
-      query?.status === 'fulfilled' && !isEmptySetupsQuery(query)
-    )),
+    Object.entries(state.api.queries)
+      .filter(([, query]) => query?.status === 'fulfilled' && !isEmptySetupsQuery(query))
+      .map(([key, query]) => [key, compactQuery(query as QueryState)]),
   )
   const queryKeys = new Set(Object.keys(queries))
 

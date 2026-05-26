@@ -36,8 +36,8 @@ const catalogRoutes: Record<string, { list: EndpointName; detail: EndpointName }
 
 const setupFormPrefetch: PrefetchRequest[] = [
   { endpoint: 'getBowls' },
-  { endpoint: 'getTobaccos' },
-  { endpoint: 'getCoals' },
+  { endpoint: 'getTobaccos', arg: { limit: 60 } },
+  { endpoint: 'getCoals', arg: { limit: 60 } },
   { endpoint: 'getKalouds' },
   { endpoint: 'getCoalPlacements' },
   { endpoint: 'getBowlSetupTypes' },
@@ -93,7 +93,7 @@ export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
       { endpoint: 'getSetup', arg: segments[1] },
       { endpoint: 'getSetupReviews', arg: segments[1] },
       { endpoint: 'getBowls' },
-      { endpoint: 'getCoals' },
+      { endpoint: 'getCoals', arg: { limit: 60 } },
       { endpoint: 'getKalouds' },
       { endpoint: 'getCoalPlacements' },
       { endpoint: 'getBowlSetupTypes' },
@@ -104,7 +104,9 @@ export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
   if (!catalog) return []
 
   if (segments.length === 1) {
-    return [{ endpoint: catalog.list, arg: segments[0] === 'tobaccos' ? tobaccoFilters : undefined }]
+    if (segments[0] === 'tobaccos') return [{ endpoint: catalog.list, arg: tobaccoFilters }]
+    if (segments[0] === 'coals') return [{ endpoint: catalog.list, arg: { limit: feedPageSize * 2, offset: 0 } }]
+    return [{ endpoint: catalog.list }]
   }
 
   if (segments[1] && (segments.length === 2 || segments[2] === 'edit')) {

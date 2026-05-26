@@ -27,6 +27,7 @@ interface CatalogProps {
 
 const strengthOptions: StrengthFilter[] = ['all', 'light', 'medium', 'strong', 'heavy']
 const TOBACCO_PAGE_SIZE = 24
+const COAL_PAGE_SIZE = 24
 
 const getSearchStrength = (value: string | null): StrengthFilter => (
   strengthOptions.includes(value as StrengthFilter) ? value as StrengthFilter : 'all'
@@ -188,15 +189,21 @@ export const Catalog = ({
   const strength = getSearchStrength(searchParams.get('strength'))
   const minPrice = searchParams.get('minPrice') || ''
   const maxPrice = searchParams.get('maxPrice') || ''
-  const currentPage = itemKind === 'tobacco' ? getSearchPage(searchParams.get('page')) : 1
+  const isPagedCatalog = itemKind === 'tobacco' || itemKind === 'coal'
+  const pageSize = itemKind === 'coal' ? COAL_PAGE_SIZE : TOBACCO_PAGE_SIZE
+  const currentPage = isPagedCatalog ? getSearchPage(searchParams.get('page')) : 1
   const tobaccoQueryParams = itemKind === 'tobacco' ? {
-    limit: TOBACCO_PAGE_SIZE,
+    limit: pageSize,
     min_price: minPrice || undefined,
     max_price: maxPrice || undefined,
-    offset: (currentPage - 1) * TOBACCO_PAGE_SIZE,
+    offset: (currentPage - 1) * pageSize,
     strength,
   } : undefined
-  const { data: rawData, isFetching, isLoading } = listHook(tobaccoQueryParams)
+  const coalQueryParams = itemKind === 'coal' ? {
+    limit: pageSize,
+    offset: (currentPage - 1) * pageSize,
+  } : undefined
+  const { data: rawData, isFetching, isLoading } = listHook(tobaccoQueryParams || coalQueryParams)
   const { data: setupsForRatings } = useGetSetupsQuery(
     itemKind === 'tobacco' ? { limit: 1000, sort: 'rating' } : undefined,
     { skip: itemKind !== 'tobacco' },
@@ -208,15 +215,15 @@ export const Catalog = ({
   const isAdmin = profile?.role === 'admin'
   const hasActiveFilters = strength !== 'all' || minPrice.trim() !== '' || maxPrice.trim() !== ''
   const pageData = useMemo(
-    () => normalizePageData(rawData, itemKind === 'tobacco' ? TOBACCO_PAGE_SIZE : 0),
-    [itemKind, rawData],
+    () => normalizePageData(rawData, isPagedCatalog ? pageSize : 0),
+    [isPagedCatalog, pageSize, rawData],
   )
-  const data = itemKind === 'tobacco'
+  const data = isPagedCatalog
     ? (loadedTobaccos.length ? loadedTobaccos : pageData.items)
     : pageData.items
-  const totalCount = itemKind === 'tobacco' ? pageData.total : data.length
-  const totalPages = itemKind === 'tobacco' ? Math.max(1, Math.ceil(totalCount / TOBACCO_PAGE_SIZE)) : 1
-  const canShowMoreTobaccos = itemKind === 'tobacco' && currentPage < totalPages
+  const totalCount = isPagedCatalog ? pageData.total : data.length
+  const totalPages = isPagedCatalog ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1
+  const canShowMoreTobaccos = isPagedCatalog && currentPage < totalPages
   const showTobaccoFilters = itemKind === 'tobacco' && (Boolean(data.length) || hasActiveFilters)
   const tobaccoRatings = useMemo(() => getTobaccoRatingMap(setupsForRatings), [setupsForRatings])
   const visiblePageNumbers = useMemo(
@@ -278,7 +285,7 @@ export const Catalog = ({
   }
 
   useEffect(() => {
-    if (itemKind !== 'tobacco' || !rawData) return
+    if (!isPagedCatalog || !rawData) return
     setLoadedTobaccos((current) => {
       if (!appendTobaccos) return pageData.items
       const seen = new Set(current.map((item) => item.id))
@@ -287,7 +294,7 @@ export const Catalog = ({
         ...pageData.items.filter((item: any) => !seen.has(item.id)),
       ]
     })
-  }, [appendTobaccos, itemKind, pageData.items, rawData])
+  }, [appendTobaccos, isPagedCatalog, pageData.items, rawData])
 
   const confirmDelete = async () => {
     if (!deleteTarget?.id) return
@@ -306,7 +313,7 @@ export const Catalog = ({
           <h1 tw="text-xl font-semibold text-[rgb(var(--color-text))]">{title}</h1>
           <p tw="text-sm text-[rgb(var(--color-text-subtle))] mt-0.5">
             {data.length
-              ? showTobaccoFilters
+              ? showTobaccoFilters || isPagedCatalog
                 ? t('catalog.filterCount', { shown: data.length, total: totalCount })
                 : t('catalog.count', { count: data.length })
               : t('common.browseItems')}
@@ -417,6 +424,8 @@ export const Catalog = ({
                           <img
                             src={item.photo_urls[0]}
                             alt={item.name}
+                            loading="lazy"
+                            decoding="async"
                             style={getCatalogImageStyle(itemKind)}
                             tw="h-full w-full object-cover transition-transform duration-200"
                           />
@@ -506,7 +515,7 @@ export const Catalog = ({
               })}
             </div>
           )}
-          {itemKind === 'tobacco' && totalPages > 1 && data.length > 0 && (
+          {isPagedCatalog && totalPages > 1 && data.length > 0 && (
             <div tw="mt-6 flex flex-col items-center gap-3">
               {canShowMoreTobaccos && (
                 <Button type="button" variant="secondary" onClick={showMoreTobaccos} disabled={isFetching}>
