@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import * as THREE from 'three'
 import tw from 'twin.macro'
 import { Card } from '../shared/ui/Card'
 import { Input, Select, Textarea } from '../shared/ui/Input'
@@ -16,7 +14,7 @@ import {
 import { BackIcon, CatalogIcon, type CatalogIconName, LockIcon, VoteDownIcon, VoteUpIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
-import { BowlPreviewFallback, detectBowlModel, useIsomorphicLayoutEffect, type BowlModel } from '../shared/ui/mixBowlModel'
+import { detectBowlModel, MIX_COLORS, type BowlModel, type SetupKind } from '../shared/ui/mixBowlModel'
 import { calculateSetupCost, formatMoney } from '../shared/setupCost'
 import { hasAuthToken } from '../shared/authToken'
 import { filterCatalogItems, getBrandOptions, getCatalogBrand } from '../shared/catalogSearch'
@@ -70,8 +68,6 @@ interface StepButtonProps {
   onClick: () => void
 }
 
-type SetupKind = 'sectors' | 'layers' | 'compot'
-
 interface MixPreviewItem {
   id: string
   name: string
@@ -105,8 +101,6 @@ const SETUP_TYPE_PRESETS: Array<{ name: string; kind: SetupKind; description: st
   },
 ]
 
-const MIX_COLORS = ['#9F1D24', '#1F1716', '#B96A18', '#5F2D22', '#7A171E', '#3E251B', '#C18A2F']
-
 const getName = (items: any[] | undefined, id: string) => (
   items?.find((item) => item.id === id)?.name || ''
 )
@@ -118,130 +112,6 @@ const detectSetupKind = (name: string): SetupKind => {
   if (normalized.includes('sector') || normalized.includes('сектор') || normalized.includes('полов')) return 'sectors'
   if (normalized.includes('layer') || normalized.includes('сло')) return 'layers'
   return 'compot'
-}
-
-const TOBACCO_SURFACE_MAX_Y = 0.765
-const TOBACCO_BASE_Y = 0.595
-
-const pseudoRandom = (seed: number) => {
-  const value = Math.sin(seed * 12.9898) * 43758.5453
-  return value - Math.floor(value)
-}
-
-const normalizeAngle = (angle: number) => {
-  const full = Math.PI * 2
-  return ((angle % full) + full) % full
-}
-
-const isAngleBetween = (angle: number, start: number, end: number) => {
-  const full = Math.PI * 2
-  if (Math.abs(end - start) >= full - 0.001) return true
-  const normalizedAngle = normalizeAngle(angle)
-  const normalizedStart = normalizeAngle(start)
-  const normalizedEnd = normalizeAngle(end)
-
-  return normalizedStart <= normalizedEnd
-    ? normalizedAngle >= normalizedStart && normalizedAngle <= normalizedEnd
-    : normalizedAngle >= normalizedStart || normalizedAngle <= normalizedEnd
-}
-
-const tobaccoHeight = (x: number, z: number, outer: number, seed: number) => {
-  const radius = Math.sqrt(x * x + z * z)
-  const edgeFalloff = Math.max(0, 1 - Math.pow(radius / Math.max(outer, 0.001), 2.8))
-  const coarse = Math.sin(x * 9.7 + z * 4.1 + seed * 1.7) * 0.045
-    + Math.cos(z * 10.9 - x * 3.8 + seed * 2.3) * 0.036
-    + Math.sin((x - z) * 15.5 + seed) * 0.028
-  const mid = Math.sin(x * 24.3 + z * 18.7 + seed * 0.7) * 0.026
-    + Math.cos(z * 27.4 - x * 21.6 + seed) * 0.02
-  const fine = (pseudoRandom(seed * 41 + x * 97 + z * 131) - 0.5) * 0.095
-  return Math.min(0.23, edgeFalloff * 0.19 + coarse + mid + fine)
-}
-
-const getSectorIndex = (angle: number, boundaries: number[]) => {
-  const normalized = normalizeAngle(angle)
-  for (let index = 0; index < boundaries.length - 1; index += 1) {
-    if (normalized >= boundaries[index] && normalized <= boundaries[index + 1]) return index
-  }
-  return boundaries.length - 2
-}
-
-const TobaccoColorSurface = ({
-  colorAt,
-  end = Math.PI * 2,
-  inner = 0,
-  outer = 1.02,
-  seed,
-  start = 0,
-  y,
-}: {
-  colorAt: (x: number, z: number, angle: number, radius: number) => string
-  end?: number
-  inner?: number
-  outer?: number
-  seed: number
-  start?: number
-  y: number
-}) => {
-  const geometry = useMemo(() => {
-    const resolution = 54
-    const positions: number[] = []
-    const colors: number[] = []
-    const indices: number[] = []
-    const vertexMap = new Map<string, number>()
-
-    Array.from({ length: resolution + 1 }).forEach((_, xIndex) => {
-      Array.from({ length: resolution + 1 }).forEach((__, zIndex) => {
-        const key = `${xIndex}:${zIndex}`
-        const xBase = -outer + (xIndex / resolution) * outer * 2
-        const zBase = -outer + (zIndex / resolution) * outer * 2
-        const isOuterGridEdge = xIndex === 0 || zIndex === 0 || xIndex === resolution || zIndex === resolution
-        const jitterScale = isOuterGridEdge ? 0 : outer / resolution * 0.42
-        const x = xBase + (pseudoRandom(seed + xIndex * 17 + zIndex * 29) - 0.5) * jitterScale
-        const z = zBase + (pseudoRandom(seed + xIndex * 31 + zIndex * 13) - 0.5) * jitterScale
-        const radius = Math.sqrt(x * x + z * z)
-        const angle = Math.atan2(z, x)
-
-        if (radius < inner || radius > outer || !isAngleBetween(angle, start, end)) return
-
-        const rawHeight = tobaccoHeight(x, z, outer, seed)
-        const height = Math.max(-0.035, Math.min(0.23, rawHeight))
-        const finalY = Math.min(TOBACCO_SURFACE_MAX_Y, y + height)
-        const tint = new THREE.Color(colorAt(x, z, angle, radius)).offsetHSL(
-          (pseudoRandom(seed + xIndex * 13 + zIndex * 7) - 0.5) * 0.028,
-          -0.16 + pseudoRandom(seed + xIndex * 11 + zIndex * 5) * 0.22,
-          -0.23 + pseudoRandom(seed + xIndex * 17 + zIndex * 3) * 0.32,
-        )
-
-        vertexMap.set(key, positions.length / 3)
-        positions.push(x, finalY, z)
-        colors.push(tint.r, tint.g, tint.b)
-      })
-    })
-
-    Array.from({ length: resolution }).forEach((_, xIndex) => {
-      Array.from({ length: resolution }).forEach((__, zIndex) => {
-        const a = vertexMap.get(`${xIndex}:${zIndex}`)
-        const b = vertexMap.get(`${xIndex + 1}:${zIndex}`)
-        const c = vertexMap.get(`${xIndex}:${zIndex + 1}`)
-        const d = vertexMap.get(`${xIndex + 1}:${zIndex + 1}`)
-        if (a === undefined || b === undefined || c === undefined || d === undefined) return
-        indices.push(a, c, b, b, c, d)
-      })
-    })
-
-    const moundGeometry = new THREE.BufferGeometry()
-    moundGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-    moundGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
-    moundGeometry.setIndex(indices)
-    moundGeometry.computeVertexNormals()
-    return moundGeometry
-  }, [colorAt, end, inner, outer, seed, start, y])
-
-  return (
-    <mesh geometry={geometry} castShadow receiveShadow>
-      <meshPhysicalMaterial vertexColors roughness={0.5} metalness={0.01} clearcoat={0.3} clearcoatRoughness={0.42} side={THREE.DoubleSide} />
-    </mesh>
-  )
 }
 
 const equalized = (items: TobaccoMixRow[]) => {
@@ -302,221 +172,18 @@ const VirtualCatalogList = <T extends { id?: string },>({
   )
 }
 
-const BowlScene = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: SetupKind; items: MixPreviewItem[] }) => {
-  const groupRef = useRef<THREE.Group>(null)
-  const userRotationRef = useRef(0.18)
-  const userTiltRef = useRef(-0.12)
-  const dragRef = useRef({ active: false, x: 0, y: 0, rotation: 0.18, tilt: -0.12 })
-  const invalidate = useThree((state) => state.invalidate)
-  const isPhunnel = bowlModel === 'phunnel'
-  const bowlProfile = useMemo(() => (
-    isPhunnel
-      ? [
-        new THREE.Vector2(0.62, -1.92),
-        new THREE.Vector2(0.82, -1.84),
-        new THREE.Vector2(0.66, -1.68),
-        new THREE.Vector2(0.48, -1.48),
-        new THREE.Vector2(0.44, -0.16),
-        new THREE.Vector2(0.78, -0.08),
-        new THREE.Vector2(1.02, 0.12),
-        new THREE.Vector2(1.18, 0.34),
-        new THREE.Vector2(1.28, 0.58),
-        new THREE.Vector2(1.22, 0.78),
-        new THREE.Vector2(1.02, 0.86),
-      ]
-      : [
-        new THREE.Vector2(0.52, -1.12),
-        new THREE.Vector2(0.75, -1.06),
-        new THREE.Vector2(0.86, -0.76),
-        new THREE.Vector2(0.86, -0.22),
-        new THREE.Vector2(0.96, 0.18),
-        new THREE.Vector2(1.18, 0.42),
-        new THREE.Vector2(1.24, 0.62),
-        new THREE.Vector2(1.17, 0.76),
-        new THREE.Vector2(1.02, 0.84),
-      ]
-  ), [isPhunnel])
-  const innerProfile = useMemo(() => (
-    isPhunnel
-      ? [
-        new THREE.Vector2(0.38, 0.5),
-        new THREE.Vector2(0.76, 0.52),
-        new THREE.Vector2(1.02, 0.6),
-        new THREE.Vector2(1.08, 0.72),
-      ]
-      : [
-        new THREE.Vector2(0.12, 0.5),
-        new THREE.Vector2(0.56, 0.46),
-        new THREE.Vector2(0.96, 0.54),
-        new THREE.Vector2(1.05, 0.68),
-      ]
-  ), [isPhunnel])
-
-  const applyRotation = () => {
-    if (!groupRef.current) return
-    groupRef.current.rotation.y = userRotationRef.current
-    groupRef.current.rotation.x = userTiltRef.current
-    invalidate()
-  }
-
-  useFrame((_, delta) => {
-    if (dragRef.current.active || !groupRef.current) return
-    userRotationRef.current += delta * 0.12
-    groupRef.current.rotation.y = userRotationRef.current
-    groupRef.current.rotation.x = userTiltRef.current
-  })
-
-  return (
-    <group
-      ref={groupRef}
-      position={[0, -0.18, 0]}
-      rotation={[-0.12, 0.18, 0]}
-      scale={isPhunnel ? [0.93, 0.93, 0.93] : [1.03, 1.03, 1.03]}
-      onPointerDown={(event: any) => {
-        event.stopPropagation()
-        dragRef.current = {
-          active: true,
-          x: event.clientX,
-          y: event.clientY,
-          rotation: userRotationRef.current,
-          tilt: userTiltRef.current,
-        }
-        event.target.setPointerCapture?.(event.pointerId)
-        applyRotation()
-      }}
-      onPointerMove={(event: any) => {
-        if (!dragRef.current.active) return
-        userRotationRef.current = dragRef.current.rotation + (event.clientX - dragRef.current.x) * 0.012
-        const nextTilt = dragRef.current.tilt + (event.clientY - dragRef.current.y) * 0.009
-        userTiltRef.current = Math.max(-0.82, Math.min(0.48, nextTilt))
-        applyRotation()
-      }}
-      onPointerUp={(event: any) => {
-        dragRef.current.active = false
-        event.target.releasePointerCapture?.(event.pointerId)
-        applyRotation()
-      }}
-      onPointerLeave={() => {
-        dragRef.current.active = false
-        applyRotation()
-      }}
-    >
-      <mesh castShadow receiveShadow>
-        <latheGeometry args={[bowlProfile, 160]} />
-        <meshPhysicalMaterial
-          color="#4A3830"
-          roughness={0.58}
-          metalness={0.03}
-          clearcoat={0.24}
-          clearcoatRoughness={0.58}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      <mesh position={[0, 0.035, 0]} castShadow>
-        <latheGeometry args={[innerProfile, 160]} />
-        <meshStandardMaterial color="#2A211D" roughness={0.8} metalness={0.01} side={THREE.DoubleSide} />
-      </mesh>
-
-      <mesh position={[0, isPhunnel ? 0.78 : 0.72, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[1.12, 0.105, 24, 160]} />
-        <meshPhysicalMaterial color="#3A2B25" roughness={0.52} metalness={0.04} clearcoat={0.28} clearcoatRoughness={0.52} />
-      </mesh>
-
-      {isPhunnel && (
-        <>
-          <mesh position={[0, 0.48, 0]} castShadow receiveShadow>
-            <cylinderGeometry args={[0.31, 0.39, 0.44, 96]} />
-            <meshPhysicalMaterial color="#4A3830" roughness={0.58} metalness={0.03} clearcoat={0.24} clearcoatRoughness={0.58} />
-          </mesh>
-          <mesh position={[0, 0.7, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <torusGeometry args={[0.23, 0.065, 18, 96]} />
-            <meshPhysicalMaterial color="#3A2B25" roughness={0.52} metalness={0.04} clearcoat={0.28} clearcoatRoughness={0.52} />
-          </mesh>
-          <mesh position={[0, 0.728, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[0.16, 72]} />
-            <meshBasicMaterial color="#0B0705" side={THREE.DoubleSide} />
-          </mesh>
-        </>
-      )}
-
-      <mesh position={[0, isPhunnel ? -1.84 : -1.05, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[0.58, 0.045, 18, 96]} />
-        <meshPhysicalMaterial color="#3C2D27" roughness={0.64} clearcoat={0.18} />
-      </mesh>
-
-      <mesh position={[0, isPhunnel ? -1.92 : -1.12, 0]} receiveShadow>
-        <cylinderGeometry args={[0.68, 0.54, 0.08, 96]} />
-        <meshStandardMaterial color="#322620" roughness={0.7} />
-      </mesh>
-
-      {items.length ? (
-        kind === 'sectors'
-          ? <SectorTobacco bowlModel={bowlModel} items={items} />
-          : kind === 'layers'
-            ? <LayerTobacco bowlModel={bowlModel} items={items} />
-            : <CompotTobacco bowlModel={bowlModel} items={items} />
-      ) : (
-        <mesh position={[0, 0.58, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          {isPhunnel ? <ringGeometry args={[0.36, 0.96, 96]} /> : <circleGeometry args={[0.96, 96]} />}
-          <meshStandardMaterial color="#211916" roughness={0.86} />
-        </mesh>
-      )}
-    </group>
-  )
-}
-
-const SectorTobacco = ({ bowlModel, items }: { bowlModel: BowlModel; items: MixPreviewItem[] }) => {
-  const colorAt = useMemo(() => {
-    let acc = 0
-    const boundaries = [0, ...items.map((item) => {
-      acc += item.percentage / 100 * Math.PI * 2
-      return acc
-    })]
-
-    return (_x: number, _z: number, angle: number) => {
-      const shiftedAngle = normalizeAngle(angle + Math.PI / 2)
-      const index = getSectorIndex(shiftedAngle, boundaries)
-      return items[Math.max(0, Math.min(items.length - 1, index))]?.color || MIX_COLORS[0]
-    }
-  }, [items])
-
-  return (
-    <TobaccoColorSurface
-      colorAt={colorAt}
-      inner={bowlModel === 'phunnel' ? 0.34 : 0.02}
-      outer={1}
-      seed={7}
-      y={TOBACCO_BASE_Y}
-    />
-  )
-}
-
-const LayerTobacco = ({ bowlModel, items }: { bowlModel: BowlModel; items: MixPreviewItem[] }) => {
-  const topColor = items[items.length - 1]?.color || MIX_COLORS[0]
-  const topColorAt = useMemo(() => () => topColor, [topColor])
-
-  return (
-    <TobaccoColorSurface
-      colorAt={topColorAt}
-      inner={bowlModel === 'phunnel' ? 0.34 : 0.02}
-      outer={1}
-      seed={29}
-      y={TOBACCO_BASE_Y + 0.012}
-    />
-  )
-}
+const LazyMixBowlPreview = lazy(() => (
+  import('../shared/ui/MixBowlPreview').then(({ MixBowlPreview }) => ({ default: MixBowlPreview }))
+))
 
 const LayerStackDiagram = ({ items }: { items: MixPreviewItem[] }) => {
-  if (!items.length) return null
-
   const total = items.reduce((sum, item) => sum + item.percentage, 0) || 100
 
   return (
-    <div tw="pointer-events-none absolute left-2 top-2 z-10 h-11 w-11 overflow-hidden rounded-[3px] border border-[#2F241F]/35 bg-[#211915] sm:left-3 sm:top-3 sm:h-12 sm:w-12">
-      <div tw="flex h-full flex-col-reverse overflow-hidden">
+    <div tw="pointer-events-none absolute bottom-4 left-4 right-4 z-20 overflow-hidden rounded-lg border border-white/50 bg-[rgb(var(--color-surface))]/85 shadow-sm backdrop-blur">
+      <div tw="flex h-2 flex-row-reverse">
         {items.map((item) => (
-          <div
+          <span
             key={`${item.id}-diagram`}
             tw="min-h-[4px]"
             style={{
@@ -530,43 +197,8 @@ const LayerStackDiagram = ({ items }: { items: MixPreviewItem[] }) => {
   )
 }
 
-const CompotTobacco = ({ bowlModel, items }: { bowlModel: BowlModel; items: MixPreviewItem[] }) => {
-  const colorAt = useMemo(() => {
-    const thresholds = items.reduce<Array<{ limit: number; color: string }>>((result, item) => {
-      const previous = result[result.length - 1]?.limit || 0
-      result.push({ limit: previous + item.percentage, color: item.color })
-      return result
-    }, [])
-
-    return (x: number, z: number) => {
-      const value = pseudoRandom(73 + Math.floor((x + 1.2) * 19) * 37 + Math.floor((z + 1.2) * 19) * 53) * 100
-      return thresholds.find((threshold) => value <= threshold.limit)?.color || items[items.length - 1]?.color || MIX_COLORS[0]
-    }
-  }, [items])
-
-  return (
-    <TobaccoColorSurface
-      colorAt={colorAt}
-      inner={bowlModel === 'phunnel' ? 0.34 : 0.02}
-      outer={1}
-      seed={43}
-      y={TOBACCO_BASE_Y}
-    />
-  )
-}
-
 const MixPreview = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: SetupKind; items: MixPreviewItem[] }) => {
-  const [mounted, setMounted] = useState(false)
-  const [sceneReady, setSceneReady] = useState(false)
   const { t } = useTranslation()
-  const total = items.reduce((sum, item) => sum + item.percentage, 0)
-  const normalizedItems = total > 0
-    ? items.map((item) => ({ ...item, percentage: item.percentage / total * 100 }))
-    : []
-
-  useIsomorphicLayoutEffect(() => {
-    setMounted(true)
-  }, [])
 
   return (
     <div tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-3 shadow-[0_18px_40px_-34px_rgba(83,48,31,0.65)]">
@@ -582,27 +214,20 @@ const MixPreview = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: Se
 
       <div tw="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_minmax(0,0.8fr)] sm:items-center">
         <div tw="relative h-[250px] overflow-hidden rounded-lg bg-transparent sm:h-[280px]">
-          {kind === 'layers' && <LayerStackDiagram items={normalizedItems} />}
-          <BowlPreviewFallback hidden={sceneReady} />
-          {mounted && (
-            <Canvas
-              camera={{ position: [0, 2.2, 4.35], fov: 34 }}
-              dpr={[1, 1.5]}
-              frameloop="always"
-              gl={{ antialias: true, alpha: true }}
-              onCreated={() => {
-                requestAnimationFrame(() => setSceneReady(true))
-              }}
-              shadows={{ enabled: true, type: THREE.PCFShadowMap }}
-              style={{ background: 'transparent', cursor: 'grab', inset: 0, position: 'absolute' }}
-            >
-              <ambientLight intensity={0.72} />
-              <hemisphereLight args={['#FFF8EF', '#7A5948', 1.25]} />
-              <directionalLight position={[3.5, 5, 4]} intensity={2.55} castShadow shadow-mapSize-width={512} shadow-mapSize-height={512} />
-              <directionalLight position={[-4, 2, -3]} intensity={0.65} />
-              <BowlScene bowlModel={bowlModel} kind={kind} items={normalizedItems} />
-            </Canvas>
-          )}
+          {kind === 'layers' && <LayerStackDiagram items={items} />}
+          <Suspense fallback={<div tw="h-full w-full rounded-lg bg-[rgb(var(--color-surface-muted))]" />}>
+            <LazyMixBowlPreview
+              autoRotate
+              bowlModel={bowlModel}
+              cameraPosition={[0, 2.2, 4.35]}
+              fov={34}
+              kind={kind}
+              items={items}
+              renderMode="live"
+              sceneScale={0.94}
+              style={{ background: 'transparent', height: '100%', width: '100%' }}
+            />
+          </Suspense>
         </div>
 
         <div tw="grid gap-1.5">
@@ -625,9 +250,7 @@ const MixPreview = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: Se
               <span tw="text-right font-semibold tabular-nums text-[rgb(var(--color-text-muted))]">{item.percentage}%</span>
             </div>
           )) : (
-            <p tw="text-[12px] font-medium leading-relaxed text-[rgb(var(--color-text-subtle))]">
-              {t('setupForm.selectTobaccosHint')}
-            </p>
+            <Muted>{t('setupForm.addTobaccosForPreview')}</Muted>
           )}
         </div>
       </div>
