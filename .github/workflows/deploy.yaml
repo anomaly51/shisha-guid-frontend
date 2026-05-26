@@ -6,10 +6,18 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
+concurrency:
+  group: shisha-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Validate frontend
     runs-on: anomaly51-runner
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
