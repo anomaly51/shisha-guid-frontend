@@ -10,6 +10,7 @@ import { AlertIcon, BackIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { hasAuthToken } from '../shared/authToken'
+import { formatCatalogDisplayName } from '../shared/catalogNames'
 
 interface DetailProps {
   title: string
@@ -41,9 +42,9 @@ const formatIntegerValue = (value: unknown, t: (key: string, options?: any) => s
 const getImageStyle = (itemKind: DetailProps['itemKind']) => (
   itemKind === 'coal'
     ? {
+        filter: 'brightness(1.14) contrast(1.04)',
         objectFit: 'contain' as const,
         padding: '1rem',
-        mixBlendMode: 'multiply' as const,
       }
     : undefined
 )
@@ -55,6 +56,7 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
   const navigate = useNavigate()
   const { t } = useTranslation()
   const isAdmin = profile?.role === 'admin'
+  const displayName = formatCatalogDisplayName(item, itemKind)
 
   if (isLoading) {
     return (
@@ -98,13 +100,28 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
       <Card>
         {item.photo_urls?.length > 0 && (
           <div tw="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-muted))]">
-            <div tw="mx-auto aspect-square w-full max-w-[520px] overflow-hidden bg-[rgb(var(--color-surface-muted))]">
-              <img src={item.photo_urls[0]} alt={item.name} loading="eager" decoding="async" style={getImageStyle(itemKind)} tw="h-full w-full object-cover" />
+            <div
+              tw="mx-auto aspect-square w-full max-w-[520px] overflow-hidden bg-[rgb(var(--color-surface-muted))]"
+              css={itemKind === 'coal'
+                ? {
+                  background: 'linear-gradient(180deg, rgb(var(--color-surface-subtle)) 0%, rgb(var(--color-surface-muted)) 100%)',
+                }
+                : undefined}
+            >
+              <img src={item.photo_urls[0]} alt={displayName} loading="eager" decoding="async" style={getImageStyle(itemKind)} tw="h-full w-full object-cover" />
             </div>
             {item.photo_urls.length > 1 && (
               <div tw="grid grid-cols-4 sm:grid-cols-6 gap-2 p-3 bg-[rgb(var(--color-surface))]">
                 {item.photo_urls.slice(1).map((url: string, index: number) => (
-                  <div key={`${url}-${index}`} tw="aspect-square rounded-lg overflow-hidden bg-[rgb(var(--color-surface-muted))]">
+                  <div
+                    key={`${url}-${index}`}
+                    tw="aspect-square rounded-lg overflow-hidden bg-[rgb(var(--color-surface-muted))]"
+                    css={itemKind === 'coal'
+                      ? {
+                        background: 'linear-gradient(180deg, rgb(var(--color-surface-subtle)) 0%, rgb(var(--color-surface-muted)) 100%)',
+                      }
+                      : undefined}
+                  >
                     <img src={url} alt="" loading="lazy" decoding="async" style={getImageStyle(itemKind)} tw="w-full h-full object-cover" />
                   </div>
                 ))}
@@ -114,7 +131,7 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
         )}
         <div tw="p-6">
           <div tw="mb-4">
-              <h1 tw="text-xl font-semibold text-[rgb(var(--color-text))] leading-tight">{item.name}</h1>
+              <h1 tw="text-xl font-semibold text-[rgb(var(--color-text))] leading-tight">{displayName}</h1>
               {formatPrice(item.price, item.price_currency) && (
                 <p tw="mt-1 text-sm font-semibold text-[rgb(var(--color-text-muted))]">{formatPrice(item.price, item.price_currency)}</p>
               )}

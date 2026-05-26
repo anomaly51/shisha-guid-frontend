@@ -77,7 +77,7 @@ export const AppRoutes = () => {
           <Route index element={<Feed />} />
 
       <Route path="bowls" element={
-        <Catalog title={t('routes.bowls')} listHook={useGetBowlsQuery}
+        <Catalog key="bowls" title={t('routes.bowls')} listHook={useGetBowlsQuery}
           deleteHook={useDeleteBowlMutation} onCreatePath="/bowls/create" onEditPath={(id) => `/bowls/${id}/edit`} itemKind="bowl" />
       } />
       <Route path="bowls/create" element={<AdminOnly><CreateItem title={t('routes.createBowl')} createHook={useCreateBowlMutation} /></AdminOnly>} />
@@ -85,7 +85,7 @@ export const AppRoutes = () => {
       <Route path="bowls/:id/edit" element={<AdminOnly><EditItem title={t('routes.editBowl')} detailHook={useGetBowlQuery} updateHook={useUpdateBowlMutation} /></AdminOnly>} />
 
       <Route path="tobaccos" element={
-        <Catalog title={t('routes.tobaccos')} listHook={useGetTobaccosQuery}
+        <Catalog key="tobaccos" title={t('routes.tobaccos')} listHook={useGetTobaccosQuery}
           deleteHook={useDeleteTobaccoMutation} onCreatePath="/tobaccos/create" onEditPath={(id) => `/tobaccos/${id}/edit`} itemKind="tobacco" />
       } />
       <Route path="tobaccos/create" element={<AdminOnly><CreateItem title={t('routes.createTobacco')} createHook={useCreateTobaccoMutation} /></AdminOnly>} />
@@ -93,7 +93,7 @@ export const AppRoutes = () => {
       <Route path="tobaccos/:id/edit" element={<AdminOnly><EditItem title={t('routes.editTobacco')} detailHook={useGetTobaccoQuery} updateHook={useUpdateTobaccoMutation} /></AdminOnly>} />
 
       <Route path="coals" element={
-        <Catalog title={t('routes.coals')} listHook={useGetCoalsQuery}
+        <Catalog key="coals" title={t('routes.coals')} listHook={useGetCoalsQuery}
           deleteHook={useDeleteCoalMutation} onCreatePath="/coals/create" onEditPath={(id) => `/coals/${id}/edit`} itemKind="coal" />
       } />
       <Route path="coals/create" element={<AdminOnly><CreateItem title={t('routes.createCoal')} createHook={useCreateCoalMutation} /></AdminOnly>} />
@@ -101,7 +101,7 @@ export const AppRoutes = () => {
       <Route path="coals/:id/edit" element={<AdminOnly><EditItem title={t('routes.editCoal')} detailHook={useGetCoalQuery} updateHook={useUpdateCoalMutation} /></AdminOnly>} />
 
       <Route path="kalouds" element={
-        <Catalog title={t('routes.kalouds')} listHook={useGetKaloudsQuery}
+        <Catalog key="kalouds" title={t('routes.kalouds')} listHook={useGetKaloudsQuery}
           deleteHook={useDeleteKaloudMutation} onCreatePath="/kalouds/create" onEditPath={(id) => `/kalouds/${id}/edit`} itemKind="kaloud" />
       } />
       <Route path="kalouds/create" element={<AdminOnly><CreateItem title={t('routes.createKaloud')} createHook={useCreateKaloudMutation} /></AdminOnly>} />
@@ -119,7 +119,7 @@ export const AppRoutes = () => {
 
       <Route path="admin/coal-placements" element={
         <AdminOnly>
-          <Catalog title={t('routes.coalPlacements')} listHook={useGetCoalPlacementsQuery}
+          <Catalog key="coal-placements" title={t('routes.coalPlacements')} listHook={useGetCoalPlacementsQuery}
             deleteHook={useDeleteCoalPlacementMutation} onCreatePath="/admin/coal-placements/create" onEditPath={(id) => `/admin/coal-placements/${id}/edit`} itemKind="placement" />
         </AdminOnly>
       } />
@@ -141,7 +141,7 @@ export const AppRoutes = () => {
 
       <Route path="admin/bowl-setup-types" element={
         <AdminOnly>
-          <Catalog title={t('routes.setupTypes')} listHook={useGetBowlSetupTypesQuery}
+          <Catalog key="bowl-setup-types" title={t('routes.setupTypes')} listHook={useGetBowlSetupTypesQuery}
             deleteHook={useDeleteBowlSetupTypeMutation} onCreatePath="/admin/bowl-setup-types/create" onEditPath={(id) => `/admin/bowl-setup-types/${id}/edit`} itemKind="setupType" />
         </AdminOnly>
       } />

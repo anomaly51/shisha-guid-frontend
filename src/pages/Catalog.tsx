@@ -12,6 +12,7 @@ import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { hasAuthToken } from '../shared/authToken'
 import { getTobaccoRatingMap } from '../shared/tobaccoRatings'
+import { formatCatalogDisplayName } from '../shared/catalogNames'
 
 type CatalogItemKind = 'default' | 'bowl' | 'tobacco' | 'coal' | 'kaloud' | 'placement' | 'setupType'
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
@@ -172,9 +173,9 @@ const getHeroMetric = (item: any, itemKind: CatalogItemKind, t: any) => {
 const getCatalogImageStyle = (itemKind: CatalogItemKind) => (
   itemKind === 'coal'
     ? {
+        filter: 'brightness(1.14) contrast(1.04)',
         objectFit: 'contain' as const,
         padding: '0.875rem',
-        mixBlendMode: 'multiply' as const,
       }
     : undefined
 )
@@ -415,15 +416,23 @@ export const Catalog = ({
                   : getHeroMetric(item, itemKind, t)
                 const packageLine = itemKind === 'tobacco' ? formatTobaccoPackageLine(item, t) : null
                 const price = formatPrice(item.price, item.price_currency)
+                const displayName = formatCatalogDisplayName(item, itemKind)
 
                 return (
                   <Card key={item.id} className="h-full">
                     <div tw="flex h-full flex-col bg-[rgb(var(--color-surface))]">
-                      <div tw="relative aspect-square overflow-hidden border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))]">
+                      <div
+                        tw="relative aspect-square overflow-hidden border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))]"
+                        css={itemKind === 'coal'
+                          ? {
+                            background: 'linear-gradient(180deg, rgb(var(--color-surface-subtle)) 0%, rgb(var(--color-surface-muted)) 100%)',
+                          }
+                          : undefined}
+                      >
                         {item.photo_urls?.length > 0 ? (
                           <img
                             src={item.photo_urls[0]}
-                            alt={item.name}
+                            alt={displayName}
                             loading="lazy"
                             decoding="async"
                             style={getCatalogImageStyle(itemKind)}
@@ -437,7 +446,9 @@ export const Catalog = ({
                             </div>
                           </div>
                         )}
-                        <div tw="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(23,19,18,0.03)_35%,rgba(23,19,18,0.34))]" />
+                        {itemKind !== 'coal' && (
+                          <div tw="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(23,19,18,0.03)_35%,rgba(23,19,18,0.34))]" />
+                        )}
                         <div tw="pointer-events-none absolute left-2.5 top-2.5 flex max-w-[calc(100%-1.25rem)] items-center gap-1.5 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur">
                           <CatalogIcon name={iconByKind[itemKind]} size={12} />
                           <span tw="max-w-[120px] truncate">{packageLine || title}</span>
@@ -490,7 +501,7 @@ export const Catalog = ({
                               </span>
                             )}
                           </div>
-                          <h3 tw="text-[13px] font-semibold leading-snug text-[rgb(var(--color-text))] line-clamp-2 sm:text-sm">{item.name}</h3>
+                          <h3 tw="text-[13px] font-semibold leading-snug text-[rgb(var(--color-text))] line-clamp-2 sm:text-sm">{displayName}</h3>
                           {itemKind === 'tobacco' && (
                             <div tw="mt-2">
                               <StrengthIndicator label={t('catalog.factStrength')} value={getTobaccoStrength(item)} compact />
