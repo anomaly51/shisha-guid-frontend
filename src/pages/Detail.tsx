@@ -42,12 +42,19 @@ const formatIntegerValue = (value: unknown, t: (key: string, options?: any) => s
 const getImageStyle = (itemKind: DetailProps['itemKind']) => (
   itemKind === 'coal'
     ? {
-        filter: 'brightness(1.14) contrast(1.04)',
+        filter: 'brightness(1.28) contrast(0.96) saturate(1.08)',
         objectFit: 'contain' as const,
         padding: '1rem',
       }
     : undefined
 )
+
+const coalImageSurfaceStyle = {
+  background: [
+    'radial-gradient(circle at 50% 38%, rgba(255,248,241,0.34), rgba(222,139,87,0.16) 46%, rgba(31,27,25,0.08) 100%)',
+    'linear-gradient(180deg, rgb(var(--color-surface-subtle)) 0%, rgb(var(--color-surface-muted)) 100%)',
+  ].join(', '),
+}
 
 export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, itemKind = 'default' }: DetailProps) => {
   const { id } = useParams<{ id: string }>()
@@ -103,9 +110,7 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
             <div
               tw="mx-auto aspect-square w-full max-w-[520px] overflow-hidden bg-[rgb(var(--color-surface-muted))]"
               css={itemKind === 'coal'
-                ? {
-                  background: 'linear-gradient(180deg, rgb(var(--color-surface-subtle)) 0%, rgb(var(--color-surface-muted)) 100%)',
-                }
+                ? coalImageSurfaceStyle
                 : undefined}
             >
               <img src={item.photo_urls[0]} alt={displayName} loading="eager" decoding="async" style={getImageStyle(itemKind)} tw="h-full w-full object-cover" />
@@ -117,9 +122,7 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
                     key={`${url}-${index}`}
                     tw="aspect-square rounded-lg overflow-hidden bg-[rgb(var(--color-surface-muted))]"
                     css={itemKind === 'coal'
-                      ? {
-                        background: 'linear-gradient(180deg, rgb(var(--color-surface-subtle)) 0%, rgb(var(--color-surface-muted)) 100%)',
-                      }
+                      ? coalImageSurfaceStyle
                       : undefined}
                   >
                     <img src={url} alt="" loading="lazy" decoding="async" style={getImageStyle(itemKind)} tw="w-full h-full object-cover" />
