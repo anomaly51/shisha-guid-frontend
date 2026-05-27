@@ -2,8 +2,9 @@ import type { UserBadge } from './api'
 
 export interface SetupReviewAuthor {
   id: string
-  email: string
-  nickname: string
+  display_name?: string | null
+  email?: string
+  nickname?: string | null
   avatar_url?: string | null
   role?: string
   badges?: UserBadge[]

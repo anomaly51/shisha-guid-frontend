@@ -1,3 +1,5 @@
+import searchSynonymGroups from './catalogSearchSynonyms.json'
+
 export interface SearchableCatalogItem {
   id?: string
   name?: string | null
@@ -94,35 +96,6 @@ const EN_TO_RU_KEYBOARD = Object.entries(RU_TO_EN_KEYBOARD).reduce<Record<string
   return result
 }, {})
 
-const SEARCH_SYNONYM_GROUPS = [
-  ['ice', 'айс', 'лед', 'лёд', 'лід', 'frost', 'freeze', 'frosty', 'cool'],
-  ['mint', 'мята', 'мʼята', "м'ята", 'мятный', 'мятний'],
-  ['apple', 'яблоко', 'яблуко', 'яблочный', 'яблучний', 'ябл'],
-  ['banana', 'банан'],
-  ['berry', 'berries', 'ягода', 'ягоды', 'ягід', 'ягоди', 'ягодный', 'ягідний'],
-  ['blueberry', 'черника', 'чорниця', 'лохина'],
-  ['blackcurrant', 'black currant', 'смородина', 'смородиновий', 'смородиновый'],
-  ['grape', 'виноград', 'виноградный', 'виноградний'],
-  ['watermelon', 'арбуз', 'кавун'],
-  ['melon', 'дыня', 'диня'],
-  ['lemon', 'лимон'],
-  ['lime', 'лайм'],
-  ['orange', 'апельсин', 'апельсиновый', 'апельсиновий'],
-  ['grapefruit', 'грейпфрут'],
-  ['mango', 'манго'],
-  ['peach', 'персик'],
-  ['pear', 'груша'],
-  ['pineapple', 'ананас'],
-  ['coconut', 'кокос'],
-  ['cola', 'кола'],
-  ['energy', 'энергетик', 'енергетик'],
-  ['candy', 'конфета', 'конфеты', 'цукерка', 'цукерки', 'леденец', 'льодяник'],
-  ['lemonade', 'лимонад'],
-  ['tea', 'чай'],
-  ['cream', 'крем', 'сливки', 'вершки'],
-  ['cookie', 'cookies', 'печенье', 'печиво'],
-]
-
 const normalizeSearchText = (value: string) => value
   .normalize('NFKD')
   .replace(/[\u0300-\u036f]/g, '')
@@ -144,7 +117,7 @@ const switchKeyboardLayout = (value: string, dictionary: Record<string, string>)
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)))
 
-const synonymGroups = SEARCH_SYNONYM_GROUPS.map((group) => unique(group.flatMap((value) => {
+const synonymGroups = searchSynonymGroups.map((group) => unique(group.flatMap((value) => {
   const normalized = normalizeSearchText(value)
   return [
     normalized,

@@ -82,8 +82,9 @@ export const TobaccoPhotoStack = ({
               <img
                 src={item.photo_url}
                 alt={item.name}
-                loading="lazy"
-                decoding="async"
+                loading={variant === 'detail' && index === 0 ? 'eager' : 'lazy'}
+                decoding={variant === 'detail' && index === 0 ? 'sync' : 'async'}
+                fetchPriority={variant === 'detail' && index === 0 ? 'high' : 'auto'}
                 tw="h-full w-full object-cover"
               />
             ) : (

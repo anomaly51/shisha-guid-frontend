@@ -20,7 +20,33 @@ const routeTitleKeys: Record<string, string> = {
   '/profile': 'profile.title',
 }
 
-const getRouteTitleKey = (pathname: string) => {
+const fallbackTitles: Record<string, string> = {
+  'feed.title': 'Feed',
+  'routes.bowls': 'Bowls',
+  'routes.createBowl': 'Create bowl',
+  'routes.editBowl': 'Edit bowl',
+  'routes.tobaccos': 'Tobaccos',
+  'routes.createTobacco': 'Create tobacco',
+  'routes.editTobacco': 'Edit tobacco',
+  'routes.coals': 'Coals',
+  'routes.createCoal': 'Create coal',
+  'routes.editCoal': 'Edit coal',
+  'routes.kalouds': 'Kalouds',
+  'routes.createKaloud': 'Create kaloud',
+  'routes.editKaloud': 'Edit kaloud',
+  'routes.coalPlacements': 'Coal placements',
+  'routes.createCoalPlacement': 'Create coal placement',
+  'routes.editCoalPlacement': 'Edit coal placement',
+  'routes.setupTypes': 'Setup types',
+  'routes.createSetupType': 'Create setup type',
+  'routes.editSetupType': 'Edit setup type',
+  'setupForm.newSetup': 'New setup',
+  'setupForm.editSetup': 'Edit setup',
+  'setupDetail.setup': 'Setup',
+  'profile.title': 'Profile',
+}
+
+export const getRouteTitleKey = (pathname: string) => {
   const normalizedPath = pathname.replace(/\/+$/, '') || '/'
   const exactTitleKey = routeTitleKeys[normalizedPath]
 
@@ -41,6 +67,12 @@ const getRouteTitleKey = (pathname: string) => {
   if (/^\/setups\/[^/]+$/.test(normalizedPath)) return 'setupDetail.setup'
 
   return null
+}
+
+export const getFallbackPageTitle = (pathname: string) => {
+  const titleKey = getRouteTitleKey(pathname)
+  const pageTitle = titleKey ? fallbackTitles[titleKey] : 'Not found'
+  return pageTitle && pageTitle !== appName ? `${pageTitle} | ${appName}` : appName
 }
 
 export const getPageTitle = (pathname: string, t: Translate) => {

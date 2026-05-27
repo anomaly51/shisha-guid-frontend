@@ -7,6 +7,7 @@ import { ServerStyleSheet } from 'styled-components'
 import { AppProviders } from '../src/app/providers'
 import { createAppStore } from '../src/app/store'
 import { prefetchRouteData } from '../src/app/prefetch'
+import { getFallbackPageTitle } from '../src/app/pageMeta'
 
 type ServerPageContext = PageContextServer & {
   Page: React.ComponentType
@@ -190,6 +191,7 @@ export const onRenderHtml = async (pageContext: ServerPageContext) => {
     const pageHtml = renderToString(app)
     const styles = sheet.getStyleTags()
     const preloadedState = getSerializableState(store.getState())
+    const pageTitle = getFallbackPageTitle(new URL(url, 'http://localhost').pathname)
 
     const documentHtml = escapeInject`<!doctype html>
       <html lang="en">
@@ -199,7 +201,7 @@ export const onRenderHtml = async (pageContext: ServerPageContext) => {
           <meta name="theme-color" content="#FAFAFA" />
           <meta name="description" content="ShishaGuid - share and discover shisha setups" />
           <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-          <title>ShishaGuid</title>
+          <title>${pageTitle}</title>
           <script>${dangerouslySkipEscape(themeScript)}</script>
           <script>${dangerouslySkipEscape(assetReloadScript)}</script>
           ${dangerouslySkipEscape(styles)}

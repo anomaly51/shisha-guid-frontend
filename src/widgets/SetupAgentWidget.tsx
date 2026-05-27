@@ -6,6 +6,7 @@ import {
   type AgentMessage,
   type AgentSetupDraft,
   useChatWithSetupAgentMutation,
+  useGetAgentCapabilitiesQuery,
   useGetBowlsQuery,
   useGetBowlSetupTypesQuery,
   useGetCoalsQuery,
@@ -144,11 +145,44 @@ const initialTimelineMessages: TimelineMessage[] = initialMessages.map((message,
 }))
 
 const createMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`
+const agentSessionStorageKey = 'shisha-guid-agent-session'
+
+const readAgentSession = () => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(agentSessionStorageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { messages?: TimelineMessage[]; draft?: AgentSetupDraft | null }
+    if (!Array.isArray(parsed.messages)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+const writeAgentSession = (messages: TimelineMessage[], draft: AgentSetupDraft | null) => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(agentSessionStorageKey, JSON.stringify({ messages, draft }))
+  } catch {
+    // Chat persistence is an optimization only.
+  }
+}
+
+const clearAgentSession = () => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(agentSessionStorageKey)
+  } catch {
+    // Nothing to clear when storage is unavailable.
+  }
+}
 
 const compactApiMessages = (messages: TimelineMessage[]): AgentMessage[] => (
   messages
     .filter((message) => message.role === 'user' || message.content.trim())
     .map(({ role, content }) => ({ role, content }))
+    .slice(-20)
 )
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -998,9 +1032,10 @@ const ChoicePreview = ({
 
 export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAgentWidgetProps) => {
   const navigate = useNavigate()
+  const savedSession = useMemo(() => readAgentSession(), [])
   const [input, setInput] = useState('')
-  const [messages, setMessages] = useState<TimelineMessage[]>(initialTimelineMessages)
-  const [draft, setDraft] = useState<AgentSetupDraft | null>(initialDraft)
+  const [messages, setMessages] = useState<TimelineMessage[]>(savedSession?.messages?.length ? savedSession.messages : initialTimelineMessages)
+  const [draft, setDraft] = useState<AgentSetupDraft | null>(initialDraft || savedSession?.draft || null)
   const [recording, setRecording] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [typing, setTyping] = useState(false)
@@ -1009,6 +1044,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [chatWithAgent, chatState] = useChatWithSetupAgentMutation()
   const [transcribeVoice, transcribeState] = useTranscribeSetupVoiceMutation()
+  const { data: capabilities } = useGetAgentCapabilitiesQuery()
   const { data: tobaccos = [] } = useGetTobaccosQuery()
   const { data: bowls = [] } = useGetBowlsQuery()
   const { data: kalouds = [] } = useGetKaloudsQuery()
@@ -1027,6 +1063,9 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
 
   const loading = chatState.isLoading || transcribeState.isLoading
   const busy = loading || typing
+  const messageLimit = capabilities?.message_limit || 20
+  const usedMessageCount = Math.min(compactApiMessages(messages).length, messageLimit)
+  const voiceEnabled = capabilities?.voice_transcription === true
   const draftKey = JSON.stringify(initialDraft || null)
   const activeDraftMessageId = useMemo(
     () => [...messages].reverse().find((message) => message.draftSnapshot)?.id,
@@ -1037,6 +1076,10 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     if (!initialDraft) return
     setDraft(initialDraft)
   }, [draftKey, initialDraft])
+
+  useEffect(() => {
+    writeAgentSession(messages, draft)
+  }, [draft, messages])
 
   useEffect(() => {
     const node = scrollRef.current
@@ -1240,7 +1283,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     return { ...(baseDraft || {}), name: cleanTitle(text) }
   }
 
-  const resolveLocalUpdate = (text: string): LocalChatResolution => {
+  const resolveLocalDraftUpdate = (text: string): LocalChatResolution | null => {
     if (isStateQuestion(text)) {
       return draft ? { trailingMessages: makeDraftMessages(draft, missing, false) } : {}
     }
@@ -1257,6 +1300,10 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     const titleDraft = applyTitleMessage(text, draft)
     if (titleDraft) return { draft: titleDraft }
 
+    return null
+  }
+
+  const resolveLocalQuestion = (text: string): LocalChatResolution | null => {
     if (isMissingQuestion(text)) {
       return draft ? { trailingMessages: makeDraftMessages(draft, missing) } : {}
     }
@@ -1267,12 +1314,29 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
 
     if (isMetaQuestion(text)) return {}
 
+    return null
+  }
+
+  const resolveLocalCatalogPrompt = (text: string): LocalChatResolution | null => {
     const explicitChoice = resolveCatalogChoice(text)
     if (explicitChoice) return { trailingMessages: [createChoiceMessage(explicitChoice)] }
 
     const missingKind = draft ? getMissingCatalogKind(missing) : null
     const missingChoice = missingKind ? resolveCatalogChoice(text, missingKind) : null
     if (missingChoice) return { trailingMessages: [createChoiceMessage(missingChoice)] }
+
+    return null
+  }
+
+  const resolveLocalUpdate = (text: string): LocalChatResolution => {
+    const localDraftUpdate = resolveLocalDraftUpdate(text)
+    if (localDraftUpdate) return localDraftUpdate
+
+    const localQuestion = resolveLocalQuestion(text)
+    if (localQuestion) return localQuestion
+
+    const localCatalogPrompt = resolveLocalCatalogPrompt(text)
+    if (localCatalogPrompt) return localCatalogPrompt
 
     return {}
   }
@@ -1356,6 +1420,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       setDraft(response.draft || draft)
       await typeAssistantText(response.reply)
       if (response.created_setup_id) {
+        clearAgentSession()
         navigate(`/setups/${response.created_setup_id}`)
       }
     } catch {
@@ -1381,6 +1446,10 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   }
 
   const startRecording = async () => {
+    if (!voiceEnabled) {
+      await typeAssistantText('Голосовой ввод сейчас недоступен: на сервере не настроен ключ распознавания.')
+      return
+    }
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     const recorder = new MediaRecorder(stream)
@@ -1430,7 +1499,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
           </div>
           <StatusPill>
             <span tw="h-1.5 w-1.5 rounded-full bg-[rgb(var(--color-accent))]" />
-            AI ассистент
+            {usedMessageCount}/{messageLimit}
           </StatusPill>
         </Header>
 
@@ -1466,7 +1535,13 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
         </ScrollArea>
 
         <Composer onSubmit={handleSubmit}>
-          <ToolButton type="button" onClick={handleVoice} disabled={busy} aria-label="Record voice">
+          <ToolButton
+            type="button"
+            onClick={handleVoice}
+            disabled={busy || !voiceEnabled}
+            aria-label={voiceEnabled ? 'Record voice' : 'Voice input unavailable'}
+            title={voiceEnabled ? 'Record voice' : 'Голосовой ввод недоступен'}
+          >
             {recording ? <CloseIcon size={13} /> : <MicIcon size={16} />}
           </ToolButton>
           <Textarea

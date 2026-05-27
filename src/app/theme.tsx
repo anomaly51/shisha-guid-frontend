@@ -36,9 +36,14 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [preference, setPreferenceState] = useState<ThemePreference>(getInitialPreference)
-  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme)
+  const [preference, setPreferenceState] = useState<ThemePreference>('light')
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>('light')
   const resolvedTheme = preference === 'system' ? systemTheme : preference
+
+  useEffect(() => {
+    setPreferenceState(getInitialPreference())
+    setSystemTheme(getSystemTheme())
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return

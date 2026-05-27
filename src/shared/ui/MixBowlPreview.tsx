@@ -23,9 +23,6 @@ type SnapshotTask = {
   start: (release: () => void) => void
 }
 
-let activeSnapshotCount = 0
-const snapshotQueue: SnapshotTask[] = []
-
 const requestIdle = (callback: () => void) => {
   if (typeof window === 'undefined') return () => undefined
 
@@ -42,54 +39,59 @@ const requestIdle = (callback: () => void) => {
   return () => globalThis.clearTimeout(id)
 }
 
-const pumpSnapshotQueue = () => {
-  if (activeSnapshotCount >= MAX_CONCURRENT_SNAPSHOTS) return
+const createSnapshotScheduler = () => {
+  let activeSnapshotCount = 0
+  const snapshotQueue: SnapshotTask[] = []
 
-  const task = snapshotQueue.shift()
-  if (!task) return
-  if (task.cancelled) {
-    pumpSnapshotQueue()
-    return
-  }
+  const pumpSnapshotQueue = () => {
+    if (activeSnapshotCount >= MAX_CONCURRENT_SNAPSHOTS) return
 
-  task.reserved = true
-  activeSnapshotCount += 1
-
-  const release = () => {
-    if (task.released) return
-    task.released = true
-    activeSnapshotCount = Math.max(0, activeSnapshotCount - 1)
-    pumpSnapshotQueue()
-  }
-
-  task.cancelIdle = requestIdle(() => {
-    task.cancelIdle = undefined
+    const task = snapshotQueue.shift()
+    if (!task) return
     if (task.cancelled) {
-      release()
+      pumpSnapshotQueue()
       return
     }
-    task.start(release)
-  })
-}
 
-const scheduleSnapshot = (start: (release: () => void) => void) => {
-  const task: SnapshotTask = {
-    cancelled: false,
-    released: false,
-    reserved: false,
-    start,
-  }
+    task.reserved = true
+    activeSnapshotCount += 1
 
-  snapshotQueue.push(task)
-  pumpSnapshotQueue()
-
-  return () => {
-    task.cancelled = true
-    task.cancelIdle?.()
-    if (task.reserved && !task.released) {
+    const release = () => {
+      if (task.released) return
       task.released = true
       activeSnapshotCount = Math.max(0, activeSnapshotCount - 1)
       pumpSnapshotQueue()
+    }
+
+    task.cancelIdle = requestIdle(() => {
+      task.cancelIdle = undefined
+      if (task.cancelled) {
+        release()
+        return
+      }
+      task.start(release)
+    })
+  }
+
+  return (start: (release: () => void) => void) => {
+    const task: SnapshotTask = {
+      cancelled: false,
+      released: false,
+      reserved: false,
+      start,
+    }
+
+    snapshotQueue.push(task)
+    pumpSnapshotQueue()
+
+    return () => {
+      task.cancelled = true
+      task.cancelIdle?.()
+      if (task.reserved && !task.released) {
+        task.released = true
+        activeSnapshotCount = Math.max(0, activeSnapshotCount - 1)
+        pumpSnapshotQueue()
+      }
     }
   }
 }
@@ -505,6 +507,7 @@ export const MixBowlPreview = ({
   const [snapshotRenderAllowed, setSnapshotRenderAllowed] = useState(renderMode === 'live')
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null)
   const snapshotReleaseRef = useRef<(() => void) | null>(null)
+  const scheduleSnapshotRef = useRef(createSnapshotScheduler())
   const total = items.reduce((sum, item) => sum + item.percentage, 0)
   const isSnapshot = renderMode === 'snapshot'
   const { ref: visibilityRef, visible: isPreviewVisible } = useVisibilityGate(isSnapshot)
@@ -537,7 +540,7 @@ export const MixBowlPreview = ({
     if (!mounted || !isSnapshot || !isPreviewVisible || snapshotUrl) return undefined
 
     let active = true
-    const cancel = scheduleSnapshot((release) => {
+    const cancel = scheduleSnapshotRef.current((release) => {
       if (!active) {
         release()
         return

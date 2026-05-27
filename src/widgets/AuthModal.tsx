@@ -124,6 +124,12 @@ export const AuthModal = ({ open, onClose }: AuthModalProps) => {
     }
   }, [])
 
+  useEffect(() => {
+    if (open) return
+    handledCodeRef.current = ''
+    setAuthPending(false)
+  }, [open])
+
   return (
     <Modal open={open} onClose={onClose} title={t('auth.title')}>
       <div tw="flex flex-col gap-4">

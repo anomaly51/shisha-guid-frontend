@@ -58,8 +58,11 @@ export const NavigationProgress = () => {
       const currentUrl = new URL(window.location.href)
       const targetRoute = `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`
       const currentRoute = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`
+      const targetPage = `${targetUrl.pathname}${targetUrl.search}`
+      const currentPage = `${currentUrl.pathname}${currentUrl.search}`
 
       if (targetRoute === currentRoute) return
+      if (targetPage === currentPage && targetUrl.hash) return
 
       event.preventDefault()
       window.clearTimeout(hideTimer.current)

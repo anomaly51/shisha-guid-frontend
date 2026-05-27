@@ -525,8 +525,8 @@ export const Catalog = ({
                             <button
                               type="button"
                               onClick={() => navigate(onEditPath(item.id))}
-                              aria-label={t('common.edit')}
-                              title={t('common.edit')}
+                              aria-label={`${t('common.edit')}: ${displayName}`}
+                              title={`${t('common.edit')}: ${displayName}`}
                               tw="flex h-8 w-8 items-center justify-center rounded-lg border border-white/75 bg-[rgb(var(--color-surface))]/95 text-[rgb(var(--color-text-muted))] shadow-[0_12px_24px_-18px_rgba(83,48,31,0.7)] transition-colors hover:bg-[rgb(var(--color-accent-muted))] hover:text-[rgb(var(--color-text))]"
                             >
                               <EditIcon />
@@ -534,8 +534,8 @@ export const Catalog = ({
                             <button
                               type="button"
                               onClick={() => setDeleteTarget(item)}
-                              aria-label={t('common.delete')}
-                              title={t('common.delete')}
+                              aria-label={`${t('common.delete')}: ${displayName}`}
+                              title={`${t('common.delete')}: ${displayName}`}
                               tw="flex h-8 w-8 items-center justify-center rounded-lg border border-white/75 bg-[rgb(var(--color-surface))]/95 text-[rgb(var(--color-danger))] shadow-[0_12px_24px_-18px_rgba(83,48,31,0.7)] transition-colors hover:bg-[rgb(var(--color-danger-surface))]"
                             >
                               <TrashIcon />

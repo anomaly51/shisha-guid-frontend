@@ -76,10 +76,17 @@ export const setupsApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { setupId }) => [{ type: 'SetupReviews', id: setupId }, 'Setups'],
     }),
+    deleteSetupReview: builder.mutation<any, { setupId: string; reviewId: string }>({
+      query: ({ setupId, reviewId }) => ({
+        url: `/shisha/bowl-setups/${setupId}/reviews/${reviewId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, { setupId }) => [{ type: 'SetupReviews', id: setupId }, 'Setups'],
+    }),
   }),
 })
 
 export const {
   useGetSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
-  useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation,
+  useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation, useDeleteSetupReviewMutation,
 } = setupsApi

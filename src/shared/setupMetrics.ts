@@ -23,6 +23,9 @@ export const getTobaccoStrength = (tobacco: any) => {
 }
 
 export const getSetupHeaviness = (setup: any, tobaccos: any[] | undefined) => {
+  const cached = Number(setup?.heaviness_score)
+  if (Number.isFinite(cached)) return clamp(cached, 0, 10)
+
   const mix = setup?.tobaccos || []
   const total = mix.reduce((sum: number, item: any) => sum + Number(item.percentage || 0), 0) || 100
   const value = mix.reduce((sum: number, item: any) => {

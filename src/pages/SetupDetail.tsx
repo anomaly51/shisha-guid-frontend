@@ -4,6 +4,7 @@ import tw from 'twin.macro'
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useCreateSetupReviewMutation,
+  useDeleteSetupReviewMutation,
   useGetBowlSetupTypesQuery,
   useGetBowlsQuery,
   useGetCoalPlacementsQuery,
@@ -311,6 +312,7 @@ const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreat
   const { data: reviews = [], isLoading } = useGetSetupReviewsQuery(setupId)
   const [createReview, { isLoading: saving }] = useCreateSetupReviewMutation()
   const [updateReview, { isLoading: updating }] = useUpdateSetupReviewMutation()
+  const [deleteReview, { isLoading: deletingReview }] = useDeleteSetupReviewMutation()
   const [rating, setRating] = useState(8)
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
@@ -319,7 +321,7 @@ const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreat
   const average = getReviewAverage(reviews)
   const ownReview = profile ? reviews.find((review: SetupReview) => isReviewAuthor(review, profile)) : undefined
   const isSetupOwner = Boolean(profile?.id && setupCreatorId && String(profile.id) === String(setupCreatorId))
-  const isSaving = saving || updating
+  const isSaving = saving || updating || deletingReview
   const formTitle = ownReview ? t('reviews.editTitle') : t('reviews.writeTitle')
   const formHint = profile
     ? ownReview
@@ -343,6 +345,17 @@ const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreat
     window.setTimeout(() => {
       reviewFormRef.current?.querySelector('textarea')?.focus()
     }, 250)
+  }
+
+  const handleDeleteReview = async (reviewId: string) => {
+    setError('')
+    try {
+      await deleteReview({ setupId, reviewId }).unwrap()
+      setDescription('')
+      setRating(8)
+    } catch {
+      setError(t('reviews.saveFailed'))
+    }
   }
 
   const handleSubmit = async (event: FormEvent) => {
@@ -411,13 +424,23 @@ const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreat
                 <div tw="min-w-0">
                   <p tw="text-[11px] font-medium text-[rgb(var(--color-text-subtle))]">{formatReviewDate(review.created_at, i18n.language)}</p>
                   {isOwnReview && (
-                    <button
-                      type="button"
-                      onClick={focusReviewForm}
-                      tw="mt-1 text-[11px] font-bold text-[rgb(var(--color-accent))] underline-offset-2 hover:underline"
-                    >
-                      {t('reviews.editReviewLink')}
-                    </button>
+                    <div tw="mt-1 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={focusReviewForm}
+                        tw="text-[11px] font-bold text-[rgb(var(--color-accent))] underline-offset-2 hover:underline"
+                      >
+                        {t('reviews.editReviewLink')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteReview(review.id)}
+                        disabled={isSaving}
+                        tw="text-[11px] font-bold text-[rgb(var(--color-danger))] underline-offset-2 hover:underline disabled:opacity-50"
+                      >
+                        {t('common.delete')}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

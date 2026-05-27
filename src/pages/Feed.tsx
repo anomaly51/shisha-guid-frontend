@@ -255,7 +255,7 @@ export const Feed = () => {
   const normalizedSetupsPage = useMemo(() => normalizeSetupsPage(setupsPage), [setupsPage])
   const { data: tobaccos } = useGetTobaccosQuery(undefined, {
     refetchOnMountOrArgChange: false,
-    skip: selectedTobaccos.length === 0,
+    skip: selectedTobaccos.length === 0 || tobaccoPickerOpen,
   })
   const tobaccoPickerQueryParams = useMemo(() => ({
     search: tobaccoSearch.trim() || undefined,
@@ -276,6 +276,17 @@ export const Feed = () => {
   const canLoadMore = loadedSetups.length ? hasMoreSetups : Boolean(normalizedSetupsPage?.has_more)
   const bowlsById = useMemo(() => new Map<string, any>((bowls || []).map((bowl: any) => [bowl.id, bowl])), [bowls])
   const typesById = useMemo(() => new Map<string, any>((types || []).map((type: any) => [type.id, type])), [types])
+  const tobaccoNamesById = useMemo(() => {
+    const entries = new Map<string, string>()
+    ;(tobaccos || []).forEach((tobacco: any) => entries.set(tobacco.id, tobacco.name))
+    ;(pickerTobaccos || []).forEach((tobacco: any) => entries.set(tobacco.id, tobacco.name))
+    visibleSetups.forEach((setup) => {
+      ;(setup.tobaccos || []).forEach((item: any) => {
+        if (item.tobacco?.name) entries.set(item.tobacco_id, item.tobacco.name)
+      })
+    })
+    return entries
+  }, [pickerTobaccos, tobaccos, visibleSetups])
 
   const updateSearch = useCallback((updater: (next: URLSearchParams) => void) => {
     setSearchParams((current) => {
@@ -370,7 +381,7 @@ export const Feed = () => {
         if (!entry.isIntersecting) return
         setPageOffset((current) => current + SETUP_PAGE_SIZE)
       },
-      { rootMargin: '720px 0px' },
+      { rootMargin: '320px 0px' },
     )
 
     observer.observe(node)
@@ -500,7 +511,7 @@ export const Feed = () => {
         {hasActiveFilters && (
           <div tw="mt-2 flex flex-wrap items-center gap-1.5 border-t border-[rgb(var(--color-border))] pt-2">
             {selectedTobaccos.map((id) => {
-              const name = tobaccos?.find((tobacco: any) => tobacco.id === id)?.name || t('common.unknown')
+              const name = tobaccoNamesById.get(id) || t('common.unknown')
               return (
                 <button
                   key={id}

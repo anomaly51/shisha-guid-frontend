@@ -13,10 +13,11 @@ export {
 } from './catalog'
 export {
   useGetSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
-  useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation,
+  useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation, useDeleteSetupReviewMutation,
 } from './setups'
 export { useGetUploadPolicyMutation, useUploadMediaMutation } from './upload'
 export {
+  useGetAgentCapabilitiesQuery,
   useChatWithSetupAgentMutation,
   useTranscribeSetupVoiceMutation,
 } from './agent'
