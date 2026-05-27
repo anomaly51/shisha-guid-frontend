@@ -20,6 +20,13 @@ type QueryState = {
   status?: string
 }
 
+type PageMeta = {
+  canonicalUrl: string
+  description: string
+  image?: string
+  title: string
+}
+
 const listEndpoints = new Set([
   'getSetups',
   'getTobaccos',
@@ -165,6 +172,64 @@ const getSerializableState = (state: ReturnType<ReturnType<typeof createAppStore
   }
 }
 
+const getPublicSiteUrl = () => (
+  import.meta.env.VITE_PUBLIC_SITE_URL ||
+  ((globalThis as any).process?.env?.PUBLIC_SITE_URL as string | undefined) ||
+  ((globalThis as any).process?.env?.SITE_URL as string | undefined) ||
+  'http://localhost:5173'
+).replace(/\/+$/, '')
+
+const findFulfilledQueryData = (
+  state: ReturnType<ReturnType<typeof createAppStore>['getState']>,
+  endpointName: string,
+  originalArg?: unknown,
+) => Object.values(state.api.queries).find((query) => (
+  query?.status === 'fulfilled' &&
+  query.endpointName === endpointName &&
+  (originalArg === undefined || query.originalArgs === originalArg)
+))?.data as any
+
+const truncateMeta = (value: string, maxLength: number) => {
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1).trim()}…` : normalized
+}
+
+const buildPageMeta = (
+  url: string,
+  state: ReturnType<ReturnType<typeof createAppStore>['getState']>,
+): PageMeta => {
+  const parsedUrl = new URL(url, getPublicSiteUrl())
+  const canonicalUrl = `${getPublicSiteUrl()}${parsedUrl.pathname}`
+  const setupMatch = parsedUrl.pathname.match(/^\/setups\/([^/]+)$/)
+  const defaultDescription = 'ShishaGuid - share and discover shisha setups'
+
+  if (setupMatch) {
+    const setup = findFulfilledQueryData(state, 'getSetup', setupMatch[1])
+    if (setup?.name) {
+      const tobaccoNames = (setup.tobaccos || [])
+        .map((item: any) => item.tobacco?.name)
+        .filter(Boolean)
+      const description = truncateMeta(
+        setup.description ||
+        (tobaccoNames.length ? `Shisha setup with ${tobaccoNames.join(', ')}.` : defaultDescription),
+        180,
+      )
+      return {
+        canonicalUrl,
+        description,
+        image: setup.photo_urls?.[0] || setup.tobaccos?.find((item: any) => item.tobacco?.photo_urls?.[0])?.tobacco.photo_urls[0],
+        title: `${setup.name} | ShishaGuid`,
+      }
+    }
+  }
+
+  return {
+    canonicalUrl,
+    description: defaultDescription,
+    title: getFallbackPageTitle(parsedUrl.pathname),
+  }
+}
+
 export const onRenderHtml = async (pageContext: ServerPageContext) => {
   const store = createAppStore()
   const url = pageContext.urlOriginal
@@ -191,7 +256,7 @@ export const onRenderHtml = async (pageContext: ServerPageContext) => {
     const pageHtml = renderToString(app)
     const styles = sheet.getStyleTags()
     const preloadedState = getSerializableState(store.getState())
-    const pageTitle = getFallbackPageTitle(new URL(url, 'http://localhost').pathname)
+    const pageMeta = buildPageMeta(url, store.getState())
 
     const documentHtml = escapeInject`<!doctype html>
       <html lang="en">
@@ -199,9 +264,16 @@ export const onRenderHtml = async (pageContext: ServerPageContext) => {
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <meta name="theme-color" content="#FAFAFA" />
-          <meta name="description" content="ShishaGuid - share and discover shisha setups" />
+          <meta name="description" content="${pageMeta.description}" />
+          <link rel="canonical" href="${pageMeta.canonicalUrl}" />
+          <meta property="og:type" content="website" />
+          <meta property="og:site_name" content="ShishaGuid" />
+          <meta property="og:title" content="${pageMeta.title}" />
+          <meta property="og:description" content="${pageMeta.description}" />
+          <meta property="og:url" content="${pageMeta.canonicalUrl}" />
+          ${pageMeta.image ? escapeInject`<meta property="og:image" content="${pageMeta.image}" />` : ''}
           <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-          <title>${pageTitle}</title>
+          <title>${pageMeta.title}</title>
           <script>${dangerouslySkipEscape(themeScript)}</script>
           <script>${dangerouslySkipEscape(assetReloadScript)}</script>
           ${dangerouslySkipEscape(styles)}

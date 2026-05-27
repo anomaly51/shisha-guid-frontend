@@ -57,6 +57,7 @@ export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
     min_price: searchParams.get('minPrice') || undefined,
     max_price: searchParams.get('maxPrice') || undefined,
     strength: searchParams.get('strength') || undefined,
+    brand: searchParams.get('brand') || undefined,
     limit: feedPageSize * 2,
     offset: Math.max(0, (Number(searchParams.get('page')) || 1) - 1) * feedPageSize * 2,
   }

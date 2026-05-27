@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_SSR_API_URL?: string
   readonly VITE_GOOGLE_CLIENT_ID: string
   readonly VITE_UPLOAD_PUBLIC_URL?: string
+  readonly VITE_PUBLIC_SITE_URL?: string
 }
 
 interface ImportMeta {

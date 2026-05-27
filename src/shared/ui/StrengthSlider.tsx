@@ -36,7 +36,7 @@ export const StrengthSlider = ({ value, onChange, label, hint, disabled }: Stren
           </legend>
         </div>
         <p tw="shrink-0 text-[13px] font-black tabular-nums" style={{ color }}>
-          {normalized.toFixed(1)}
+          {Math.round(normalized)}
           <span tw="ml-1 text-[10px] font-bold uppercase text-[rgb(var(--color-text-subtle))]">{t(`metrics.heaviness.${tone}`)}</span>
         </p>
       </div>

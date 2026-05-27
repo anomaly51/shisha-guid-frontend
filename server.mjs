@@ -15,6 +15,8 @@ const publicRoot = path.resolve(__dirname, 'public')
 const buildVersion = process.env.APP_VERSION || process.env.VCS_REF || 'unknown'
 const buildCommit = process.env.VCS_REF || ''
 const buildDate = process.env.BUILD_DATE || ''
+const publicSiteUrl = normalizePublicUrl(process.env.PUBLIC_SITE_URL || process.env.SITE_URL || `http://localhost:${port}`)
+const apiBaseUrl = (process.env.SSR_API_URL || process.env.VITE_SSR_API_URL || process.env.VITE_API_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '')
 
 const app = express()
 const server = http.createServer(app)
@@ -33,6 +35,36 @@ app.get('/health', (_req, res) => {
 
 app.use('/.well-known/appspecific', (_req, res) => {
   res.status(204).end()
+})
+
+app.get('/robots.txt', (_req, res) => {
+  res
+    .type('text/plain')
+    .set('Cache-Control', 'public, max-age=3600')
+    .send([
+      'User-agent: *',
+      'Allow: /',
+      `Sitemap: ${publicSiteUrl}/sitemap.xml`,
+      '',
+    ].join('\n'))
+})
+
+app.get('/sitemap.xml', async (_req, res) => {
+  const staticPaths = [
+    '/',
+    '/bowls',
+    '/tobaccos',
+    '/coals',
+    '/kalouds',
+  ]
+  const setupPaths = await fetchSetupSitemapPaths()
+  const urls = [...staticPaths, ...setupPaths]
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    urls.map((urlPath) => `  <url><loc>${escapeXml(`${publicSiteUrl}${urlPath}`)}</loc></url>`).join('\n') +
+    `\n</urlset>\n`
+
+  res.type('application/xml').set('Cache-Control', 'public, max-age=1800').send(xml)
 })
 
 if (!isProduction) {
@@ -109,6 +141,34 @@ function normalizeBase(value) {
   if (!value || value === '/') return '/'
   const withLeadingSlash = value.startsWith('/') ? value : `/${value}`
   return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`
+}
+
+function normalizePublicUrl(value) {
+  return value.replace(/\/+$/, '')
+}
+
+function escapeXml(value) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+async function fetchSetupSitemapPaths() {
+  try {
+    const response = await fetch(`${apiBaseUrl}/shisha/bowl-setups?limit=50&sort=newest`)
+    if (!response.ok) return []
+    const data = await response.json()
+    const items = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : []
+    return items
+      .map((item) => item?.id)
+      .filter(Boolean)
+      .map((id) => `/setups/${encodeURIComponent(id)}`)
+  } catch (error) {
+    console.error('sitemap setup fetch failed:', error)
+    return []
+  }
 }
 
 function getPathname(url) {

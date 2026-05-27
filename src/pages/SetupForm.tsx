@@ -101,6 +101,28 @@ const SETUP_TYPE_PRESETS: Array<{ name: string; kind: SetupKind; description: st
     description: 'Tobaccos are mixed together before packing the bowl.',
   },
 ]
+const SETUP_DRAFT_STORAGE_KEY = 'shisha-guid:setup-form-draft'
+
+type SetupFormDraft = {
+  name?: string
+  description?: string
+  photoUrls?: string[]
+  bowlId?: string
+  coalId?: string
+  kaloudId?: string
+  placementId?: string
+  typeId?: string
+  tobaccoMix?: TobaccoMixRow[]
+}
+
+const readSetupDraft = (): SetupFormDraft | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    return JSON.parse(window.localStorage.getItem(SETUP_DRAFT_STORAGE_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
 
 const getName = (items: any[] | undefined, id: string) => (
   items?.find((item) => item.id === id)?.name || ''
@@ -431,23 +453,26 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const { data: types, isFetching: typesLoading } = useGetBowlSetupTypesQuery()
   const [createSetup, { isLoading: creating }] = useCreateSetupMutation()
   const [updateSetup, { isLoading: updating }] = useUpdateSetupMutation()
+  const savedDraft = useMemo(() => (!isEdit && !initialValues ? readSetupDraft() : null), [initialValues, isEdit])
 
   const [step, setStep] = useState(0)
-  const [name, setName] = useState(initialValues?.name || '')
-  const [nameEdited, setNameEdited] = useState(Boolean(initialValues?.name))
-  const [description, setDescription] = useState(initialValues?.description || '')
-  const [photoUrls, setPhotoUrls] = useState<string[]>(initialValues?.photo_urls || [])
-  const [bowlId, setBowlId] = useState(initialValues?.bowl_id || '')
-  const [coalId, setCoalId] = useState(initialValues?.coal_id || '')
-  const [kaloudId, setKaloudId] = useState(initialValues?.kaloud_id || '')
-  const [placementId, setPlacementId] = useState(initialValues?.coal_placement_id || '')
-  const [typeId, setTypeId] = useState(initialValues?.bowl_setup_type_id || '')
+  const [name, setName] = useState(initialValues?.name || savedDraft?.name || '')
+  const [nameEdited, setNameEdited] = useState(Boolean(initialValues?.name || savedDraft?.name))
+  const [description, setDescription] = useState(initialValues?.description || savedDraft?.description || '')
+  const [photoUrls, setPhotoUrls] = useState<string[]>(initialValues?.photo_urls || savedDraft?.photoUrls || [])
+  const [bowlId, setBowlId] = useState(initialValues?.bowl_id || savedDraft?.bowlId || '')
+  const [coalId, setCoalId] = useState(initialValues?.coal_id || savedDraft?.coalId || '')
+  const [kaloudId, setKaloudId] = useState(initialValues?.kaloud_id || savedDraft?.kaloudId || '')
+  const [placementId, setPlacementId] = useState(initialValues?.coal_placement_id || savedDraft?.placementId || '')
+  const [typeId, setTypeId] = useState(initialValues?.bowl_setup_type_id || savedDraft?.typeId || '')
   const [activeEquipmentIndex, setActiveEquipmentIndex] = useState(0)
   const [error, setError] = useState('')
   const [tobaccoSearch, setTobaccoSearch] = useState('')
   const [tobaccoBrand, setTobaccoBrand] = useState('')
   const [tobaccoMix, setTobaccoMix] = useState<TobaccoMixRow[]>(
-    initialValues?.tobaccos?.length
+    savedDraft?.tobaccoMix?.length
+      ? savedDraft.tobaccoMix
+      : initialValues?.tobaccos?.length
       ? initialValues.tobaccos.map((item: any, index: number) => ({
         tobacco_id: item.tobacco_id || '',
         percentage: item.percentage || 1,
@@ -555,6 +580,24 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   }, [generatedName, nameEdited])
 
   useEffect(() => {
+    if (isEdit || !isDirty) return undefined
+    const timeout = window.setTimeout(() => {
+      window.localStorage.setItem(SETUP_DRAFT_STORAGE_KEY, JSON.stringify({
+        name,
+        description,
+        photoUrls,
+        bowlId,
+        coalId,
+        kaloudId,
+        placementId,
+        typeId,
+        tobaccoMix,
+      }))
+    }, 350)
+    return () => window.clearTimeout(timeout)
+  }, [bowlId, coalId, description, isDirty, isEdit, kaloudId, name, photoUrls, placementId, tobaccoMix, typeId])
+
+  useEffect(() => {
     if (!isDirty) return undefined
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -632,6 +675,29 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
     }
   }
 
+  const handleStepClick = (targetStep: number) => {
+    setError('')
+    if (targetStep === 0) {
+      setStep(0)
+      return
+    }
+    if (!equipmentReady) {
+      setError(t('setupForm.completeEquipment'))
+      setStep(0)
+      return
+    }
+    if (targetStep === 1) {
+      setStep(1)
+      return
+    }
+    if (!mixReady) {
+      setError(duplicateTobaccoIds.size ? 'В миксе не должно быть одинаковых табаков.' : t('setupForm.completeMix'))
+      setStep(1)
+      return
+    }
+    setStep(2)
+  }
+
   const handleSave = async () => {
     if (step < 2) {
       handleNextStep()
@@ -681,6 +747,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
         await createSetup(body).unwrap()
       }
       savedRef.current = true
+      window.localStorage.removeItem(SETUP_DRAFT_STORAGE_KEY)
       navigate('/')
     } catch {
       setError(t('setupForm.saveFailed'))
@@ -745,7 +812,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                 title={t('setupForm.equipment')}
                 active={step === 0}
                 complete={equipmentReady}
-                onClick={() => setStep(0)}
+                onClick={() => handleStepClick(0)}
               />
               <StepButton
                 index={2}
@@ -753,7 +820,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                 active={step === 1}
                 complete={mixReady}
                 disabled={!equipmentReady}
-                onClick={() => equipmentReady && setStep(1)}
+                onClick={() => handleStepClick(1)}
               />
               <StepButton
                 index={3}
@@ -761,7 +828,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                 active={step === 2}
                 complete={Boolean(name.trim())}
                 disabled={!equipmentReady || !mixReady}
-                onClick={() => equipmentReady && mixReady && setStep(2)}
+                onClick={() => handleStepClick(2)}
               />
             </div>
 

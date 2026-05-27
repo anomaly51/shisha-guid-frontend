@@ -216,6 +216,7 @@ export const Catalog = ({
   const minPrice = searchParams.get('minPrice') || ''
   const maxPrice = searchParams.get('maxPrice') || ''
   const catalogSearch = searchParams.get('q') || ''
+  const brandFilter = searchParams.get('brand') || ''
   const isPagedCatalog = itemKind === 'tobacco' || itemKind === 'coal'
   const pageSize = itemKind === 'coal' ? COAL_PAGE_SIZE : TOBACCO_PAGE_SIZE
   const currentPage = isPagedCatalog ? getSearchPage(searchParams.get('page')) : 1
@@ -225,6 +226,7 @@ export const Catalog = ({
     max_price: maxPrice || undefined,
     offset: (currentPage - 1) * pageSize,
     strength,
+    brand: brandFilter || undefined,
   } : undefined
   const coalQueryParams = itemKind === 'coal' ? {
     limit: pageSize,
@@ -242,7 +244,7 @@ export const Catalog = ({
   const navigate = useNavigate()
   const { t } = useTranslation()
   const isAdmin = profile?.role === 'admin'
-  const hasActiveFilters = strength !== 'all' || minPrice.trim() !== '' || maxPrice.trim() !== '' || catalogSearch.trim() !== ''
+  const hasActiveFilters = strength !== 'all' || minPrice.trim() !== '' || maxPrice.trim() !== '' || catalogSearch.trim() !== '' || brandFilter.trim() !== ''
   const pageData = useMemo(
     () => normalizePageData(rawData, isPagedCatalog ? pageSize : 0),
     [isPagedCatalog, pageSize, rawData],
@@ -262,6 +264,14 @@ export const Catalog = ({
   const showInitialCatalogLoading = isPagedCatalog && isFetching && !data.length && !pageDataMatchesCatalog
   const showTobaccoFilters = itemKind === 'tobacco' && (Boolean(data.length) || hasActiveFilters)
   const tobaccoRatings = useMemo(() => getTobaccoRatingMap(setupsForRatings), [setupsForRatings])
+  const brandOptions = useMemo(() => {
+    const brands = new Map<string, number>()
+    pageItems.forEach((item: any) => {
+      const brand = item.brand || ''
+      if (brand) brands.set(brand, (brands.get(brand) || 0) + 1)
+    })
+    return Array.from(brands.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  }, [pageItems])
   const visiblePageNumbers = useMemo(
     () => getVisiblePageNumbers(currentPage, totalPages),
     [currentPage, totalPages],
@@ -305,6 +315,16 @@ export const Catalog = ({
     })
   }
 
+  const setBrandFilter = (value: string) => {
+    setAppendTobaccos(false)
+    setLoadedTobaccos([])
+    updateSearch((next) => {
+      if (value) next.set('brand', value)
+      else next.delete('brand')
+      next.delete('page')
+    })
+  }
+
   const resetFilters = () => {
     setAppendTobaccos(false)
     setLoadedTobaccos([])
@@ -313,6 +333,7 @@ export const Catalog = ({
       next.delete('minPrice')
       next.delete('maxPrice')
       next.delete('q')
+      next.delete('brand')
       next.delete('page')
     })
   }
@@ -482,6 +503,20 @@ export const Catalog = ({
                     />
                   </label>
                 </div>}
+
+                {itemKind === 'tobacco' && brandOptions.length > 0 && (
+                  <select
+                    value={brandFilter}
+                    onChange={(event) => setBrandFilter(event.target.value)}
+                    aria-label="Бренд табака"
+                    tw="h-[42px] rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-3 text-[13px] font-bold text-[rgb(var(--color-text))] outline-none focus:border-[rgb(var(--color-accent))]"
+                  >
+                    <option value="">Все бренды</option>
+                    {brandOptions.map(([brand, count]) => (
+                      <option key={brand} value={brand}>{brand} ({count})</option>
+                    ))}
+                  </select>
+                )}
 
                 <button
                   type="button"

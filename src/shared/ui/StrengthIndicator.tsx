@@ -57,7 +57,7 @@ export const StrengthIndicator = ({ value, compact = false, label, showScore = f
         </div>
         {showScore && (
           <span tw="shrink-0 text-[11px] font-black leading-none tabular-nums" style={{ color: styles.text }}>
-            {normalized.toFixed(1)}
+            {Math.round(normalized)}
           </span>
         )}
       </div>

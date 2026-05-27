@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import 'twin.macro'
@@ -24,6 +24,7 @@ interface FormProps {
     coals_per_package?: number | null
     coal_count?: number | null
     strength?: number | null
+    brand?: string | null
     heaviness?: number | null
     nicotine_strength?: number | null
     nicotine?: number | null
@@ -39,6 +40,7 @@ interface FormProps {
     coals_per_package?: number | null
     coal_count?: number | null
     strength?: number
+    brand?: string | null
     description: string | null
     photo_urls: string[]
   }) => Promise<unknown>
@@ -152,6 +154,7 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
   const [strength, setStrength] = useState(() => (
     initialValues ? getTobaccoStrength(initialValues) : 5
   ))
+  const [brand, setBrand] = useState(initialValues?.brand || '')
   const [coalsPerPackage, setCoalsPerPackage] = useState(
     initialValues?.coals_per_package == null ? '' : String(initialValues.coals_per_package)
   )
@@ -161,6 +164,9 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
   const [description, setDescription] = useState(initialValues?.description || '')
   const [photoUrls, setPhotoUrls] = useState<string[]>(initialValues?.photo_urls || [])
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+  const isSaving = Boolean(saving || submitting)
   const nameLength = name.trim().length
   const descriptionLength = description.trim().length
 
@@ -178,6 +184,7 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (isSaving || submittingRef.current) return
     if (!name.trim()) {
       setError(t('itemForm.nameRequired'))
       return
@@ -236,6 +243,8 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
       : undefined
     if (copy.hasCoalPlacementCount && coalCountPayload === undefined) return
     setError('')
+    setSubmitting(true)
+    submittingRef.current = true
     try {
       await onSubmit({
         name: name.trim(),
@@ -243,6 +252,7 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
         ...(copy.hasBowlCapacity ? { capacity_grams: capacityGramsPayload } : {}),
         ...(copy.hasTobaccoPackage ? { package_grams: packageGramsPayload } : {}),
         ...(copy.hasTobaccoStrength ? { strength } : {}),
+        ...(copy.hasTobaccoPackage ? { brand: brand.trim() || null } : {}),
         ...(copy.hasCoalPackage ? {
           coals_per_package: coalsPerPackagePayload,
         } : {}),
@@ -256,6 +266,9 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
       navigate(-1)
     } catch {
       setError(t('common.failedSave'))
+    } finally {
+      submittingRef.current = false
+      setSubmitting(false)
     }
   }
 
@@ -368,16 +381,27 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
                     hint={t('itemForm.packageGramsHint')}
                     value={Number(packageGrams)}
                     onChange={(value) => setPackageGrams(String(value))}
-                    disabled={saving}
+                    disabled={isSaving}
                   />
                   <StrengthSlider
                     label={t('itemForm.strength')}
                     hint={t('itemForm.strengthHint')}
                     value={strength}
                     onChange={setStrength}
-                    disabled={saving}
+                    disabled={isSaving}
                   />
                 </div>
+              )}
+
+              {copy.hasTobaccoPackage && (
+                <Input
+                  label="Бренд"
+                  value={brand}
+                  onChange={(event) => setBrand(event.target.value)}
+                  maxLength={80}
+                  placeholder="MustHave"
+                  disabled={isSaving}
+                />
               )}
 
               {copy.hasCoalPlacementCount && (
@@ -398,6 +422,7 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
                   label={t('common.description')}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  disabled={isSaving}
                   rows={4}
                   maxLength={700}
                   placeholder={copy.descriptionPlaceholder}
@@ -412,9 +437,9 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
             </div>
 
             <div tw="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-3 border-t border-[rgb(var(--color-border))]">
-              <Button variant="ghost" type="button" onClick={() => navigate(-1)}>{t('common.cancel')}</Button>
-              <Button variant="primary" type="submit" disabled={saving || !name.trim()}>
-                {saving ? t('common.saving') : isEdit ? t('common.saveChanges') : t('itemForm.createItem')}
+              <Button variant="ghost" type="button" onClick={() => navigate(-1)} disabled={isSaving}>{t('common.cancel')}</Button>
+              <Button variant="primary" type="submit" disabled={isSaving || !name.trim()}>
+                {isSaving ? t('common.saving') : isEdit ? t('common.saveChanges') : t('itemForm.createItem')}
               </Button>
             </div>
           </div>
