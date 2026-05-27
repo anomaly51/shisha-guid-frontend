@@ -35,9 +35,9 @@ export const api = createApi({
         )
 
         if (refreshResult.data && typeof refreshResult.data === 'object') {
-          const tokenData = refreshResult.data as { access_token?: string; refresh_token?: string }
+          const tokenData = refreshResult.data as { access_token?: string; expires_in?: number; refresh_token?: string }
           if (tokenData.access_token) {
-            setAuthToken(tokenData.access_token, tokenData.refresh_token)
+            setAuthToken(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in)
             return rawBaseQuery(args, baseQueryApi, extraOptions)
           }
         }

@@ -1,5 +1,6 @@
 const authTokenStorageKey = 'token'
 const refreshTokenStorageKey = 'refresh_token'
+const accessTokenExpiresAtStorageKey = 'access_token_expires_at'
 const profileCacheStorageKey = 'shisha-guid-profile'
 const authSessionChangedEvent = 'shisha-guid-auth-session-changed'
 
@@ -12,7 +13,15 @@ const emitAuthSessionChanged = () => {
 
 export const getAuthToken = () => {
   try {
-    return getStorage()?.getItem(authTokenStorageKey) || null
+    const storage = getStorage()
+    const expiresAt = Number(storage?.getItem(accessTokenExpiresAtStorageKey) || 0)
+    if (expiresAt && Date.now() >= expiresAt) {
+      storage?.removeItem(authTokenStorageKey)
+      storage?.removeItem(accessTokenExpiresAtStorageKey)
+      emitAuthSessionChanged()
+      return null
+    }
+    return storage?.getItem(authTokenStorageKey) || null
   } catch {
     return null
   }
@@ -26,11 +35,16 @@ export const getRefreshToken = () => {
   }
 }
 
-export const setAuthToken = (token: string, refreshToken?: string | null) => {
+export const setAuthToken = (token: string, refreshToken?: string | null, expiresIn?: number | null) => {
   try {
     const storage = getStorage()
     storage?.setItem(authTokenStorageKey, token)
     if (refreshToken) storage?.setItem(refreshTokenStorageKey, refreshToken)
+    if (expiresIn && Number.isFinite(expiresIn)) {
+      storage?.setItem(accessTokenExpiresAtStorageKey, String(Date.now() + expiresIn * 1000))
+    } else {
+      storage?.removeItem(accessTokenExpiresAtStorageKey)
+    }
   } catch {
     // Ignore unavailable storage: the API request will simply behave as anonymous.
   } finally {
@@ -89,6 +103,7 @@ export const clearAuthSession = () => {
     const storage = getStorage()
     storage?.removeItem(authTokenStorageKey)
     storage?.removeItem(refreshTokenStorageKey)
+    storage?.removeItem(accessTokenExpiresAtStorageKey)
     storage?.removeItem(profileCacheStorageKey)
   } catch {
     // Nothing to clear when storage is unavailable.
