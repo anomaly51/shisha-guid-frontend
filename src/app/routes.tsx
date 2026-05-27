@@ -78,7 +78,7 @@ export const AppRoutes = () => {
 
       <Route path="bowls" element={
         <Catalog key="bowls" title={t('routes.bowls')} listHook={useGetBowlsQuery}
-          deleteHook={useDeleteBowlMutation} onCreatePath="/bowls/create" onEditPath={(id) => `/bowls/${id}/edit`} itemKind="bowl" />
+          createHook={useCreateBowlMutation} deleteHook={useDeleteBowlMutation} onCreatePath="/bowls/create" onEditPath={(id) => `/bowls/${id}/edit`} itemKind="bowl" />
       } />
       <Route path="bowls/create" element={<AdminOnly><CreateItem title={t('routes.createBowl')} createHook={useCreateBowlMutation} /></AdminOnly>} />
       <Route path="bowls/:id" element={<Detail title={t('routes.bowls')} detailHook={useGetBowlQuery} listPath="/bowls" itemKind="bowl" />} />
@@ -86,7 +86,7 @@ export const AppRoutes = () => {
 
       <Route path="tobaccos" element={
         <Catalog key="tobaccos" title={t('routes.tobaccos')} listHook={useGetTobaccosQuery}
-          deleteHook={useDeleteTobaccoMutation} onCreatePath="/tobaccos/create" onEditPath={(id) => `/tobaccos/${id}/edit`} itemKind="tobacco" />
+          createHook={useCreateTobaccoMutation} deleteHook={useDeleteTobaccoMutation} onCreatePath="/tobaccos/create" onEditPath={(id) => `/tobaccos/${id}/edit`} itemKind="tobacco" />
       } />
       <Route path="tobaccos/create" element={<AdminOnly><CreateItem title={t('routes.createTobacco')} createHook={useCreateTobaccoMutation} /></AdminOnly>} />
       <Route path="tobaccos/:id" element={<Detail title={t('routes.tobaccos')} detailHook={useGetTobaccoQuery} listPath="/tobaccos" itemKind="tobacco" />} />
@@ -94,7 +94,7 @@ export const AppRoutes = () => {
 
       <Route path="coals" element={
         <Catalog key="coals" title={t('routes.coals')} listHook={useGetCoalsQuery}
-          deleteHook={useDeleteCoalMutation} onCreatePath="/coals/create" onEditPath={(id) => `/coals/${id}/edit`} itemKind="coal" />
+          createHook={useCreateCoalMutation} deleteHook={useDeleteCoalMutation} onCreatePath="/coals/create" onEditPath={(id) => `/coals/${id}/edit`} itemKind="coal" />
       } />
       <Route path="coals/create" element={<AdminOnly><CreateItem title={t('routes.createCoal')} createHook={useCreateCoalMutation} /></AdminOnly>} />
       <Route path="coals/:id" element={<Detail title={t('routes.coals')} detailHook={useGetCoalQuery} listPath="/coals" itemKind="coal" />} />
@@ -102,7 +102,7 @@ export const AppRoutes = () => {
 
       <Route path="kalouds" element={
         <Catalog key="kalouds" title={t('routes.kalouds')} listHook={useGetKaloudsQuery}
-          deleteHook={useDeleteKaloudMutation} onCreatePath="/kalouds/create" onEditPath={(id) => `/kalouds/${id}/edit`} itemKind="kaloud" />
+          createHook={useCreateKaloudMutation} deleteHook={useDeleteKaloudMutation} onCreatePath="/kalouds/create" onEditPath={(id) => `/kalouds/${id}/edit`} itemKind="kaloud" />
       } />
       <Route path="kalouds/create" element={<AdminOnly><CreateItem title={t('routes.createKaloud')} createHook={useCreateKaloudMutation} /></AdminOnly>} />
       <Route path="kalouds/:id" element={<Detail title={t('routes.kalouds')} detailHook={useGetKaloudQuery} listPath="/kalouds" />} />
@@ -120,7 +120,7 @@ export const AppRoutes = () => {
       <Route path="admin/coal-placements" element={
         <AdminOnly>
           <Catalog key="coal-placements" title={t('routes.coalPlacements')} listHook={useGetCoalPlacementsQuery}
-            deleteHook={useDeleteCoalPlacementMutation} onCreatePath="/admin/coal-placements/create" onEditPath={(id) => `/admin/coal-placements/${id}/edit`} itemKind="placement" />
+            createHook={useCreateCoalPlacementMutation} deleteHook={useDeleteCoalPlacementMutation} onCreatePath="/admin/coal-placements/create" onEditPath={(id) => `/admin/coal-placements/${id}/edit`} itemKind="placement" />
         </AdminOnly>
       } />
       <Route path="admin/coal-placements/create" element={
@@ -142,7 +142,7 @@ export const AppRoutes = () => {
       <Route path="admin/bowl-setup-types" element={
         <AdminOnly>
           <Catalog key="bowl-setup-types" title={t('routes.setupTypes')} listHook={useGetBowlSetupTypesQuery}
-            deleteHook={useDeleteBowlSetupTypeMutation} onCreatePath="/admin/bowl-setup-types/create" onEditPath={(id) => `/admin/bowl-setup-types/${id}/edit`} itemKind="setupType" />
+            createHook={useCreateBowlSetupTypeMutation} deleteHook={useDeleteBowlSetupTypeMutation} onCreatePath="/admin/bowl-setup-types/create" onEditPath={(id) => `/admin/bowl-setup-types/${id}/edit`} itemKind="setupType" />
         </AdminOnly>
       } />
       <Route path="admin/bowl-setup-types/create" element={

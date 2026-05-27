@@ -455,9 +455,20 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   )
 
   const mixTotal = tobaccoMix.reduce((sum, item) => sum + Number(item.percentage || 0), 0)
+  const duplicateTobaccoIds = useMemo(() => {
+    const seen = new Set<string>()
+    const duplicates = new Set<string>()
+    tobaccoMix.forEach((item) => {
+      if (!item.tobacco_id) return
+      if (seen.has(item.tobacco_id)) duplicates.add(item.tobacco_id)
+      seen.add(item.tobacco_id)
+    })
+    return duplicates
+  }, [tobaccoMix])
   const equipmentReady = Boolean(bowlId && coalId && kaloudId && placementId && typeId)
   const mixReady = tobaccoMix.length > 0
     && tobaccoMix.every((item) => item.tobacco_id && item.percentage >= 1 && item.percentage <= 100)
+    && duplicateTobaccoIds.size === 0
     && mixTotal === 100
   const generatedName = useMemo(() => {
     const names = tobaccoMix
@@ -525,12 +536,33 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const activeEquipment = equipmentItems[activeEquipmentIndex] || equipmentItems[0]
   const selectedEquipmentCount = equipmentItems.filter((item) => item.value).length
   const nextMissingEquipment = equipmentItems.find((item) => !item.value)?.label
+  const savedRef = useRef(false)
+  const isDirty = useMemo(() => {
+    if (savedRef.current) return false
+    if (isEdit) {
+      return Boolean(name.trim() || description.trim() || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId)
+    }
+    return Boolean(name.trim() || description.trim() || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId)
+  }, [bowlId, coalId, description, isEdit, kaloudId, name, placementId, tobaccoMix.length, typeId])
+  const confirmLeave = () => !isDirty || window.confirm('Несохраненные изменения будут потеряны. Уйти со страницы?')
 
   useEffect(() => {
     if (!nameEdited) {
       setName(generatedName)
     }
   }, [generatedName, nameEdited])
+
+  useEffect(() => {
+    if (!isDirty) return undefined
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isDirty])
 
   const toggleTobacco = (tobaccoId: string) => {
     setTobaccoMix((items) => {
@@ -616,7 +648,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
     }
 
     if (!mixReady) {
-      setError(t('setupForm.completeMix'))
+      setError(duplicateTobaccoIds.size ? 'В миксе не должно быть одинаковых табаков.' : t('setupForm.completeMix'))
       setStep(1)
       return
     }
@@ -645,6 +677,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
       } else {
         await createSetup(body).unwrap()
       }
+      savedRef.current = true
       navigate('/')
     } catch {
       setError(t('setupForm.saveFailed'))
@@ -666,7 +699,9 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   return (
     <div tw="max-w-3xl">
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => {
+          if (confirmLeave()) navigate(-1)
+        }}
         tw="mb-4 flex items-center gap-1.5 text-[13px] font-medium text-[rgb(var(--color-text-muted))] transition-colors hover:text-[rgb(var(--color-text))]"
       >
         <BackIcon />
@@ -688,7 +723,9 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
               </div>
               <div tw="hidden shrink-0 items-center gap-2 sm:inline-flex">
                 {!isEdit && (
-                  <Button type="button" variant="outline" size="sm" onClick={() => navigate('/ai-chat')}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => {
+                    if (confirmLeave()) navigate('/ai-chat')
+                  }}>
                     <CatalogIcon name="setupType" size={14} />
                     Chatbot
                   </Button>

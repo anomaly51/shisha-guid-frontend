@@ -27,7 +27,7 @@ export const AuthModal = ({ open, onClose }: AuthModalProps) => {
     setAuthPending(true)
     try {
       const result = await googleLogin({ code, redirect_uri: redirectUri }).unwrap()
-      setAuthToken(result.access_token)
+      setAuthToken(result.access_token, result.refresh_token)
       sessionStorage.removeItem('google_oauth_state')
       window.location.reload()
     } catch {

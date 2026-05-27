@@ -1,5 +1,5 @@
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import 'twin.macro'
 import { Card } from '../shared/ui/Card'
@@ -265,10 +265,11 @@ export const Feed = () => {
   const { data: types } = useGetBowlSetupTypesQuery()
   const { data: bowls } = useGetBowlsQuery()
   const navigate = useNavigate()
+  const location = useLocation()
   const { t } = useTranslation()
   const openSetup = useCallback((setupId: string) => {
-    navigate(`/setups/${setupId}`)
-  }, [navigate])
+    navigate(`/setups/${setupId}`, { state: { feedSearch: location.search } })
+  }, [location.search, navigate])
   const initialSetups: any[] = normalizedSetupsPage?.offset === 0 ? normalizedSetupsPage.items : []
   const visibleSetups = loadedSetups.length ? loadedSetups : initialSetups
   const visibleTotal = loadedSetups.length ? totalSetups : normalizedSetupsPage?.total || 0

@@ -7,13 +7,14 @@ export interface PublicCreator {
   id?: string
   email?: string
   nickname?: string | null
+  display_name?: string | null
   avatar_url?: string | null
   role?: string
   badges?: UserBadge[]
 }
 
 const getAuthorName = (author?: PublicCreator | null) => (
-  author?.nickname || author?.email?.split('@')[0] || 'Unknown author'
+  author?.nickname || author?.display_name || 'Unknown author'
 )
 
 const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || '?'

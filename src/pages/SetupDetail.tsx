@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import tw from 'twin.macro'
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
@@ -304,7 +304,7 @@ const RatingPicker = ({
   </div>
 )
 
-const SetupReviews = ({ setupId }: { setupId: string }) => {
+const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreatorId?: string }) => {
   const { i18n, t } = useTranslation()
   const hasToken = hasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
@@ -318,6 +318,7 @@ const SetupReviews = ({ setupId }: { setupId: string }) => {
 
   const average = getReviewAverage(reviews)
   const ownReview = profile ? reviews.find((review: SetupReview) => isReviewAuthor(review, profile)) : undefined
+  const isSetupOwner = Boolean(profile?.id && setupCreatorId && String(profile.id) === String(setupCreatorId))
   const isSaving = saving || updating
   const formTitle = ownReview ? t('reviews.editTitle') : t('reviews.writeTitle')
   const formHint = profile
@@ -347,6 +348,10 @@ const SetupReviews = ({ setupId }: { setupId: string }) => {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     setError('')
+    if (isSetupOwner) {
+      setError('Автор не может оставить отзыв на свою забивку.')
+      return
+    }
     const text = description.trim()
     if (text.length < 3) {
       setError(t('reviews.tooShort'))
@@ -438,7 +443,7 @@ const SetupReviews = ({ setupId }: { setupId: string }) => {
                 placeholder={ownReview ? t('reviews.updatePlaceholder') : t('reviews.createPlaceholder')}
                 rows={4}
                 maxLength={2000}
-                disabled={!profile || isSaving}
+                disabled={!profile || isSetupOwner || isSaving}
               />
             </div>
             <p tw="mt-1 text-right text-[11px] font-medium text-[rgb(var(--color-text-subtle))]">{description.length}/2000</p>
@@ -450,14 +455,14 @@ const SetupReviews = ({ setupId }: { setupId: string }) => {
             </div>
             <RatingPicker
               value={rating}
-              disabled={!profile || isSaving}
+              disabled={!profile || isSetupOwner || isSaving}
               onChange={(value) => setRating(normalizeReviewRating(value))}
             />
           </div>
         </div>
         {error && <p tw="mt-3 rounded-lg border border-[rgb(var(--color-danger-border))] bg-[rgb(var(--color-danger-surface))] px-3 py-2 text-[13px] font-medium text-[rgb(var(--color-danger))]">{error}</p>}
         <div tw="mt-3 flex justify-end">
-          <Button type="submit" disabled={!profile || isSaving}>
+          <Button type="submit" disabled={!profile || isSetupOwner || isSaving}>
             {isSaving ? t('reviews.saving') : ownReview ? t('reviews.saveChanges') : t('reviews.save')}
           </Button>
         </div>
@@ -470,6 +475,7 @@ export const SetupDetail = () => {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { data: item, isLoading } = useGetSetupQuery(id!)
   const hasToken = hasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
@@ -501,6 +507,8 @@ export const SetupDetail = () => {
   }), [bowl, coal, item?.tobaccos, placement])
   const isAdmin = profile?.role === 'admin'
   const canManageSetup = isAdmin || isSetupAuthor(item, profile)
+  const feedSearch = (location.state as { feedSearch?: string } | null)?.feedSearch || ''
+  const feedPath = `/${feedSearch}`
 
   useEffect(() => {
     if (!id) return
@@ -513,7 +521,7 @@ export const SetupDetail = () => {
 
     try {
       await deleteSetup(item.id).unwrap()
-      navigate('/')
+      navigate(feedPath)
     } catch {
       setDeleteError(t('setupDetail.deleteFailed'))
     }
@@ -547,7 +555,7 @@ export const SetupDetail = () => {
       <div tw="relative mx-auto w-full max-w-5xl">
         <div tw="flex min-w-0 flex-col gap-4">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(feedPath)}
             tw="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[rgb(var(--color-text-muted))] transition-colors hover:text-[rgb(var(--color-text))]"
           >
             <BackIcon />
@@ -577,20 +585,8 @@ export const SetupDetail = () => {
               <span tw="tabular-nums">{Number(item.views_count || 0)}</span>
               <span tw="font-semibold text-[rgb(var(--color-text-subtle))]">{t('setupDetail.views')}</span>
             </div>
-            {item.description && (
-              <p tw="mt-3 line-clamp-3 text-[13px] font-medium leading-relaxed text-[rgb(var(--color-text-muted))]">{item.description}</p>
-            )}
-
-            <div tw="mt-4">
-              <CostSummary cost={setupCost} />
-            </div>
-
-            <div tw="mt-3">
-              <CompactSetupSummary kind={kind} typeName={typeName} heaviness={heaviness} />
-            </div>
-
             {canManageSetup && (
-              <div tw="mt-auto flex flex-wrap gap-2 pt-4">
+              <div tw="mt-3 flex flex-wrap gap-2">
                 <Link to={`/setups/${item.id}/edit`}>
                   <Button variant="secondary" size="sm">{t('setupDetail.editSetup')}</Button>
                 </Link>
@@ -607,11 +603,22 @@ export const SetupDetail = () => {
                 </Button>
               </div>
             )}
+            {item.description && (
+              <p tw="mt-3 line-clamp-3 text-[13px] font-medium leading-relaxed text-[rgb(var(--color-text-muted))]">{item.description}</p>
+            )}
+
+            <div tw="mt-4">
+              <CostSummary cost={setupCost} />
+            </div>
+
+            <div tw="mt-3">
+              <CompactSetupSummary kind={kind} typeName={typeName} heaviness={heaviness} />
+            </div>
           </div>
         </div>
       </Card>
 
-      <SetupReviews setupId={item.id} />
+      <SetupReviews setupId={item.id} setupCreatorId={item.creator_id || item.creator?.id} />
 
       <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-4 sm:p-5">
         <StepHeader

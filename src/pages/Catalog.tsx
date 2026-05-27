@@ -20,6 +20,7 @@ type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
 interface CatalogProps {
   title: string
   listHook: (params?: any) => any
+  createHook: () => any
   deleteHook: () => any
   onCreatePath: string
   onEditPath: (id: string) => string
@@ -203,10 +204,11 @@ const coalImageSurfaceStyle = {
 }
 
 export const Catalog = ({
-  title, listHook, deleteHook, onCreatePath, onEditPath, itemKind = 'default',
+  title, listHook, createHook, deleteHook, onCreatePath, onEditPath, itemKind = 'default',
 }: CatalogProps) => {
   const [searchParams, setSearchParams] = useSearchParams()
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [notice, setNotice] = useState<{ message: string; undoItem?: any } | null>(null)
   const [appendTobaccos, setAppendTobaccos] = useState(false)
   const [loadedTobaccos, setLoadedTobaccos] = useState<any[]>([])
   const [loadedCatalogKind, setLoadedCatalogKind] = useState<CatalogItemKind>(itemKind)
@@ -234,6 +236,7 @@ export const Catalog = ({
   )
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
   const [deleteItem, { isLoading: deleting }] = deleteHook()
+  const [createItem, { isLoading: restoring }] = createHook()
   const navigate = useNavigate()
   const { t } = useTranslation()
   const isAdmin = profile?.role === 'admin'
@@ -339,9 +342,21 @@ export const Catalog = ({
     if (!deleteTarget?.id) return
     try {
       await deleteItem(deleteTarget.id).unwrap()
+      setNotice({ message: `${deleteTarget.name || title} удалён.`, undoItem: deleteTarget })
       setDeleteTarget(null)
     } catch {
       // The API layer owns the exact error shape; keep the dialog open so the admin can retry.
+    }
+  }
+
+  const restoreDeleted = async () => {
+    if (!notice?.undoItem) return
+    const { id: _id, creator_id: _creatorId, created_at: _createdAt, ...body } = notice.undoItem
+    try {
+      await createItem(body).unwrap()
+      setNotice({ message: `${notice.undoItem.name || title} восстановлен.` })
+    } catch {
+      setNotice({ message: 'Не удалось восстановить элемент.' })
     }
   }
 
@@ -365,6 +380,17 @@ export const Catalog = ({
           </Button>
         )}
       </div>
+
+      {notice && (
+        <div tw="mb-4 flex flex-col gap-2 rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] px-3 py-2 text-[13px] font-semibold text-[rgb(var(--color-text-muted))] sm:flex-row sm:items-center sm:justify-between">
+          <span>{notice.message}</span>
+          {notice.undoItem && (
+            <Button type="button" variant="secondary" size="sm" onClick={restoreDeleted} disabled={restoring}>
+              {restoring ? t('common.saving') : 'Undo'}
+            </Button>
+          )}
+        </div>
+      )}
 
       {isLoading || showInitialCatalogLoading ? (
         <div tw="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

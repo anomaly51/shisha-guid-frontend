@@ -1,4 +1,5 @@
 const authTokenStorageKey = 'token'
+const refreshTokenStorageKey = 'refresh_token'
 const profileCacheStorageKey = 'shisha-guid-profile'
 const authSessionChangedEvent = 'shisha-guid-auth-session-changed'
 
@@ -17,9 +18,19 @@ export const getAuthToken = () => {
   }
 }
 
-export const setAuthToken = (token: string) => {
+export const getRefreshToken = () => {
   try {
-    getStorage()?.setItem(authTokenStorageKey, token)
+    return getStorage()?.getItem(refreshTokenStorageKey) || null
+  } catch {
+    return null
+  }
+}
+
+export const setAuthToken = (token: string, refreshToken?: string | null) => {
+  try {
+    const storage = getStorage()
+    storage?.setItem(authTokenStorageKey, token)
+    if (refreshToken) storage?.setItem(refreshTokenStorageKey, refreshToken)
   } catch {
     // Ignore unavailable storage: the API request will simply behave as anonymous.
   } finally {
@@ -77,6 +88,7 @@ export const clearAuthSession = () => {
   try {
     const storage = getStorage()
     storage?.removeItem(authTokenStorageKey)
+    storage?.removeItem(refreshTokenStorageKey)
     storage?.removeItem(profileCacheStorageKey)
   } catch {
     // Nothing to clear when storage is unavailable.
