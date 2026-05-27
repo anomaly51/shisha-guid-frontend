@@ -6,7 +6,7 @@ import { ItemForm } from './ItemForm'
 interface EditItemProps {
   title: string
   detailHook: (id: string) => any
-  updateHook: () => [any, { isLoading: boolean }]
+  updateHook: () => readonly [any, { isLoading: boolean }]
 }
 
 export const EditItem = ({ title, detailHook, updateHook }: EditItemProps) => {

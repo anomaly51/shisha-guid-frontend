@@ -44,6 +44,7 @@ const setupFormPrefetch: PrefetchRequest[] = [
 ]
 
 const feedPageSize = 12
+const PREFETCH_TIMEOUT_MS = 4500
 
 export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
   const { pathname, searchParams } = new URL(url, 'http://localhost')
@@ -129,7 +130,12 @@ export const prefetchRouteData = async (store: AppStore, url: string) => {
   })
 
   try {
-    await Promise.all(subscriptions.map((subscription) => subscription.unwrap()))
+    await Promise.race([
+      Promise.all(subscriptions.map((subscription) => subscription.unwrap())),
+      new Promise((resolve) => {
+        setTimeout(resolve, PREFETCH_TIMEOUT_MS)
+      }),
+    ])
   } finally {
     subscriptions.forEach((subscription) => subscription.unsubscribe())
   }

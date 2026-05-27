@@ -17,6 +17,9 @@ const buildCommit = process.env.VCS_REF || ''
 const buildDate = process.env.BUILD_DATE || ''
 const publicSiteUrl = normalizePublicUrl(process.env.PUBLIC_SITE_URL || process.env.SITE_URL || `http://localhost:${port}`)
 const apiBaseUrl = (process.env.SSR_API_URL || process.env.VITE_SSR_API_URL || process.env.VITE_API_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '')
+const ssrRateWindowMs = Number(process.env.SSR_RATE_WINDOW_MS || 60000)
+const ssrRateLimit = Number(process.env.SSR_RATE_LIMIT || 180)
+const ssrRateBuckets = new Map()
 
 const app = express()
 const server = http.createServer(app)
@@ -101,6 +104,8 @@ if (isProduction) {
   app.use(devMiddleware)
 }
 
+app.use(limitSsrRequests)
+
 app.use(async (req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     next()
@@ -181,4 +186,36 @@ function stripBase(url) {
 
   if (!pathname.startsWith(base)) return url
   return `/${url.slice(base.length)}`
+}
+
+function limitSsrRequests(req, res, next) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    next()
+    return
+  }
+
+  const now = Date.now()
+  const ip = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
+  const bucket = ssrRateBuckets.get(ip) || { count: 0, resetAt: now + ssrRateWindowMs }
+
+  if (bucket.resetAt <= now) {
+    bucket.count = 0
+    bucket.resetAt = now + ssrRateWindowMs
+  }
+
+  bucket.count += 1
+  ssrRateBuckets.set(ip, bucket)
+
+  if (ssrRateBuckets.size > 5000) {
+    for (const [key, value] of ssrRateBuckets.entries()) {
+      if (value.resetAt <= now) ssrRateBuckets.delete(key)
+    }
+  }
+
+  if (bucket.count > ssrRateLimit) {
+    res.status(429).set('Retry-After', Math.ceil((bucket.resetAt - now) / 1000)).send('Too Many Requests')
+    return
+  }
+
+  next()
 }

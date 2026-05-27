@@ -2,7 +2,7 @@ import { ItemForm } from './ItemForm'
 
 interface CreateItemProps {
   title: string
-  createHook: () => [any, { isLoading: boolean }]
+  createHook: () => readonly [any, { isLoading: boolean }]
 }
 
 export const CreateItem = ({ title, createHook }: CreateItemProps) => {

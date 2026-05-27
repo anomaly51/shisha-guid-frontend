@@ -1,5 +1,5 @@
-import { Navigate, Route, Routes, useParams } from 'react-router-dom'
-import { lazy, Suspense, type ComponentType, type ReactElement } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Layout } from '../widgets/Layout'
 import { PageTitle } from './PageTitle'
@@ -10,9 +10,8 @@ import {
   useGetKaloudsQuery, useCreateKaloudMutation, useGetKaloudQuery, useUpdateKaloudMutation, useDeleteKaloudMutation,
   useGetCoalPlacementsQuery, useCreateCoalPlacementMutation, useGetCoalPlacementQuery, useUpdateCoalPlacementMutation, useDeleteCoalPlacementMutation,
   useGetBowlSetupTypesQuery, useCreateBowlSetupTypeMutation, useGetBowlSetupTypeQuery, useUpdateBowlSetupTypeMutation, useDeleteBowlSetupTypeMutation,
-  useGetProfileQuery,
 } from '../shared/api'
-import { hasAuthToken } from '../shared/authToken'
+import { AdminOnly, LegacyAdminCatalogRedirect } from './RouteGuards'
 
 const routeComponent = <TModule extends Record<string, ComponentType<any>>, TKey extends keyof TModule>(
   loader: () => Promise<TModule>,
@@ -52,21 +51,6 @@ const PublicProfile = import.meta.env.SSR
 const AgentChat = import.meta.env.SSR
   ? (await import('../pages/AgentChat')).AgentChat
   : routeComponent(() => import('../pages/AgentChat'), 'AgentChat')
-
-const AdminOnly = ({ children }: { children: ReactElement }) => {
-  const hasToken = hasAuthToken()
-  const { data: profile, isLoading } = useGetProfileQuery(undefined, { skip: !hasToken })
-
-  if (hasToken && isLoading) return null
-  if (profile?.role !== 'admin') return <Navigate to="/profile" replace />
-
-  return children
-}
-
-const LegacyAdminCatalogRedirect = ({ base, edit = false }: { base: string; edit?: boolean }) => {
-  const { id } = useParams<{ id: string }>()
-  return <Navigate to={`/admin/${base}/${id}${edit ? '/edit' : ''}`} replace />
-}
 
 export const AppRoutes = () => {
   const { t } = useTranslation()

@@ -489,7 +489,9 @@ export const MixBowlPreview = ({
   renderMode = 'live',
   sceneScale = 0.98,
   style,
+  ariaLabel,
 }: {
+  ariaLabel?: string
   autoRotate?: boolean
   bowlModel?: BowlModel
   cameraPosition?: [number, number, number]
@@ -568,6 +570,8 @@ export const MixBowlPreview = ({
     <div
       className={className}
       ref={visibilityRef}
+      role="img"
+      aria-label={ariaLabel || `Bowl preview: ${kind} mix with ${items.length} tobacco${items.length === 1 ? '' : 's'}`}
       style={style}
       tw="relative aspect-square overflow-hidden bg-[rgb(var(--color-surface-muted))]"
       onClick={(event) => {

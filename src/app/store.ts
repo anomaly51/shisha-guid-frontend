@@ -16,7 +16,16 @@ const createStore = (preloadedState?: Partial<RootState>) => configureStore({
 
 export const store = createStore()
 
-export const createAppStore = (preloadedState?: Partial<RootState>) => createStore(preloadedState)
+const getDevStore = (preloadedState?: Partial<RootState>) => {
+  const globalStore = globalThis as typeof globalThis & { __shishaGuidStore?: ReturnType<typeof createStore> }
+  if (import.meta.env.PROD || import.meta.env.SSR) return createStore(preloadedState)
+  if (!globalStore.__shishaGuidStore) {
+    globalStore.__shishaGuidStore = createStore(preloadedState)
+  }
+  return globalStore.__shishaGuidStore
+}
+
+export const createAppStore = (preloadedState?: Partial<RootState>) => getDevStore(preloadedState)
 
 export type AppStore = ReturnType<typeof createAppStore>
 export type AppDispatch = AppStore['dispatch']

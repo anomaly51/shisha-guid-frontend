@@ -44,7 +44,6 @@ export const api = createApi({
       }
 
       clearAuthSession()
-      baseQueryApi.dispatch(api.util.resetApiState())
       if (typeof window !== 'undefined') {
         const next = `${window.location.pathname}${window.location.search}`
         window.location.assign(`/profile?next=${encodeURIComponent(next)}`)

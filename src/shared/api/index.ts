@@ -23,6 +23,7 @@ export {
 export { useGetUploadPolicyMutation, useUploadMediaMutation } from './upload'
 export {
   useGetAgentCapabilitiesQuery,
+  useGetAgentSchemaQuery,
   useChatWithSetupAgentMutation,
   useTranscribeSetupVoiceMutation,
 } from './agent'

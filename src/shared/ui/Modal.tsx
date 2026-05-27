@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import styled from 'styled-components'
 import tw from 'twin.macro'
 import { CloseIcon } from './Icons'
@@ -29,6 +29,8 @@ interface ModalProps {
 }
 
 export const Modal = ({ open, onClose, title, children }: ModalProps) => {
+  const contentRef = useRef<HTMLDivElement | null>(null)
+
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden'
@@ -42,21 +44,55 @@ export const Modal = ({ open, onClose, title, children }: ModalProps) => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
+      if (e.key !== 'Tab') return
+      const focusable = contentRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!focusable?.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [open, onClose])
 
+  useEffect(() => {
+    if (!open) return
+    const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    window.setTimeout(() => {
+      const target = contentRef.current?.querySelector<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      target?.focus()
+    }, 0)
+    return () => previousActive?.focus()
+  }, [open])
+
   if (!open) return null
 
   return (
     <Overlay onClick={onClose}>
-      <Content onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+      <Content
+        ref={contentRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
         {title && (
           <div tw="flex items-center justify-between px-5 py-3.5 border-b border-[rgb(var(--color-border-muted))]">
             <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">{title}</h2>
             <button
+              type="button"
               onClick={onClose}
+              aria-label="Close dialog"
               tw="w-8 h-8 flex items-center justify-center rounded-lg text-[rgb(var(--color-text-subtle))] hover:text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-surface-muted))] transition-colors"
             >
               <CloseIcon />
