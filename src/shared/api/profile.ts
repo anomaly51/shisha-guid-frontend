@@ -36,7 +36,35 @@ export const profileApi = api.injectEndpoints({
       query: (body) => ({ url: '/profile/me', method: 'PATCH', body }),
       invalidatesTags: ['Profile'],
     }),
+    getPublicProfile: builder.query<any, string>({
+      query: (id) => `/profile/users/${id}`,
+      providesTags: (_result, _error, id) => [{ type: 'Profile', id }],
+    }),
+    followUser: builder.mutation<any, string>({
+      query: (id) => ({ url: `/profile/users/${id}/follow`, method: 'POST' }),
+      invalidatesTags: (_result, _error, id) => [{ type: 'Profile', id }, 'Profile'],
+    }),
+    unfollowUser: builder.mutation<any, string>({
+      query: (id) => ({ url: `/profile/users/${id}/follow`, method: 'DELETE' }),
+      invalidatesTags: (_result, _error, id) => [{ type: 'Profile', id }, 'Profile'],
+    }),
+    getNotifications: builder.query<{ items: any[]; unread_count: number }, void>({
+      query: () => '/profile/notifications',
+      providesTags: ['Profile'],
+    }),
+    markNotificationsRead: builder.mutation<any, void>({
+      query: () => ({ url: '/profile/notifications/read', method: 'POST' }),
+      invalidatesTags: ['Profile'],
+    }),
   }),
 })
 
-export const { useGetProfileQuery, useUpdateProfileMutation } = profileApi
+export const {
+  useGetProfileQuery,
+  useUpdateProfileMutation,
+  useGetPublicProfileQuery,
+  useFollowUserMutation,
+  useUnfollowUserMutation,
+  useGetNotificationsQuery,
+  useMarkNotificationsReadMutation,
+} = profileApi

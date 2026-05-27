@@ -6,6 +6,10 @@ export type SetupsQueryParams = {
   tobacco_ids?: string[]
   strength?: 'all' | 'light' | 'medium' | 'strong' | 'heavy'
   sort?: 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' | 'name'
+  search?: string
+  creator_id?: string
+  bookmarked?: boolean
+  following?: boolean
 } | void
 
 export type SetupsPageResponse = {
@@ -24,6 +28,10 @@ const withParams = (path: string, params: SetupsQueryParams) => {
   if (typeof params.offset === 'number') searchParams.set('offset', String(params.offset))
   if (params.strength && params.strength !== 'all') searchParams.set('strength', params.strength)
   if (params.sort && params.sort !== 'newest') searchParams.set('sort', params.sort)
+  if (params.search?.trim()) searchParams.set('search', params.search.trim())
+  if (params.creator_id) searchParams.set('creator_id', params.creator_id)
+  if (params.bookmarked) searchParams.set('bookmarked', 'true')
+  if (params.following) searchParams.set('following', 'true')
   params.tobacco_ids?.forEach((id) => searchParams.append('tobacco_ids', id))
 
   const query = searchParams.toString()
@@ -55,6 +63,22 @@ export const setupsApi = api.injectEndpoints({
     deleteSetup: builder.mutation<any, string>({
       query: (id) => ({ url: `/shisha/bowl-setups/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Setups'],
+    }),
+    cloneSetup: builder.mutation<any, string>({
+      query: (id) => ({ url: `/shisha/bowl-setups/${id}/clone`, method: 'POST' }),
+      invalidatesTags: ['Setups'],
+    }),
+    bookmarkSetup: builder.mutation<any, string>({
+      query: (id) => ({ url: `/shisha/bowl-setups/${id}/bookmark`, method: 'POST' }),
+      invalidatesTags: ['Setups'],
+    }),
+    unbookmarkSetup: builder.mutation<any, string>({
+      query: (id) => ({ url: `/shisha/bowl-setups/${id}/bookmark`, method: 'DELETE' }),
+      invalidatesTags: ['Setups'],
+    }),
+    getSetupVersions: builder.query<any[], string>({
+      query: (id) => `/shisha/bowl-setups/${id}/versions`,
+      providesTags: ['Setups'],
     }),
     getSetupReviews: builder.query<any[], string>({
       query: (id) => `/shisha/bowl-setups/${id}/reviews`,
@@ -88,5 +112,6 @@ export const setupsApi = api.injectEndpoints({
 
 export const {
   useGetSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
+  useCloneSetupMutation, useBookmarkSetupMutation, useUnbookmarkSetupMutation, useGetSetupVersionsQuery,
   useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation, useDeleteSetupReviewMutation,
 } = setupsApi

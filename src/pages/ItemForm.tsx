@@ -250,6 +250,9 @@ export const ItemForm = ({ title, initialValues, onSubmit, saving, isEdit }: For
         description: description.trim() || null,
         photo_urls: photoUrls,
       })
+      if (!isEdit) {
+        window.sessionStorage.setItem('shisha-guid:catalog-toast', `${name.trim()} создан.`)
+      }
       navigate(-1)
     } catch {
       setError(t('common.failedSave'))

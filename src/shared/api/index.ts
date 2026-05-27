@@ -1,6 +1,10 @@
 export { api } from './base'
 export { useGoogleLoginMutation, useLogoutMutation } from './auth'
-export { useGetProfileQuery, useUpdateProfileMutation } from './profile'
+export {
+  useGetProfileQuery, useUpdateProfileMutation,
+  useGetPublicProfileQuery, useFollowUserMutation, useUnfollowUserMutation,
+  useGetNotificationsQuery, useMarkNotificationsReadMutation,
+} from './profile'
 export { useGetAdminUsersQuery, useUpdateAdminUserMutation } from './admin'
 export type { AdminUser, BadgeEffect, UserBadge } from './admin'
 export {
@@ -13,6 +17,7 @@ export {
 } from './catalog'
 export {
   useGetSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
+  useCloneSetupMutation, useBookmarkSetupMutation, useUnbookmarkSetupMutation, useGetSetupVersionsQuery,
   useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation, useDeleteSetupReviewMutation,
 } from './setups'
 export { useGetUploadPolicyMutation, useUploadMediaMutation } from './upload'

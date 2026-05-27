@@ -18,6 +18,7 @@ type SortValue = 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' 
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
 
 const SETUP_PAGE_SIZE = 12
+const SEARCH_HISTORY_KEY = 'shisha-guid:setup-searches'
 
 const LazyMixBowlPreview = lazy(() => (
   import('../shared/ui/MixBowlPreview').then(({ MixBowlPreview }) => ({ default: MixBowlPreview }))
@@ -238,13 +239,27 @@ export const Feed = () => {
   const selectedTobaccos = useMemo(() => searchParams.getAll('tobacco'), [searchParams])
   const selectedTobaccoKey = selectedTobaccos.join('\u0001')
   const strength = getSearchStrength(searchParams.get('strength'))
+  const setupSearch = searchParams.get('q') || ''
+  const bookmarked = searchParams.get('bookmarked') === '1'
+  const following = searchParams.get('following') === '1'
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      return JSON.parse(window.sessionStorage.getItem(SEARCH_HISTORY_KEY) || '[]')
+    } catch {
+      return []
+    }
+  })
   const setupQueryParams = useMemo(() => ({
     limit: SETUP_PAGE_SIZE,
     offset: pageOffset,
     tobacco_ids: selectedTobaccos,
     strength,
     sort,
-  }), [pageOffset, selectedTobaccoKey, selectedTobaccos, sort, strength])
+    search: setupSearch || undefined,
+    bookmarked,
+    following,
+  }), [bookmarked, following, pageOffset, selectedTobaccoKey, selectedTobaccos, setupSearch, sort, strength])
   const {
     data: setupsPage,
     isError: isSetupsError,
@@ -310,6 +325,27 @@ export const Feed = () => {
     })
   }
 
+  const setSetupSearchFilter = (value: string) => {
+    const normalized = value.trim()
+    updateSearch((next) => {
+      if (normalized) next.set('q', normalized)
+      else next.delete('q')
+    })
+    if (!normalized) return
+    setSearchHistory((current) => {
+      const next = [normalized, ...current.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 6)
+      window.sessionStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  const toggleFlagFilter = (key: 'bookmarked' | 'following') => {
+    updateSearch((next) => {
+      if (next.get(key) === '1') next.delete(key)
+      else next.set(key, '1')
+    })
+  }
+
   const toggleTobaccoFilter = (id: string) => {
     updateSearch((next) => {
       const current = next.getAll('tobacco')
@@ -334,6 +370,9 @@ export const Feed = () => {
     updateSearch((next) => {
       next.delete('tobacco')
       next.delete('strength')
+      next.delete('q')
+      next.delete('bookmarked')
+      next.delete('following')
     })
   }
 
@@ -342,7 +381,7 @@ export const Feed = () => {
     setPageOffset(0)
     setTotalSetups(0)
     setHasMoreSetups(false)
-  }, [selectedTobaccoKey, sort, strength])
+  }, [bookmarked, following, selectedTobaccoKey, setupSearch, sort, strength])
 
   useEffect(() => {
     if (!normalizedSetupsPage) return
@@ -390,6 +429,9 @@ export const Feed = () => {
 
   const activeFilterCount = selectedTobaccos.length
     + (strength !== 'all' ? 1 : 0)
+    + (setupSearch ? 1 : 0)
+    + (bookmarked ? 1 : 0)
+    + (following ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
   const strengthLabel = strength === 'all' ? '' : t(`metrics.heaviness.${strength}`)
 
@@ -435,7 +477,7 @@ export const Feed = () => {
       </div>
 
       <div tw="-mx-2 mb-5 border-y border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))]/95 px-2 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border sm:bg-[rgb(var(--color-surface))] sm:p-3 sm:shadow-[0_18px_42px_-36px_rgba(83,48,31,0.45)] lg:sticky lg:top-[var(--sticky-filter-top)] lg:z-30">
-        <div tw="grid grid-cols-1 gap-2 lg:grid-cols-[220px_minmax(0,1fr)_auto]">
+        <div tw="grid grid-cols-1 gap-2 lg:grid-cols-[220px_minmax(240px,1fr)_minmax(0,1fr)_auto]">
           <label tw="relative block min-w-0">
             <span tw="sr-only">{t('feed.controls.showFirst')}</span>
             <select
@@ -451,6 +493,27 @@ export const Feed = () => {
               <option value="name">{t('feed.sort.name')}</option>
             </select>
             <span tw="pointer-events-none absolute right-3 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 border-b-2 border-r-2 border-[rgb(var(--color-accent))]" />
+          </label>
+
+          <label tw="relative block min-w-0">
+            <span tw="sr-only">Поиск забивки</span>
+            <CatalogIcon name="feed" size={14} tw="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--color-text-subtle))]" />
+            <input
+              defaultValue={setupSearch}
+              onBlur={(event) => setSetupSearchFilter(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  setSetupSearchFilter(event.currentTarget.value)
+                }
+              }}
+              placeholder="Поиск по названию"
+              list="setup-search-history"
+              tw="h-[42px] w-full rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] pl-9 pr-3 text-[13px] font-bold text-[rgb(var(--color-text))] outline-none placeholder:text-[rgb(var(--color-text-subtle))] focus:border-[rgb(var(--color-accent))] focus:shadow-[0_0_0_2px_rgba(139,74,43,0.1)]"
+            />
+            <datalist id="setup-search-history">
+              {searchHistory.map((item) => <option key={item} value={item} />)}
+            </datalist>
           </label>
 
           <div tw="flex gap-1 overflow-x-auto rounded-lg bg-[rgb(var(--color-surface-subtle))] p-1">
@@ -505,6 +568,25 @@ export const Feed = () => {
                 />
               </span>
             </span>
+          </button>
+        </div>
+
+        <div tw="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => toggleFlagFilter('following')}
+            tw="rounded-lg border px-3 py-1.5 text-[12px] font-bold transition-colors"
+            css={following ? { backgroundColor: 'rgb(var(--color-surface-inverse))', borderColor: 'rgb(var(--color-surface-inverse))', color: 'white' } : { backgroundColor: 'rgb(var(--color-surface))', borderColor: 'rgb(var(--color-border-strong))', color: 'rgb(var(--color-text-muted))' }}
+          >
+            Подписки
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleFlagFilter('bookmarked')}
+            tw="rounded-lg border px-3 py-1.5 text-[12px] font-bold transition-colors"
+            css={bookmarked ? { backgroundColor: 'rgb(var(--color-surface-inverse))', borderColor: 'rgb(var(--color-surface-inverse))', color: 'white' } : { backgroundColor: 'rgb(var(--color-surface))', borderColor: 'rgb(var(--color-border-strong))', color: 'rgb(var(--color-text-muted))' }}
+          >
+            Избранное
           </button>
         </div>
 

@@ -4,6 +4,8 @@ import tw from 'twin.macro'
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useCreateSetupReviewMutation,
+  useBookmarkSetupMutation,
+  useCloneSetupMutation,
   useDeleteSetupReviewMutation,
   useGetBowlSetupTypesQuery,
   useGetBowlsQuery,
@@ -15,6 +17,7 @@ import {
   useGetSetupQuery,
   useDeleteSetupMutation,
   useRecordSetupViewMutation,
+  useUnbookmarkSetupMutation,
   useUpdateSetupReviewMutation,
 } from '../shared/api'
 import { Button } from '../shared/ui/Button'
@@ -503,6 +506,9 @@ export const SetupDetail = () => {
   const hasToken = hasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
   const [deleteSetup, { isLoading: deleting }] = useDeleteSetupMutation()
+  const [cloneSetup, { isLoading: cloning }] = useCloneSetupMutation()
+  const [bookmarkSetup, { isLoading: bookmarking }] = useBookmarkSetupMutation()
+  const [unbookmarkSetup, { isLoading: unbookmarking }] = useUnbookmarkSetupMutation()
   const [recordSetupView] = useRecordSetupViewMutation()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -548,6 +554,18 @@ export const SetupDetail = () => {
     } catch {
       setDeleteError(t('setupDetail.deleteFailed'))
     }
+  }
+
+  const handleClone = async () => {
+    if (!item?.id) return
+    const cloned = await cloneSetup(item.id).unwrap()
+    navigate(`/setups/${cloned.id}/edit`)
+  }
+
+  const handleBookmark = async () => {
+    if (!item?.id) return
+    if (item.is_bookmarked) await unbookmarkSetup(item.id).unwrap()
+    else await bookmarkSetup(item.id).unwrap()
   }
 
   if (isLoading) {
@@ -608,6 +626,24 @@ export const SetupDetail = () => {
               <span tw="tabular-nums">{Number(item.views_count || 0)}</span>
               <span tw="font-semibold text-[rgb(var(--color-text-subtle))]">{t('setupDetail.views')}</span>
             </div>
+            {profile && (
+              <div tw="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleBookmark}
+                  disabled={bookmarking || unbookmarking}
+                >
+                  {item.is_bookmarked ? 'В избранном' : 'В избранное'}
+                </Button>
+                {!canManageSetup && (
+                  <Button type="button" variant="outline" size="sm" onClick={handleClone} disabled={cloning}>
+                    {cloning ? t('common.saving') : 'Копировать'}
+                  </Button>
+                )}
+              </div>
+            )}
             {canManageSetup && (
               <div tw="mt-3 flex flex-wrap gap-2">
                 <Link to={`/setups/${item.id}/edit`}>
@@ -628,6 +664,22 @@ export const SetupDetail = () => {
             )}
             {item.description && (
               <p tw="mt-3 line-clamp-3 text-[13px] font-medium leading-relaxed text-[rgb(var(--color-text-muted))]">{item.description}</p>
+            )}
+
+            {item.photo_urls?.length > 0 && (
+              <div tw="mt-4 grid grid-cols-3 gap-2">
+                {item.photo_urls.slice(0, 6).map((url: string, index: number) => (
+                  <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" tw="block overflow-hidden rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))]">
+                    <img
+                      src={url}
+                      alt=""
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                      decoding="async"
+                      tw="aspect-square h-full w-full object-cover"
+                    />
+                  </a>
+                ))}
+              </div>
             )}
 
             <div tw="mt-4">

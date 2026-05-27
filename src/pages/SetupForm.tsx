@@ -18,6 +18,7 @@ import { detectBowlModel, MIX_COLORS, type BowlModel, type SetupKind } from '../
 import { calculateSetupCost, formatMoney } from '../shared/setupCost'
 import { hasAuthToken } from '../shared/authToken'
 import { filterCatalogItems, getBrandOptions, getCatalogBrand } from '../shared/catalogSearch'
+import { PhotoUploader } from '../shared/ui/PhotoUploader'
 
 const Label = tw.label`text-[10px] font-semibold text-[rgb(var(--color-text-muted))] uppercase tracking-wide`
 const Muted = tw.span`text-[11px] font-medium text-[rgb(var(--color-text-subtle))]`
@@ -435,6 +436,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const [name, setName] = useState(initialValues?.name || '')
   const [nameEdited, setNameEdited] = useState(Boolean(initialValues?.name))
   const [description, setDescription] = useState(initialValues?.description || '')
+  const [photoUrls, setPhotoUrls] = useState<string[]>(initialValues?.photo_urls || [])
   const [bowlId, setBowlId] = useState(initialValues?.bowl_id || '')
   const [coalId, setCoalId] = useState(initialValues?.coal_id || '')
   const [kaloudId, setKaloudId] = useState(initialValues?.kaloud_id || '')
@@ -540,10 +542,10 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const isDirty = useMemo(() => {
     if (savedRef.current) return false
     if (isEdit) {
-      return Boolean(name.trim() || description.trim() || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId)
+      return Boolean(name.trim() || description.trim() || photoUrls.length || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId)
     }
-    return Boolean(name.trim() || description.trim() || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId)
-  }, [bowlId, coalId, description, isEdit, kaloudId, name, placementId, tobaccoMix.length, typeId])
+    return Boolean(name.trim() || description.trim() || photoUrls.length || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId)
+  }, [bowlId, coalId, description, isEdit, kaloudId, name, photoUrls.length, placementId, tobaccoMix.length, typeId])
   const confirmLeave = () => !isDirty || window.confirm('Несохраненные изменения будут потеряны. Уйти со страницы?')
 
   useEffect(() => {
@@ -668,6 +670,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
       coal_id: coalId,
       coal_placement_id: placementId,
       bowl_setup_type_id: typeId,
+      photo_urls: photoUrls,
       tobaccos: preparedTobaccos,
     }
 
@@ -1170,6 +1173,13 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                     rows={3}
                     maxLength={900}
                     placeholder={t('setupForm.notesPlaceholder')}
+                  />
+
+                  <PhotoUploader
+                    label="Фото забивки"
+                    value={photoUrls}
+                    onChange={setPhotoUrls}
+                    max={6}
                   />
                 </div>
               </section>

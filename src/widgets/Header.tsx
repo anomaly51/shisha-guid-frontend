@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
 import tw from 'twin.macro'
 import { Button } from '../shared/ui/Button'
-import { useGetProfileQuery, useLogoutMutation } from '../shared/api'
+import { useGetNotificationsQuery, useGetProfileQuery, useLogoutMutation, useMarkNotificationsReadMutation } from '../shared/api'
 import { AuthModal } from './AuthModal'
 import { LogoutIcon, PlusIcon, ShishaGuidLogo } from '../shared/ui/Icons'
 import { RoleBadge } from '../shared/ui/RoleBadge'
@@ -47,12 +47,18 @@ const NewSetupLink = styled(Link)`
 export const Header = () => {
   const hasToken = useHasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
+  const { data: notifications } = useGetNotificationsQuery(undefined, {
+    pollingInterval: 60000,
+    skip: !hasToken,
+  })
   const [logout] = useLogoutMutation()
+  const [markNotificationsRead] = useMarkNotificationsReadMutation()
   const [authOpen, setAuthOpen] = useState(false)
   const navigate = useNavigate()
   const { t } = useTranslation()
   const isResolvingAuth = hasToken === undefined
   const isResolvingProfile = hasToken === true && !profile
+  const unreadCount = notifications?.unread_count || 0
 
   const handleLogout = async () => {
     await logout()
@@ -80,6 +86,20 @@ export const Header = () => {
           <div tw="flex items-center gap-2">
             {profile ? (
               <>
+                <button
+                  type="button"
+                  onClick={() => markNotificationsRead()}
+                  aria-label={unreadCount ? `Непрочитанные отзывы: ${unreadCount}` : 'Нет непрочитанных отзывов'}
+                  title={unreadCount ? `Непрочитанные отзывы: ${unreadCount}` : 'Нет непрочитанных отзывов'}
+                  tw="relative flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[13px] font-black text-[rgb(var(--color-text-inverse))] transition-colors hover:bg-white/10"
+                >
+                  <span aria-hidden="true">!</span>
+                  {unreadCount > 0 && (
+                    <span tw="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[rgb(var(--color-accent))] px-1 text-center text-[10px] font-black leading-[18px] text-white">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </button>
                 <button
                   onClick={() => navigate('/profile')}
                   tw="flex items-center gap-2 text-[rgb(var(--color-text-inverse))] hover:opacity-80 transition-opacity"

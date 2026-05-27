@@ -215,6 +215,7 @@ export const Catalog = ({
   const strength = getSearchStrength(searchParams.get('strength'))
   const minPrice = searchParams.get('minPrice') || ''
   const maxPrice = searchParams.get('maxPrice') || ''
+  const catalogSearch = searchParams.get('q') || ''
   const isPagedCatalog = itemKind === 'tobacco' || itemKind === 'coal'
   const pageSize = itemKind === 'coal' ? COAL_PAGE_SIZE : TOBACCO_PAGE_SIZE
   const currentPage = isPagedCatalog ? getSearchPage(searchParams.get('page')) : 1
@@ -228,6 +229,7 @@ export const Catalog = ({
   const coalQueryParams = itemKind === 'coal' ? {
     limit: pageSize,
     offset: (currentPage - 1) * pageSize,
+    search: catalogSearch || undefined,
   } : undefined
   const { data: rawData, isFetching, isLoading } = listHook(tobaccoQueryParams || coalQueryParams)
   const { data: setupsForRatings } = useGetSetupsQuery(
@@ -240,7 +242,7 @@ export const Catalog = ({
   const navigate = useNavigate()
   const { t } = useTranslation()
   const isAdmin = profile?.role === 'admin'
-  const hasActiveFilters = strength !== 'all' || minPrice.trim() !== '' || maxPrice.trim() !== ''
+  const hasActiveFilters = strength !== 'all' || minPrice.trim() !== '' || maxPrice.trim() !== '' || catalogSearch.trim() !== ''
   const pageData = useMemo(
     () => normalizePageData(rawData, isPagedCatalog ? pageSize : 0),
     [isPagedCatalog, pageSize, rawData],
@@ -293,6 +295,16 @@ export const Catalog = ({
     })
   }
 
+  const setCatalogSearch = (value: string) => {
+    setAppendTobaccos(false)
+    setLoadedTobaccos([])
+    updateSearch((next) => {
+      if (value.trim()) next.set('q', value.trim())
+      else next.delete('q')
+      next.delete('page')
+    })
+  }
+
   const resetFilters = () => {
     setAppendTobaccos(false)
     setLoadedTobaccos([])
@@ -300,6 +312,7 @@ export const Catalog = ({
       next.delete('strength')
       next.delete('minPrice')
       next.delete('maxPrice')
+      next.delete('q')
       next.delete('page')
     })
   }
@@ -323,6 +336,13 @@ export const Catalog = ({
     setLoadedTobaccos([])
     setLoadedCatalogKind(itemKind)
   }, [itemKind])
+
+  useEffect(() => {
+    const message = window.sessionStorage.getItem('shisha-guid:catalog-toast')
+    if (!message) return
+    window.sessionStorage.removeItem('shisha-guid:catalog-toast')
+    setNotice({ message })
+  }, [])
 
   useEffect(() => {
     if (!isPagedCatalog || !rawData || !pageDataMatchesCatalog) return
@@ -406,9 +426,21 @@ export const Catalog = ({
         </div>
       ) : (
         <>
-          {showTobaccoFilters && (
+          {(showTobaccoFilters || itemKind === 'coal') && (
             <div tw="-mx-2 mb-5 border-y border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))]/95 px-2 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border sm:bg-[rgb(var(--color-surface))] sm:p-3 sm:shadow-[0_18px_42px_-36px_rgba(83,48,31,0.45)] lg:sticky lg:top-[var(--sticky-filter-top)] lg:z-30">
               <div tw="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_240px_auto]">
+                {itemKind === 'coal' ? (
+                  <label tw="relative block min-w-0">
+                    <span tw="sr-only">Поиск углей</span>
+                    <CatalogIcon name="coal" size={14} tw="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--color-text-subtle))]" />
+                    <input
+                      value={catalogSearch}
+                      onChange={(event) => setCatalogSearch(event.target.value)}
+                      placeholder="Поиск углей"
+                      tw="h-[42px] w-full rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] pl-9 pr-3 text-[13px] font-bold text-[rgb(var(--color-text))] outline-none placeholder:text-[rgb(var(--color-text-subtle))] focus:border-[rgb(var(--color-accent))] focus:shadow-[0_0_0_2px_rgba(139,74,43,0.1)]"
+                    />
+                  </label>
+                ) : (
                 <div tw="flex gap-1 overflow-x-auto rounded-lg bg-[rgb(var(--color-surface-subtle))] p-1">
                   {strengthOptions.map((option) => (
                     <button
@@ -422,8 +454,9 @@ export const Catalog = ({
                     </button>
                   ))}
                 </div>
+                )}
 
-                <div tw="grid grid-cols-2 gap-2">
+                {itemKind === 'tobacco' && <div tw="grid grid-cols-2 gap-2">
                   <label tw="min-w-0">
                     <span tw="sr-only">{t('catalog.filters.minPrice')}</span>
                     <input
@@ -448,7 +481,7 @@ export const Catalog = ({
                       tw="h-[42px] w-full rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-3 text-[13px] font-bold text-[rgb(var(--color-text))] outline-none placeholder:text-[rgb(var(--color-text-subtle))] focus:border-[rgb(var(--color-accent))] focus:shadow-[0_0_0_2px_rgba(139,74,43,0.1)]"
                     />
                   </label>
-                </div>
+                </div>}
 
                 <button
                   type="button"
