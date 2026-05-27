@@ -31,7 +31,7 @@ export const normalizeReviewRating = (value: number) => {
 }
 
 export const getReviewAverage = (reviews: Pick<SetupReview, 'rating'>[]) => {
-  if (!reviews.length) return 0
+  if (!reviews.length) return null
   const average = reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
   return Number(average.toFixed(1))
 }

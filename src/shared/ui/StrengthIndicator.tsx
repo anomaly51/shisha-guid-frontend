@@ -4,7 +4,7 @@ import tw from 'twin.macro'
 import { getHeavinessToneKey } from '../setupMetrics'
 
 type StrengthIndicatorProps = {
-  value: number
+  value: number | null
   compact?: boolean
   label?: ReactNode
   showScore?: boolean
@@ -31,7 +31,8 @@ const toneStyles = {
 
 export const StrengthIndicator = ({ value, compact = false, label, showScore = false }: StrengthIndicatorProps) => {
   const { t } = useTranslation()
-  const normalized = Math.min(10, Math.max(0, Number.isFinite(value) ? value : 5))
+  const hasValue = typeof value === 'number' && Number.isFinite(value)
+  const normalized = Math.min(10, Math.max(0, hasValue ? value : 0))
   const tone = getHeavinessToneKey(normalized)
   const styles = toneStyles[tone]
   const filled = Math.round(normalized)
@@ -52,10 +53,10 @@ export const StrengthIndicator = ({ value, compact = false, label, showScore = f
             ]}
             style={{ color: styles.text }}
           >
-            {t(`metrics.heaviness.${tone}`)}
+            {hasValue ? t(`metrics.heaviness.${tone}`) : t('common.notSelected')}
           </span>
         </div>
-        {showScore && (
+        {showScore && hasValue && (
           <span tw="shrink-0 text-[11px] font-black leading-none tabular-nums" style={{ color: styles.text }}>
             {Math.round(normalized)}
           </span>

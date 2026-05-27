@@ -13,7 +13,7 @@ const nonNegativeNumberOrNull = (value: unknown) => (
 
 export const formatMoney = (value: unknown, currency?: string) => (
   typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency === 'UAH' || !currency ? 'грн' : currency}`
+    ? `${value.toLocaleString('uk-UA', { maximumFractionDigits: 2 })} ${currency === 'UAH' || !currency ? 'грн' : currency}`
     : null
 )
 

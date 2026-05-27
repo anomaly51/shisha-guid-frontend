@@ -67,7 +67,7 @@ const buildMixItems = (setup: any, tobaccos: any[] | undefined, fallbackName: (i
 
 const formatReviewDate = (value: string | undefined, language: string) => {
   if (!value) return ''
-  return new Intl.DateTimeFormat(language, { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
+  return new Intl.DateTimeFormat(language, { day: '2-digit', month: 'short', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, year: 'numeric' }).format(new Date(value))
 }
 
 const isReviewAuthor = (review: SetupReview, profile: any) => {
@@ -151,7 +151,7 @@ const CostSummary = ({ cost }: { cost: ReturnType<typeof calculateSetupCost> }) 
   )
 }
 
-const CompactSetupSummary = ({ kind, typeName, heaviness }: { kind: ReturnType<typeof detectSetupKind>; typeName: string; heaviness: number }) => {
+const CompactSetupSummary = ({ kind, typeName, heaviness }: { kind: ReturnType<typeof detectSetupKind>; typeName: string; heaviness: number | null }) => {
   const { t } = useTranslation()
 
   return (
@@ -165,7 +165,7 @@ const CompactSetupSummary = ({ kind, typeName, heaviness }: { kind: ReturnType<t
         <div tw="shrink-0 text-right">
           <Label>{t('setupDetail.heaviness')}</Label>
           <p tw="mt-1 rounded-lg bg-[rgb(var(--color-surface-inverse))] px-2.5 py-1.5 text-[14px] font-black text-white tabular-nums">
-            {heaviness.toFixed(1)}/10
+            {heaviness === null ? '-' : `${heaviness.toFixed(1)}/10`}
           </p>
         </div>
       </div>
@@ -252,12 +252,12 @@ const TobaccoMeasureCard = ({ count, kind, mix, index }: { count: number; kind: 
   )
 }
 
-const RatingPill = ({ rating }: { rating: number }) => (
+const RatingPill = ({ rating }: { rating: number | null }) => (
   <span
     tw="inline-flex min-w-[54px] items-baseline justify-center rounded-lg bg-[rgb(var(--color-surface-inverse))] px-2.5 py-1.5 text-[15px] font-black text-white tabular-nums"
   >
-    {Number(rating).toFixed(1)}
-    <span tw="ml-0.5 text-[9px] font-bold text-white/65">/10</span>
+    {rating === null ? '-' : Number(rating).toFixed(1)}
+    {rating !== null && <span tw="ml-0.5 text-[9px] font-bold text-white/65">/10</span>}
   </span>
 )
 
@@ -527,7 +527,7 @@ export const SetupDetail = () => {
   const kind = detectSetupKind(typeName)
   const bowlModel = detectBowlModel(bowl)
   const mixItems = useMemo(() => (item ? buildMixItems(item, undefined, (index) => t('common.tobaccoFallback', { number: index + 1 })) : []), [item, t])
-  const heaviness = useMemo(() => (item ? getSetupHeaviness(item, undefined) : 0), [item])
+  const heaviness = useMemo(() => (item ? getSetupHeaviness(item, undefined) : null), [item])
   const setupCost = useMemo(() => calculateSetupCost({
     bowl,
     coal,

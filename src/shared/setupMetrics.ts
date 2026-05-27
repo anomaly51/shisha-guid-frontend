@@ -27,13 +27,15 @@ export const getSetupHeaviness = (setup: any, tobaccos: any[] | undefined) => {
   if (Number.isFinite(cached)) return clamp(cached, 0, 10)
 
   const mix = setup?.tobaccos || []
+  if (!mix.length) return null
+
   const total = mix.reduce((sum: number, item: any) => sum + Number(item.percentage || 0), 0) || 100
   const value = mix.reduce((sum: number, item: any) => {
     const tobacco = item.tobacco || tobaccos?.find((entry) => entry.id === item.tobacco_id)
     return sum + getTobaccoStrength(tobacco) * (Number(item.percentage || 0) / total)
   }, 0)
 
-  return clamp(value || 5, 0, 10)
+  return Number.isFinite(value) && value > 0 ? clamp(value, 0, 10) : null
 }
 
 export const getHeavinessToneKey = (value: number) => {

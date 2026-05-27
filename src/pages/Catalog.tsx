@@ -107,7 +107,7 @@ const GridSkeleton = () => (
 
 const formatPrice = (value: unknown, currency?: string) => (
   typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString()} ${currency === 'UAH' || !currency ? 'грн' : currency}`
+    ? `${value.toLocaleString('uk-UA')} ${currency === 'UAH' || !currency ? 'грн' : currency}`
     : null
 )
 

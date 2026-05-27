@@ -18,6 +18,7 @@ type SortValue = 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' 
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
 
 const SETUP_PAGE_SIZE = 12
+const SETUPS_EMPTY_RETRY_LIMIT = 3
 const SEARCH_HISTORY_KEY = 'shisha-guid:setup-searches'
 
 const LazyMixBowlPreview = lazy(() => (
@@ -234,6 +235,7 @@ export const Feed = () => {
   const [pageOffset, setPageOffset] = useState(0)
   const [totalSetups, setTotalSetups] = useState(0)
   const [hasMoreSetups, setHasMoreSetups] = useState(false)
+  const [emptyRetryCount, setEmptyRetryCount] = useState(0)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const sort = getSearchSort(searchParams.get('sort'))
   const selectedTobaccos = useMemo(() => searchParams.getAll('tobacco'), [searchParams])
@@ -381,6 +383,7 @@ export const Feed = () => {
     setPageOffset(0)
     setTotalSetups(0)
     setHasMoreSetups(false)
+    setEmptyRetryCount(0)
   }, [bookmarked, following, selectedTobaccoKey, setupSearch, sort, strength])
 
   useEffect(() => {
@@ -389,6 +392,7 @@ export const Feed = () => {
 
     setTotalSetups(page.total)
     setHasMoreSetups(page.has_more)
+    setEmptyRetryCount(0)
     setLoadedSetups((current) => {
       if (page.offset === 0) return page.items
       const seen = new Set(current.map((setup) => setup.id))
@@ -400,14 +404,15 @@ export const Feed = () => {
   }, [normalizedSetupsPage])
 
   useEffect(() => {
-    if (!isSetupsError || loadedSetups.length) return undefined
+    if (!isSetupsError || loadedSetups.length || emptyRetryCount >= SETUPS_EMPTY_RETRY_LIMIT) return undefined
 
     const timeout = window.setTimeout(() => {
+      setEmptyRetryCount((current) => current + 1)
       refetchSetups()
     }, 900)
 
     return () => window.clearTimeout(timeout)
-  }, [isSetupsError, loadedSetups.length, refetchSetups])
+  }, [emptyRetryCount, isSetupsError, loadedSetups.length, refetchSetups])
 
   useEffect(() => {
     if (!canLoadMore) return undefined
@@ -435,10 +440,21 @@ export const Feed = () => {
   const hasActiveFilters = activeFilterCount > 0
   const strengthLabel = strength === 'all' ? '' : t(`metrics.heaviness.${strength}`)
 
-  if (isLoading || (isSetupsError && !loadedSetups.length)) {
+  if (isLoading || (isSetupsError && !loadedSetups.length && emptyRetryCount < SETUPS_EMPTY_RETRY_LIMIT)) {
     return (
       <div tw="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {[1, 2, 3, 4, 5, 6].map((n) => <CardSkeleton key={n} />)}
+      </div>
+    )
+  }
+
+  if (isSetupsError && !loadedSetups.length) {
+    return (
+      <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface-muted))] px-4 py-8 text-center">
+        <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">{t('feed.filters.loadFailed')}</h2>
+        <button type="button" onClick={() => { setEmptyRetryCount(0); refetchSetups() }} tw="mt-4 rounded-lg bg-[rgb(var(--color-surface-inverse))] px-4 py-2 text-[13px] font-bold text-white">
+          {t('feed.filters.retry')}
+        </button>
       </div>
     )
   }
