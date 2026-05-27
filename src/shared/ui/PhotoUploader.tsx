@@ -11,10 +11,14 @@ interface PhotoUploaderProps {
 }
 
 const Label = tw.label`text-[10px] font-semibold text-[rgb(var(--color-text-muted))] uppercase tracking-wide`
-export const ACCEPTED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/gif']
+const configuredMaxUploadBytes = Number(import.meta.env.VITE_MAX_UPLOAD_BYTES)
+
+export const ACCEPTED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 export const ACCEPTED_MEDIA_INPUT = ACCEPTED_MEDIA_TYPES.join(',')
-export const ACCEPTED_MEDIA_LABEL = 'JPG, PNG or GIF up to 5 MB'
-export const MAX_MEDIA_SIZE_BYTES = 5242880
+export const MAX_MEDIA_SIZE_BYTES = Number.isFinite(configuredMaxUploadBytes) && configuredMaxUploadBytes > 0
+  ? configuredMaxUploadBytes
+  : 5242880
+export const LARGE_GIF_WARNING_BYTES = 2 * 1024 * 1024
 
 export const isAcceptedMediaFile = (file: File) => (
   ACCEPTED_MEDIA_TYPES.includes(file.type) && file.size <= MAX_MEDIA_SIZE_BYTES
@@ -41,6 +45,7 @@ export const getPublicUrl = (uploadUrl: string, key: string) => {
 export const PhotoUploader = ({ label = 'Photos', value, onChange, max = 10 }: PhotoUploaderProps) => {
   const [uploadMedia] = useUploadMediaMutation()
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState('')
   const { t } = useTranslation()
   const availableSlots = Math.max(max - value.length, 0)
@@ -50,6 +55,7 @@ export const PhotoUploader = ({ label = 'Photos', value, onChange, max = 10 }: P
   const uploadFiles = async (files: FileList | null) => {
     if (!files?.length || availableSlots === 0) return
     setUploading(true)
+    setUploadProgress(null)
     setError('')
     try {
       const selected = Array.from(files)
@@ -61,16 +67,23 @@ export const PhotoUploader = ({ label = 'Photos', value, onChange, max = 10 }: P
         return
       }
 
-      const uploaded = await Promise.all(selected.map(async (file) => {
+      const largeGif = selected.find((file) => file.type === 'image/gif' && file.size > LARGE_GIF_WARNING_BYTES)
+      if (largeGif && !window.confirm(t('uploader.largeGifWarning'))) return
+
+      setUploadProgress({ done: 0, total: selected.length })
+      const uploaded: string[] = []
+      for (const file of selected) {
         const response = await uploadMedia(file).unwrap()
-        return response.url
-      }))
+        uploaded.push(response.url)
+        setUploadProgress((current) => ({ done: (current?.done || 0) + 1, total: current?.total || selected.length }))
+      }
 
       onChange([...value, ...uploaded])
     } catch {
       setError(t('common.uploadFailed'))
     } finally {
       setUploading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -147,7 +160,11 @@ export const PhotoUploader = ({ label = 'Photos', value, onChange, max = 10 }: P
         {availableSlots > 0 && (
           <label tw="aspect-square rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))]/80 hover:bg-[rgb(var(--color-accent-muted))] transition-colors flex flex-col items-center justify-center gap-1.5 text-[rgb(var(--color-text-muted))] cursor-pointer">
             <span tw="w-6 h-6 rounded-md bg-[rgb(var(--color-surface-subtle))] flex items-center justify-center text-lg leading-none">+</span>
-            <span tw="text-[11px] font-semibold">{uploading ? t('common.uploading') : t('common.addMedia')}</span>
+            <span tw="text-[11px] font-semibold">
+              {uploading && uploadProgress
+                ? t('uploader.uploadProgress', { done: uploadProgress.done, total: uploadProgress.total })
+                : uploading ? t('common.uploading') : t('common.addMedia')}
+            </span>
             <span tw="px-2 text-center text-[10px] leading-tight text-[rgb(var(--color-text-subtle))]">{t('common.mediaRules')}</span>
             <input
               type="file"

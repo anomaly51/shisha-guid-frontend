@@ -54,26 +54,29 @@ export const TobaccoPhotoStack = ({
 }) => {
   if (!items.length) return null
 
-  const { size, maxWidth } = getStackMetrics(items.length, variant)
+  const maxVisible = variant === 'detail' ? 4 : 3
+  const visibleItems = items.slice(0, maxVisible)
+  const hiddenCount = Math.max(0, items.length - visibleItems.length)
+  const { size, maxWidth } = getStackMetrics(visibleItems.length, variant)
   const naturalStep = size * 0.72
-  const width = items.length <= 1
+  const width = visibleItems.length <= 1
     ? size
-    : Math.min(maxWidth, size + naturalStep * (items.length - 1))
-  const step = items.length <= 1 ? 0 : (width - size) / (items.length - 1)
+    : Math.min(maxWidth, size + naturalStep * (visibleItems.length - 1))
+  const step = visibleItems.length <= 1 ? 0 : (width - size) / (visibleItems.length - 1)
   const height = size + 4
   const mobileScale = variant === 'detail' ? 0.64 : 1
 
   return (
     <StackRoot $width={width} $height={height} $mobileScale={mobileScale}>
       <StackInner $width={width} $height={height} $mobileScale={mobileScale}>
-        {items.map((item, index) => (
+        {visibleItems.map((item, index) => (
           <div
             key={`${item.id}-${index}`}
             tw="absolute overflow-hidden bg-[rgb(var(--color-surface))] shadow-[0_12px_26px_-16px_rgba(0,0,0,0.7)]"
             style={{
               height: size,
               left: index * step,
-              top: index % 2 && items.length > 3 ? 4 : 0,
+              top: index % 2 && visibleItems.length > 3 ? 4 : 0,
               width: size,
               zIndex: index + 1,
             }}
@@ -90,6 +93,11 @@ export const TobaccoPhotoStack = ({
             ) : (
               <div tw="flex h-full w-full items-center justify-center" style={{ backgroundColor: item.color }}>
                 <CatalogIcon name="tobacco" size={Math.max(18, size - 14)} tw="text-white/90" />
+              </div>
+            )}
+            {hiddenCount > 0 && index === visibleItems.length - 1 && (
+              <div tw="absolute inset-0 flex items-center justify-center bg-[rgba(23,19,18,0.62)] text-[13px] font-black text-white tabular-nums">
+                +{hiddenCount}
               </div>
             )}
           </div>
