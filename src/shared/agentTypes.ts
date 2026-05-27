@@ -31,3 +31,5 @@ export type AgentChatResponse = {
   needs_confirmation: boolean
   created_setup_id?: string | null
 }
+
+export type AgentLanguage = 'ru' | 'uk' | 'en'

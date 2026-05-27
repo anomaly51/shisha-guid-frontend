@@ -1,5 +1,6 @@
 import { Fragment, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
 import tw from 'twin.macro'
 import {
@@ -132,17 +133,11 @@ type LocalChatResolution = {
   trailingMessages?: TimelineMessage[]
 }
 
-const initialMessages: AgentMessage[] = [
-  {
-    role: 'assistant',
-    content: 'Расскажи забивку обычным сообщением. Можно коротко: вкус, табаки, чаша, калауд, уголь или раскладка углей. Я сам покажу варианты из базы и спрошу только то, чего не хватает.',
-  },
-]
-
-const initialTimelineMessages: TimelineMessage[] = initialMessages.map((message, index) => ({
-  ...message,
-  id: `initial-${index}`,
-}))
+const createInitialTimelineMessages = (content: string): TimelineMessage[] => ([{
+  id: 'initial-0',
+  role: 'assistant',
+  content,
+}])
 
 const createMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`
 const agentSessionStorageKey = 'shisha-guid-agent-session'
@@ -877,15 +872,16 @@ const DraftPreview = ({
   publishing: boolean
   catalogs: Record<CatalogKind, any[]>
 }) => {
+  const { t } = useTranslation()
   const ready = missing.length === 0
   const summary = compactSummary(draft)
   const mixItems = buildDraftMixItems(draft, catalogs.tobacco)
   const specs = [
-    { icon: 'bowl' as const, label: 'Чаша', value: draft.bowl_name, item: getCatalogItem(catalogs.bowl, draft.bowl_id, draft.bowl_name) },
-    { icon: 'kaloud' as const, label: 'Калауд', value: draft.kaloud_name, item: getCatalogItem(catalogs.kaloud, draft.kaloud_id, draft.kaloud_name) },
-    { icon: 'coal' as const, label: 'Уголь', value: draft.coal_name, item: getCatalogItem(catalogs.coal, draft.coal_id, draft.coal_name) },
-    { icon: 'placement' as const, label: 'Угли', value: draft.coal_placement_name, item: getCatalogItem(catalogs.placement, draft.coal_placement_id, draft.coal_placement_name) },
-    { icon: 'setupType' as const, label: 'Тип', value: draft.bowl_setup_type_name, item: getCatalogItem(catalogs.setupType, draft.bowl_setup_type_id, draft.bowl_setup_type_name) },
+    { icon: 'bowl' as const, label: t('agent.kind.bowl'), value: draft.bowl_name, item: getCatalogItem(catalogs.bowl, draft.bowl_id, draft.bowl_name) },
+    { icon: 'kaloud' as const, label: t('agent.kind.kaloud'), value: draft.kaloud_name, item: getCatalogItem(catalogs.kaloud, draft.kaloud_id, draft.kaloud_name) },
+    { icon: 'coal' as const, label: t('agent.kind.coal'), value: draft.coal_name, item: getCatalogItem(catalogs.coal, draft.coal_id, draft.coal_name) },
+    { icon: 'placement' as const, label: t('agent.kind.placement'), value: draft.coal_placement_name, item: getCatalogItem(catalogs.placement, draft.coal_placement_id, draft.coal_placement_name) },
+    { icon: 'setupType' as const, label: t('agent.kind.setupType'), value: draft.bowl_setup_type_name, item: getCatalogItem(catalogs.setupType, draft.bowl_setup_type_id, draft.bowl_setup_type_name) },
   ].filter((item) => item.value)
   const hasVisualDraftContent = mixItems.length > 0 || specs.length > 0
 
@@ -893,12 +889,12 @@ const DraftPreview = ({
     <DraftShell>
       <DraftHeader>
         <DraftTitle>
-          <DraftName>{draft.name || 'Название не указано'}</DraftName>
-          <DraftLabel>Черновик, не опубликовано</DraftLabel>
+          <DraftName>{draft.name || t('agent.draft.noName')}</DraftName>
+          <DraftLabel>{t('agent.draft.label')}</DraftLabel>
         </DraftTitle>
         <DraftBadge>
           <CatalogIcon name="feed" size={12} />
-          {ready ? 'готово' : 'сбор'}
+          {ready ? t('agent.draft.ready') : t('agent.draft.collecting')}
         </DraftBadge>
       </DraftHeader>
 
@@ -919,7 +915,7 @@ const DraftPreview = ({
                   </DraftMiniPhoto>
                   <div tw="min-w-0">
                     <DraftMixName>{item.name}</DraftMixName>
-                    <DraftMixMeta>табак</DraftMixMeta>
+                    <DraftMixMeta>{t('agent.kind.tobacco')}</DraftMixMeta>
                   </div>
                   <DraftPercent>{item.percentage}%</DraftPercent>
                 </DraftMixRow>
@@ -954,17 +950,17 @@ const DraftPreview = ({
           {summary.length ? summary.map((item) => (
             <DraftToken key={item}>{item}</DraftToken>
           )) : (
-            <span>Пока ничего не выбрано</span>
+            <span>{t('agent.draft.empty')}</span>
           )}
         </DraftLine>
       )}
 
-      {!ready && <MissingText tw="mt-2">Осталось выбрать: {missing.join(', ')}.</MissingText>}
+      {!ready && <MissingText tw="mt-2">{t('agent.draft.missing', { fields: missing.join(', ') })}</MissingText>}
 
       {onPublish && (
         <PublishButton type="button" onClick={onPublish} disabled={!ready || publishing} tw="mt-2">
           <CheckIcon size={14} />
-          {publishing ? 'Публикую' : 'Опубликовать'}
+          {publishing ? t('agent.publishing') : t('agent.publish')}
         </PublishButton>
       )}
     </DraftShell>
@@ -979,12 +975,15 @@ const ChoicePreview = ({
   choice: CatalogChoiceSnapshot
   onSelect: (kind: CatalogKind, item: any) => void
   disabled: boolean
-}) => (
+}) => {
+  const { t } = useTranslation()
+
+  return (
   <ChoiceShell>
     <ChoiceHeader>
       <div tw="min-w-0">
-        <ChoiceTitle>{choice.title}</ChoiceTitle>
-        <ChoiceHint>{choice.hint}</ChoiceHint>
+        <ChoiceTitle>{t('agent.choiceTitle', { label: t(`agent.kind.${choice.kind}`) })}</ChoiceTitle>
+        <ChoiceHint>{t('agent.choiceHint')}</ChoiceHint>
         {choice.missing?.length ? (
           <MissingChips>
             {choice.missing.map((field) => (
@@ -1003,9 +1002,9 @@ const ChoicePreview = ({
         const meta = [
           item?.description,
           typeof item?.price === 'number' ? `${item.price} ${item.price_currency || 'UAH'}` : null,
-          typeof item?.capacity_grams === 'number' ? `${item.capacity_grams} г` : null,
-          typeof item?.package_grams === 'number' ? `${item.package_grams} г` : null,
-          typeof item?.coal_count === 'number' ? `${item.coal_count} угля` : null,
+          typeof item?.capacity_grams === 'number' ? t('agent.grams', { value: item.capacity_grams }) : null,
+          typeof item?.package_grams === 'number' ? t('agent.grams', { value: item.package_grams }) : null,
+          typeof item?.coal_count === 'number' ? t('agent.coals', { count: item.coal_count }) : null,
         ].filter(Boolean)[0]
 
         return (
@@ -1028,13 +1027,15 @@ const ChoicePreview = ({
       })}
     </ChoiceGrid>
   </ChoiceShell>
-)
+  )
+}
 
 export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAgentWidgetProps) => {
+  const { i18n, t } = useTranslation()
   const navigate = useNavigate()
   const savedSession = useMemo(() => readAgentSession(), [])
   const [input, setInput] = useState('')
-  const [messages, setMessages] = useState<TimelineMessage[]>(savedSession?.messages?.length ? savedSession.messages : initialTimelineMessages)
+  const [messages, setMessages] = useState<TimelineMessage[]>(savedSession?.messages?.length ? savedSession.messages : createInitialTimelineMessages(t('agent.initialMessage')))
   const [draft, setDraft] = useState<AgentSetupDraft | null>(initialDraft || savedSession?.draft || null)
   const [recording, setRecording] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -1357,7 +1358,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     onDraftChange?.(nextDraft)
 
     try {
-      const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, nextDraft), draft: nextDraft }).unwrap()
+      const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, nextDraft), draft: nextDraft, language: i18n.language as 'ru' | 'uk' | 'en' }).unwrap()
       const responseDraft = explicitDraftFromResponse(nextDraft, response.draft, nextMessages)
       const finalDraft = responseDraft || nextDraft
       const nextMissing = getMissingFields(finalDraft)
@@ -1365,7 +1366,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       onDraftChange?.(finalDraft)
       await typeAssistantText(sanitizeAssistantReply(response.reply), makeDraftMessages(finalDraft, nextMissing))
     } catch {
-      await typeAssistantText('Не получилось обработать запрос. Попробуй еще раз.')
+      await typeAssistantText(t('agent.errors.processFailed'))
     }
   }
 
@@ -1384,7 +1385,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     const draftForAgent = localResolution.draft !== undefined ? withAutoDraftName(localResolution.draft, draft) : draft
 
     try {
-      const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, draftForAgent || null), draft: draftForAgent }).unwrap()
+      const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, draftForAgent || null), draft: draftForAgent, language: i18n.language as 'ru' | 'uk' | 'en' }).unwrap()
       const allowAgentChoices = response.needs_confirmation || isAgentAutofillRequest(text) || isPositiveConfirmation(text)
       const responseDraft = explicitDraftFromResponse(draftForAgent || null, response.draft, nextMessages, allowAgentChoices)
       const replyDraft = allowAgentChoices ? buildDraftFromAgentReply(response.reply, responseDraft || draftForAgent || null) : null
@@ -1403,7 +1404,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
         trailingMessages,
       )
     } catch {
-      await typeAssistantText('Не получилось обработать запрос. Попробуй еще раз.')
+      await typeAssistantText(t('agent.errors.processFailed'))
     }
   }
 
@@ -1411,12 +1412,12 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     if (!draft || missing.length || busy) return
 
     setPublishing(true)
-    const publishMessage = { id: createMessageId(), role: 'user' as const, content: 'Опубликовать черновик' }
+    const publishMessage = { id: createMessageId(), role: 'user' as const, content: t('agent.publish') }
     const nextMessages = [...messages, publishMessage]
     setMessages(nextMessages)
 
     try {
-      const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, draft), draft, publish: true }).unwrap()
+      const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, draft), draft, publish: true, language: i18n.language as 'ru' | 'uk' | 'en' }).unwrap()
       setDraft(response.draft || draft)
       await typeAssistantText(response.reply)
       if (response.created_setup_id) {
@@ -1424,7 +1425,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
         navigate(`/setups/${response.created_setup_id}`)
       }
     } catch {
-      await typeAssistantText('Не получилось опубликовать черновик. Проверь данные и попробуй еще раз.')
+      await typeAssistantText(t('agent.errors.publishFailed'))
     } finally {
       setPublishing(false)
     }
@@ -1447,7 +1448,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
 
   const startRecording = async () => {
     if (!voiceEnabled) {
-      await typeAssistantText('Голосовой ввод сейчас недоступен: на сервере не настроен ключ распознавания.')
+      await typeAssistantText(t('agent.errors.voiceUnavailable'))
       return
     }
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return
@@ -1468,7 +1469,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
         const result = await transcribeVoice(blob).unwrap()
         if (result.text) await sendText(result.text)
       } catch {
-        await typeAssistantText('Не получилось распознать голос. Попробуй текстом.')
+        await typeAssistantText(t('agent.errors.transcribeFailed'))
       }
     }
 
@@ -1493,8 +1494,8 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
               <CatalogIcon name="setupType" size={22} />
             </HeaderMark>
             <div tw="min-w-0">
-              <Title>Новая забивка через Chatbot</Title>
-              <Subtitle>{recording ? 'Идет запись голоса. Закончи запись, и я разберу текст.' : 'Опиши вкус, табаки и железо. Я соберу черновик, покажу варианты из базы и не буду спрашивать лишнее.'}</Subtitle>
+              <Title>{t('agent.title')}</Title>
+              <Subtitle>{recording ? t('agent.recordingSubtitle') : t('agent.subtitle')}</Subtitle>
             </div>
           </div>
           <StatusPill>
@@ -1530,7 +1531,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
                 )}
               </Fragment>
             ))}
-            {loading && <TypingBubble>Печатает...</TypingBubble>}
+            {loading && <TypingBubble>{t('agent.typing')}</TypingBubble>}
           </Messages>
         </ScrollArea>
 
@@ -1539,8 +1540,8 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
             type="button"
             onClick={handleVoice}
             disabled={busy || !voiceEnabled}
-            aria-label={voiceEnabled ? 'Record voice' : 'Voice input unavailable'}
-            title={voiceEnabled ? 'Record voice' : 'Голосовой ввод недоступен'}
+            aria-label={voiceEnabled ? t('agent.recordVoice') : t('agent.voiceUnavailable')}
+            title={voiceEnabled ? t('agent.recordVoice') : t('agent.voiceUnavailable')}
           >
             {recording ? <CloseIcon size={13} /> : <MicIcon size={16} />}
           </ToolButton>
@@ -1548,10 +1549,10 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={handleComposerKeyDown}
-            placeholder="Например: хочу свежую ягодную забивку, 2-3 табака, легко по крепости..."
+            placeholder={t('agent.placeholder')}
             disabled={busy}
           />
-          <SendButton type="submit" disabled={!input.trim() || busy} aria-label="Send setup details">
+          <SendButton type="submit" disabled={!input.trim() || busy} aria-label={t('agent.send')}>
             <SendIcon size={16} />
           </SendButton>
         </Composer>

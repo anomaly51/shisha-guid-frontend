@@ -1,5 +1,5 @@
 import { api } from './base'
-import type { AgentChatResponse, AgentMessage, AgentSetupDraft } from '../agentTypes'
+import type { AgentChatResponse, AgentLanguage, AgentMessage, AgentSetupDraft } from '../agentTypes'
 export type { AgentChatResponse, AgentDraftTobacco, AgentMessage, AgentSetupDraft } from '../agentTypes'
 
 const agentApi = api.injectEndpoints({
@@ -10,7 +10,7 @@ const agentApi = api.injectEndpoints({
     getAgentSchema: builder.query<Record<string, unknown>, void>({
       query: () => '/agent/schema',
     }),
-    chatWithSetupAgent: builder.mutation<AgentChatResponse, { messages: AgentMessage[]; draft?: AgentSetupDraft | null; publish?: boolean }>({
+    chatWithSetupAgent: builder.mutation<AgentChatResponse, { messages: AgentMessage[]; draft?: AgentSetupDraft | null; publish?: boolean; language?: AgentLanguage }>({
       query: (body) => ({ url: '/agent/chat', method: 'POST', body }),
       invalidatesTags: (_result) => ['Setups'],
     }),
