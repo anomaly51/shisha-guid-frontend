@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
-import { clearAuthSession, getAuthToken, getRefreshToken, setAuthToken } from '../authToken'
+import { clearAuthSession, getAuthToken, refreshAuthToken } from '../authToken'
 
 const apiBaseUrl = import.meta.env.SSR
   ? import.meta.env.VITE_SSR_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
@@ -30,26 +30,10 @@ export const api = createApi({
   baseQuery: async (args, baseQueryApi, extraOptions) => {
     const result = await rawBaseQuery(args, baseQueryApi, extraOptions)
     if (result.error?.status === 401) {
-      const refreshToken = getRefreshToken()
-      if (refreshToken) {
-        const refreshResult = await rawBaseQuery(
-          {
-            url: '/auth/refresh',
-            method: 'POST',
-            body: { refresh_token: refreshToken },
-          },
-          baseQueryApi,
-          extraOptions,
-        )
-
-        if (refreshResult.data && typeof refreshResult.data === 'object') {
-          const tokenData = refreshResult.data as { access_token?: string; expires_in?: number; refresh_token?: string }
-          if (tokenData.access_token) {
-            authRedirectInProgress = false
-            setAuthToken(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in)
-            return rawBaseQuery(args, baseQueryApi, extraOptions)
-          }
-        }
+      const refreshedToken = await refreshAuthToken(apiBaseUrl)
+      if (refreshedToken) {
+        authRedirectInProgress = false
+        return rawBaseQuery(args, baseQueryApi, extraOptions)
       }
 
       if (typeof window !== 'undefined') {

@@ -587,30 +587,34 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const activeEquipment = equipmentItems[activeEquipmentIndex] || equipmentItems[0]
   const selectedEquipmentCount = equipmentItems.filter((item) => item.value).length
   const nextMissingEquipment = equipmentItems.find((item) => !item.value)?.label
-  const draftRef = useRef<SetupFormDraft>({})
+  const currentDraft = useMemo<SetupFormDraft>(() => ({
+    name,
+    description,
+    photoUrls,
+    bowlId,
+    coalId,
+    kaloudId,
+    placementId,
+    typeId,
+    tobaccoMix,
+    tags,
+  }), [bowlId, coalId, description, kaloudId, name, photoUrls, placementId, tags, tobaccoMix, typeId])
+  const currentDraftSignature = useMemo(() => JSON.stringify(currentDraft), [currentDraft])
+  const initialDraftSignatureRef = useRef<string | null>(null)
+  if (initialDraftSignatureRef.current === null) {
+    initialDraftSignatureRef.current = currentDraftSignature
+  }
+  const draftRef = useRef<SetupFormDraft>(currentDraft)
   const isDirty = useMemo(() => {
     if (saved) return false
-    if (isEdit) {
-      return Boolean(name.trim() || description.trim() || photoUrls.length || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId)
-    }
+    if (isEdit) return currentDraftSignature !== initialDraftSignatureRef.current
     return Boolean(name.trim() || description.trim() || photoUrls.length || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId || tags.length)
-  }, [bowlId, coalId, description, isEdit, kaloudId, name, photoUrls.length, placementId, saved, tags.length, tobaccoMix.length, typeId])
+  }, [bowlId, coalId, currentDraftSignature, description, isEdit, kaloudId, name, photoUrls.length, placementId, saved, tags.length, tobaccoMix.length, typeId])
   const confirmLeave = () => !isDirty || window.confirm('Несохраненные изменения будут потеряны. Уйти со страницы?')
 
   useEffect(() => {
-    draftRef.current = {
-      name,
-      description,
-      photoUrls,
-      bowlId,
-      coalId,
-      kaloudId,
-      placementId,
-      typeId,
-      tobaccoMix,
-      tags,
-    }
-  }, [bowlId, coalId, description, kaloudId, name, photoUrls, placementId, tags, tobaccoMix, typeId])
+    draftRef.current = currentDraft
+  }, [currentDraft])
 
   const saveDraftNow = useCallback(() => {
     if (isEdit || saved) return
@@ -630,7 +634,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
       saveDraftNow()
     }, 350)
     return () => window.clearTimeout(timeout)
-  }, [isDirty, isEdit, saveDraftNow])
+  }, [currentDraftSignature, isDirty, isEdit, saveDraftNow])
 
   const addTag = () => {
     const clean = tagDraft.trim().toLowerCase()
