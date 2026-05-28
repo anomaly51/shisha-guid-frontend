@@ -11,6 +11,15 @@ interface AuthModalProps {
   onClose: () => void
 }
 
+const getLoginErrorMessage = (error: any, fallback: string) => {
+  const detail = error?.data?.detail
+  if (typeof detail === 'string') {
+    if (detail.toLowerCase().includes('banned')) return 'Аккаунт заблокирован. Вход недоступен.'
+    if (detail.toLowerCase().includes('verified')) return 'Email Google не подтверждён.'
+  }
+  return fallback
+}
+
 export const AuthModal = ({ open, onClose }: AuthModalProps) => {
   const [googleLogin, { isLoading }] = useGoogleLoginMutation()
   const [error, setError] = useState('')
@@ -30,8 +39,8 @@ export const AuthModal = ({ open, onClose }: AuthModalProps) => {
       setAuthToken(result.access_token, result.refresh_token, result.expires_in)
       sessionStorage.removeItem('google_oauth_state')
       window.location.reload()
-    } catch {
-      setError(t('auth.loginFailed'))
+    } catch (requestError) {
+      setError(getLoginErrorMessage(requestError, t('auth.loginFailed')))
       setAuthPending(false)
     }
   }, [googleLogin, redirectUri, t])

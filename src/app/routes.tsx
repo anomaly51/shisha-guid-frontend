@@ -48,6 +48,9 @@ const Profile = import.meta.env.SSR
 const PublicProfile = import.meta.env.SSR
   ? (await import('../pages/PublicProfile')).PublicProfile
   : routeComponent(() => import('../pages/PublicProfile'), 'PublicProfile')
+const Authors = import.meta.env.SSR
+  ? (await import('../pages/Authors')).Authors
+  : routeComponent(() => import('../pages/Authors'), 'Authors')
 const AgentChat = import.meta.env.SSR
   ? (await import('../pages/AgentChat')).AgentChat
   : routeComponent(() => import('../pages/AgentChat'), 'AgentChat')
@@ -154,6 +157,7 @@ export const AppRoutes = () => {
       <Route path="ai-chat" element={<AgentChat />} />
 
       <Route path="profile" element={<Profile />} />
+      <Route path="authors" element={<Authors />} />
       <Route path="users/:id" element={<PublicProfile />} />
         </Route>
       </Routes>

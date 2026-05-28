@@ -6,7 +6,7 @@ import { Button } from '../shared/ui/Button'
 import { Card } from '../shared/ui/Card'
 import { Modal } from '../shared/ui/Modal'
 import { Skeleton } from '../shared/ui/Skeleton'
-import { useGetProfileQuery, useGetSetupsQuery } from '../shared/api'
+import { useGetProfileQuery, useGetSetupsQuery, useGetTobaccosQuery } from '../shared/api'
 import { CatalogIcon, type CatalogIconName, EditIcon, EmptyIcon, PlusIcon, TrashIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
@@ -30,6 +30,7 @@ interface CatalogProps {
 const strengthOptions: StrengthFilter[] = ['all', 'light', 'medium', 'strong', 'heavy']
 const TOBACCO_PAGE_SIZE = 24
 const COAL_PAGE_SIZE = 24
+const CATALOG_SEARCH_HISTORY_KEY = 'shisha-guid:catalog-searches'
 
 const getSearchStrength = (value: string | null): StrengthFilter => (
   strengthOptions.includes(value as StrengthFilter) ? value as StrengthFilter : 'all'
@@ -142,7 +143,8 @@ const getCatalogFacts = (item: any, itemKind: CatalogItemKind, t: any) => {
 
   if (itemKind === 'tobacco') {
     pushFact('catalog.factBrand', pickFirst(item, ['brand', 'manufacturer']))
-    pushFact('catalog.factFlavor', pickFirst(item, ['flavor', 'taste', 'line']))
+    if (typeof item?.setups_count === 'number') facts.push({ label: 'В забивках', value: String(item.setups_count) })
+    else pushFact('catalog.factFlavor', pickFirst(item, ['flavor', 'taste', 'line']))
   }
 
   return facts.slice(0, 2)
@@ -212,6 +214,14 @@ export const Catalog = ({
   const [appendTobaccos, setAppendTobaccos] = useState(false)
   const [loadedTobaccos, setLoadedTobaccos] = useState<any[]>([])
   const [loadedCatalogKind, setLoadedCatalogKind] = useState<CatalogItemKind>(itemKind)
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      return JSON.parse(window.sessionStorage.getItem(CATALOG_SEARCH_HISTORY_KEY) || '[]')
+    } catch {
+      return []
+    }
+  })
   const strength = getSearchStrength(searchParams.get('strength'))
   const minPrice = searchParams.get('minPrice') || ''
   const maxPrice = searchParams.get('maxPrice') || ''
@@ -225,6 +235,7 @@ export const Catalog = ({
     min_price: minPrice || undefined,
     max_price: maxPrice || undefined,
     offset: (currentPage - 1) * pageSize,
+    search: catalogSearch || undefined,
     strength,
     brand: brandFilter || undefined,
   } : undefined
@@ -234,6 +245,7 @@ export const Catalog = ({
     search: catalogSearch || undefined,
   } : undefined
   const { data: rawData, isFetching, isLoading } = listHook(tobaccoQueryParams || coalQueryParams)
+  const { data: allTobaccosForBrands } = useGetTobaccosQuery(undefined, { skip: itemKind !== 'tobacco' })
   const { data: setupsForRatings } = useGetSetupsQuery(
     itemKind === 'tobacco' ? { limit: 1000, sort: 'rating' } : undefined,
     { skip: itemKind !== 'tobacco' },
@@ -266,12 +278,15 @@ export const Catalog = ({
   const tobaccoRatings = useMemo(() => getTobaccoRatingMap(setupsForRatings), [setupsForRatings])
   const brandOptions = useMemo(() => {
     const brands = new Map<string, number>()
-    pageItems.forEach((item: any) => {
+    const sourceItems = Array.isArray(allTobaccosForBrands)
+      ? allTobaccosForBrands
+      : allTobaccosForBrands?.items || pageItems
+    sourceItems.forEach((item: any) => {
       const brand = item.brand || ''
       if (brand) brands.set(brand, (brands.get(brand) || 0) + 1)
     })
     return Array.from(brands.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [pageItems])
+  }, [allTobaccosForBrands, pageItems])
   const visiblePageNumbers = useMemo(
     () => getVisiblePageNumbers(currentPage, totalPages),
     [currentPage, totalPages],
@@ -306,12 +321,19 @@ export const Catalog = ({
   }
 
   const setCatalogSearch = (value: string) => {
+    const normalized = value.trim()
     setAppendTobaccos(false)
     setLoadedTobaccos([])
     updateSearch((next) => {
-      if (value.trim()) next.set('q', value.trim())
+      if (normalized) next.set('q', normalized)
       else next.delete('q')
       next.delete('page')
+    })
+    if (!normalized) return
+    setSearchHistory((current) => {
+      const next = [normalized, ...current.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 8)
+      window.sessionStorage.setItem(CATALOG_SEARCH_HISTORY_KEY, JSON.stringify(next))
+      return next
     })
   }
 
@@ -460,21 +482,40 @@ export const Catalog = ({
                       placeholder="Поиск углей"
                       tw="h-[42px] w-full rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] pl-9 pr-3 text-[13px] font-bold text-[rgb(var(--color-text))] outline-none placeholder:text-[rgb(var(--color-text-subtle))] focus:border-[rgb(var(--color-accent))] focus:shadow-[0_0_0_2px_rgba(139,74,43,0.1)]"
                     />
+                    <datalist id="catalog-search-history">
+                      {searchHistory.map((item) => <option key={item} value={item} />)}
+                    </datalist>
                   </label>
                 ) : (
-                <div tw="flex gap-1 overflow-x-auto rounded-lg bg-[rgb(var(--color-surface-subtle))] p-1">
-                  {strengthOptions.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => setStrengthFilter(option)}
-                      tw="h-[34px] shrink-0 rounded-md px-3 text-[12px] font-bold transition-all"
-                      css={strength === option ? { backgroundColor: 'rgb(var(--color-surface-inverse))', color: 'rgb(var(--color-text-inverse))', boxShadow: '0 12px 22px -18px rgba(0,0,0,0.75)' } : { color: 'rgb(var(--color-text-muted))' }}
-                    >
-                      {option === 'all' ? t('catalog.filters.allStrength') : t(`metrics.heaviness.${option}`)}
-                    </button>
-                  ))}
-                </div>
+                  <>
+                    <label tw="relative block min-w-0">
+                      <span tw="sr-only">Поиск табаков</span>
+                      <CatalogIcon name="tobacco" size={14} tw="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--color-text-subtle))]" />
+                      <input
+                        value={catalogSearch}
+                        onChange={(event) => setCatalogSearch(event.target.value)}
+                        placeholder="Поиск табаков"
+                        list="catalog-search-history"
+                        tw="h-[42px] w-full rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] pl-9 pr-3 text-[13px] font-bold text-[rgb(var(--color-text))] outline-none placeholder:text-[rgb(var(--color-text-subtle))] focus:border-[rgb(var(--color-accent))] focus:shadow-[0_0_0_2px_rgba(139,74,43,0.1)]"
+                      />
+                      <datalist id="catalog-search-history">
+                        {searchHistory.map((item) => <option key={item} value={item} />)}
+                      </datalist>
+                    </label>
+                    <div tw="flex gap-1 overflow-x-auto rounded-lg bg-[rgb(var(--color-surface-subtle))] p-1">
+                      {strengthOptions.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => setStrengthFilter(option)}
+                          tw="h-[34px] shrink-0 rounded-md px-3 text-[12px] font-bold transition-all"
+                          css={strength === option ? { backgroundColor: 'rgb(var(--color-surface-inverse))', color: 'rgb(var(--color-text-inverse))', boxShadow: '0 12px 22px -18px rgba(0,0,0,0.75)' } : { color: 'rgb(var(--color-text-muted))' }}
+                        >
+                          {option === 'all' ? t('catalog.filters.allStrength') : t(`metrics.heaviness.${option}`)}
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
 
                 {itemKind === 'tobacco' && <div tw="grid grid-cols-2 gap-2">

@@ -4,18 +4,20 @@ import { useTranslation } from 'react-i18next'
 import 'twin.macro'
 import { Card } from '../shared/ui/Card'
 import { Button } from '../shared/ui/Button'
-import { useGetBowlSetupTypesQuery, useGetBowlsQuery, useGetSetupsQuery, useGetTobaccosQuery } from '../shared/api'
+import { useGetBowlSetupTypesQuery, useGetBowlsQuery, useGetProfileQuery, useGetSetupsQuery, useGetTobaccosQuery, useLikeSetupMutation, useUnlikeSetupMutation } from '../shared/api'
 import { CardSkeleton } from '../shared/ui/Skeleton'
-import { CatalogIcon, ChevronDownIcon, CloseIcon, EyeIcon, PlusIcon } from '../shared/ui/Icons'
+import { CatalogIcon, ChevronDownIcon, CloseIcon, CommentIcon, EyeIcon, HeartIcon, PlusIcon } from '../shared/ui/Icons'
 import { BowlPreviewFallback, MIX_COLORS, detectBowlModel, detectSetupKind, type BowlModel, type MixBowlItem, type SetupKind } from '../shared/ui/mixBowlModel'
 import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
 import { AuthorChip } from '../shared/ui/AuthorChip'
 import { getSetupHeaviness } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { getSetupAggregateRating } from '../shared/tobaccoRatings'
+import { hasAuthToken } from '../shared/authToken'
 
 type SortValue = 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' | 'name'
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
+type PeriodFilter = 'all' | 'week'
 
 const SETUP_PAGE_SIZE = 12
 const SETUPS_EMPTY_RETRY_LIMIT = 3
@@ -136,6 +138,7 @@ const SetupCard = memo(({
   typeName,
   rating,
   onOpen,
+  onToggleLike,
 }: {
   setup: any
   bowl?: any
@@ -143,6 +146,7 @@ const SetupCard = memo(({
   typeName: string
   rating: number
   onOpen: (setupId: string) => void
+  onToggleLike: (setup: any) => void
 }) => {
   const { t } = useTranslation()
   const mixItems = useMemo(
@@ -181,13 +185,26 @@ const SetupCard = memo(({
             <EyeIcon size={13} />
             <span tw="tabular-nums">{Number(setup.views_count || 0)}</span>
           </div>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggleLike(setup)
+            }}
+            aria-pressed={Boolean(setup.is_liked)}
+            tw="absolute right-2.5 top-2.5 flex items-center gap-1 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[11px] font-black shadow-[0_12px_26px_-20px_rgba(83,48,31,0.7)] backdrop-blur transition-colors hover:bg-[rgb(var(--color-accent-muted))]"
+            css={setup.is_liked ? { color: 'rgb(var(--color-danger))' } : { color: 'rgb(var(--color-text-muted))' }}
+          >
+            <HeartIcon size={13} />
+            <span tw="tabular-nums">{Number(setup.likes_count || 0)}</span>
+          </button>
         </div>
 
         <div tw="flex flex-1 flex-col gap-3 px-3.5 py-3.5">
           <div tw="min-w-0">
             <h3 tw="text-[13px] font-semibold leading-snug text-[rgb(var(--color-text))] line-clamp-2 sm:text-sm">{setup.name}</h3>
             <div tw="mt-2">
-              <AuthorChip author={setup.creator} compact />
+              <AuthorChip author={setup.creator} compact quickFollow />
             </div>
           </div>
 
@@ -216,7 +233,19 @@ const SetupCard = memo(({
             )}
           </div>
 
+          {setup.tags?.length > 0 && (
+            <div tw="flex flex-wrap gap-1">
+              {setup.tags.slice(0, 3).map((tag: string) => (
+                <span key={tag} tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-1.5 py-1 text-[10px] font-bold text-[rgb(var(--color-text-subtle))]">#{tag}</span>
+              ))}
+            </div>
+          )}
+
           <div tw="mt-auto border-t border-[rgb(var(--color-border))] pt-3">
+            <div tw="mb-2 flex items-center gap-2 text-[11px] font-black text-[rgb(var(--color-text-muted))]">
+              <CommentIcon size={13} />
+              <span tw="tabular-nums">{Number(setup.comments_count || 0)}</span>
+            </div>
             <StrengthIndicator label={t('feed.strength')} value={heaviness} compact />
           </div>
         </div>
@@ -240,10 +269,19 @@ export const Feed = () => {
   const sort = getSearchSort(searchParams.get('sort'))
   const selectedTobaccos = useMemo(() => searchParams.getAll('tobacco'), [searchParams])
   const selectedTobaccoKey = selectedTobaccos.join('\u0001')
+  const selectedTags = useMemo(() => searchParams.getAll('tag'), [searchParams])
+  const selectedTagKey = selectedTags.join('\u0001')
+  const [tagDraft, setTagDraft] = useState('')
   const strength = getSearchStrength(searchParams.get('strength'))
   const setupSearch = searchParams.get('q') || ''
   const bookmarked = searchParams.get('bookmarked') === '1'
   const following = searchParams.get('following') === '1'
+  const period: PeriodFilter = searchParams.get('period') === 'week' ? 'week' : 'all'
+  const hasToken = hasAuthToken()
+  const unauthRestrictedFilter = (bookmarked || following) && !hasToken
+  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
+  const [likeSetup] = useLikeSetupMutation()
+  const [unlikeSetup] = useUnlikeSetupMutation()
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {
     if (typeof window === 'undefined') return []
     try {
@@ -256,19 +294,21 @@ export const Feed = () => {
     limit: SETUP_PAGE_SIZE,
     offset: pageOffset,
     tobacco_ids: selectedTobaccos,
+    tags: selectedTags,
     strength,
     sort,
     search: setupSearch || undefined,
     bookmarked,
     following,
-  }), [bookmarked, following, pageOffset, selectedTobaccoKey, selectedTobaccos, setupSearch, sort, strength])
+    period,
+  }), [bookmarked, following, pageOffset, period, selectedTagKey, selectedTags, selectedTobaccoKey, selectedTobaccos, setupSearch, sort, strength])
   const {
     data: setupsPage,
     isError: isSetupsError,
     isFetching,
     isLoading,
     refetch: refetchSetups,
-  } = useGetSetupsQuery(setupQueryParams, { refetchOnMountOrArgChange: false })
+  } = useGetSetupsQuery(setupQueryParams, { refetchOnMountOrArgChange: false, skip: unauthRestrictedFilter })
   const normalizedSetupsPage = useMemo(() => normalizeSetupsPage(setupsPage), [setupsPage])
   const { data: tobaccos } = useGetTobaccosQuery(undefined, {
     refetchOnMountOrArgChange: false,
@@ -348,6 +388,16 @@ export const Feed = () => {
     })
   }
 
+  const toggleWeekPeriod = () => {
+    updateSearch((next) => {
+      if (next.get('period') === 'week') next.delete('period')
+      else {
+        next.set('period', 'week')
+        if (!next.get('sort')) next.set('sort', 'views')
+      }
+    })
+  }
+
   const toggleTobaccoFilter = (id: string) => {
     updateSearch((next) => {
       const current = next.getAll('tobacco')
@@ -367,6 +417,24 @@ export const Feed = () => {
     })
   }
 
+  const addTagFilter = () => {
+    const clean = tagDraft.trim().toLowerCase()
+    if (!clean) return
+    updateSearch((next) => {
+      const current = next.getAll('tag')
+      if (!current.includes(clean)) next.append('tag', clean)
+    })
+    setTagDraft('')
+  }
+
+  const removeTagFilter = (tag: string) => {
+    updateSearch((next) => {
+      const updated = next.getAll('tag').filter((item) => item !== tag)
+      next.delete('tag')
+      updated.forEach((item) => next.append('tag', item))
+    })
+  }
+
   const resetFilters = () => {
     setTobaccoSearch('')
     updateSearch((next) => {
@@ -375,6 +443,8 @@ export const Feed = () => {
       next.delete('q')
       next.delete('bookmarked')
       next.delete('following')
+      next.delete('period')
+      next.delete('tag')
     })
   }
 
@@ -384,7 +454,7 @@ export const Feed = () => {
     setTotalSetups(0)
     setHasMoreSetups(false)
     setEmptyRetryCount(0)
-  }, [bookmarked, following, selectedTobaccoKey, setupSearch, sort, strength])
+  }, [bookmarked, following, period, selectedTagKey, selectedTobaccoKey, setupSearch, sort, strength])
 
   useEffect(() => {
     if (!normalizedSetupsPage) return
@@ -433,10 +503,12 @@ export const Feed = () => {
   }, [canLoadMore, isFetching])
 
   const activeFilterCount = selectedTobaccos.length
+    + selectedTags.length
     + (strength !== 'all' ? 1 : 0)
     + (setupSearch ? 1 : 0)
     + (bookmarked ? 1 : 0)
     + (following ? 1 : 0)
+    + (period === 'week' ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
   const strengthLabel = strength === 'all' ? '' : t(`metrics.heaviness.${strength}`)
 
@@ -444,6 +516,15 @@ export const Feed = () => {
     return (
       <div tw="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {[1, 2, 3, 4, 5, 6].map((n) => <CardSkeleton key={n} />)}
+      </div>
+    )
+  }
+
+  if (unauthRestrictedFilter) {
+    return (
+      <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface-muted))] px-4 py-8 text-center">
+        <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">Нужен вход</h2>
+        <p tw="mt-1 text-sm text-[rgb(var(--color-text-subtle))]">Войди, чтобы увидеть подписки или избранные забивки по этой ссылке.</p>
       </div>
     )
   }
@@ -467,7 +548,7 @@ export const Feed = () => {
         </div>
         <h2 tw="text-lg font-semibold text-[rgb(var(--color-text))] mb-1.5">{t('feed.noSetups')}</h2>
         <p tw="text-sm text-[rgb(var(--color-text-subtle))] mb-6 w-full max-w-xs px-2">
-          {t('feed.noSetupsHint')}
+          ShishaGuid собирает рецепты забивок: оборудование, табаки, пропорции, крепость и отзывы. Начни с первой карточки, чтобы лента ожила.
         </p>
         <Link to="/setups/create">
           <Button variant="primary" size="lg">
@@ -604,6 +685,29 @@ export const Feed = () => {
           >
             Избранное
           </button>
+          <button
+            type="button"
+            onClick={toggleWeekPeriod}
+            tw="rounded-lg border px-3 py-1.5 text-[12px] font-bold transition-colors"
+            css={period === 'week' ? { backgroundColor: 'rgb(var(--color-surface-inverse))', borderColor: 'rgb(var(--color-surface-inverse))', color: 'white' } : { backgroundColor: 'rgb(var(--color-surface))', borderColor: 'rgb(var(--color-border-strong))', color: 'rgb(var(--color-text-muted))' }}
+          >
+            Топ недели
+          </button>
+          <label tw="flex min-w-[180px] items-center gap-1 rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-2">
+            <span tw="text-[11px] font-black text-[rgb(var(--color-text-subtle))]">#</span>
+            <input
+              value={tagDraft}
+              onChange={(event) => setTagDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  addTagFilter()
+                }
+              }}
+              placeholder="тег"
+              tw="h-[31px] min-w-0 flex-1 bg-transparent text-[12px] font-bold text-[rgb(var(--color-text))] outline-none placeholder:text-[rgb(var(--color-text-subtle))]"
+            />
+          </label>
         </div>
 
         {hasActiveFilters && (
@@ -632,6 +736,17 @@ export const Feed = () => {
                 <CloseIcon size={10} />
               </button>
             )}
+            {selectedTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => removeTagFilter(tag)}
+                tw="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-[rgb(var(--color-surface-inverse))] px-2.5 py-1.5 text-[11px] font-bold text-white"
+              >
+                <span tw="min-w-0 truncate">#{tag}</span>
+                <CloseIcon size={10} />
+              </button>
+            ))}
             <button
               type="button"
               onClick={resetFilters}
@@ -728,8 +843,14 @@ export const Feed = () => {
 
       {!visibleSetups.length && (
         <div tw="mb-5 rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface-muted))] px-4 py-8 text-center">
-          <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">{t('feed.filters.empty')}</h2>
-          <p tw="mt-1 text-sm text-[rgb(var(--color-text-subtle))]">{t('feed.filters.emptyHint')}</p>
+          <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">
+            {following ? 'В подписках пока пусто' : t('feed.filters.empty')}
+          </h2>
+          <p tw="mt-1 text-sm text-[rgb(var(--color-text-subtle))]">
+            {following
+              ? profile ? 'У авторов, на которых ты подписан, пока нет подходящих забивок.' : 'Войди и подпишись на авторов, чтобы собрать свою ленту.'
+              : t('feed.filters.emptyHint')}
+          </p>
           <button type="button" onClick={resetFilters} tw="mt-4 rounded-lg bg-[rgb(var(--color-surface-inverse))] px-4 py-2 text-[13px] font-bold text-white">
             {t('feed.controls.reset')}
           </button>
@@ -746,8 +867,18 @@ export const Feed = () => {
             typeName={typesById.get(setup.bowl_setup_type_id)?.name || ''}
             rating={getSetupRating(setup)}
             onOpen={openSetup}
+            onToggleLike={(targetSetup) => {
+              if (!profile) return
+              if (targetSetup.is_liked) unlikeSetup(targetSetup.id)
+              else likeSetup(targetSetup.id)
+            }}
           />
         ))}
+        {isFetching && visibleSetups.length > 0 && (
+          <>
+            {[1, 2, 3].map((n) => <CardSkeleton key={`next-${n}`} />)}
+          </>
+        )}
       </div>
 
       {canLoadMore && (

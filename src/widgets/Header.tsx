@@ -1,10 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
 import tw from 'twin.macro'
 import { Button } from '../shared/ui/Button'
-import { useGetNotificationsQuery, useGetProfileQuery, useLogoutMutation, useMarkNotificationsReadMutation } from '../shared/api'
+import {
+  useGetCoalsQuery,
+  useGetNotificationsQuery,
+  useGetProfileQuery,
+  useGetSetupsQuery,
+  useGetTobaccosQuery,
+  useLogoutMutation,
+  useMarkNotificationsReadMutation,
+  useSearchUsersQuery,
+} from '../shared/api'
 import { AuthModal } from './AuthModal'
 import { LogoutIcon, PlusIcon, ShishaGuidLogo } from '../shared/ui/Icons'
 import { RoleBadge } from '../shared/ui/RoleBadge'
@@ -44,6 +53,81 @@ const NewSetupLink = styled(Link)`
   }
 `
 
+const normalizePageItems = (data: any) => (Array.isArray(data) ? data : data?.items || [])
+
+const GlobalSearch = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
+  const [query, setQuery] = useState('')
+  const navigate = useNavigate()
+  const canSearch = open && query.trim().length >= 2
+  const search = query.trim()
+  const { data: setups } = useGetSetupsQuery({ search, limit: 5 }, { skip: !canSearch })
+  const { data: tobaccos } = useGetTobaccosQuery({ search, limit: 5 }, { skip: !canSearch })
+  const { data: coals } = useGetCoalsQuery({ search, limit: 5 }, { skip: !canSearch })
+  const { data: users = [] } = useSearchUsersQuery({ nickname: search, limit: 5 }, { skip: !canSearch })
+  const setupItems = useMemo(() => normalizePageItems(setups).slice(0, 5), [setups])
+  const tobaccoItems = useMemo(() => normalizePageItems(tobaccos).slice(0, 5), [tobaccos])
+  const coalItems = useMemo(() => normalizePageItems(coals).slice(0, 5), [coals])
+
+  useEffect(() => {
+    if (open) setQuery('')
+  }, [open])
+
+  if (!open) return null
+
+  const go = (path: string) => {
+    onClose()
+    navigate(path)
+  }
+
+  return (
+    <div tw="fixed inset-0 z-50 bg-black/35 px-3 py-16 backdrop-blur-sm" onMouseDown={onClose}>
+      <div tw="mx-auto w-full max-w-2xl overflow-hidden rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] shadow-[0_28px_80px_-38px_rgba(0,0,0,0.65)]" onMouseDown={(event) => event.stopPropagation()}>
+        <input
+          autoFocus
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') onClose()
+          }}
+          placeholder="Поиск забивок, табаков, углей и авторов"
+          tw="h-12 w-full border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] px-4 text-[14px] font-semibold text-[rgb(var(--color-text))] outline-none placeholder:text-[rgb(var(--color-text-subtle))]"
+        />
+        <div tw="max-h-[70vh] overflow-y-auto p-3">
+          {!canSearch ? (
+            <p tw="px-2 py-6 text-center text-[13px] font-medium text-[rgb(var(--color-text-subtle))]">Введите минимум 2 символа.</p>
+          ) : (
+            <div tw="grid gap-3">
+              {[
+                ['Забивки', setupItems, (item: any) => `/setups/${item.id}`],
+                ['Табаки', tobaccoItems, (item: any) => `/tobaccos/${item.id}`],
+                ['Угли', coalItems, (item: any) => `/coals/${item.id}`],
+                ['Авторы', users.slice(0, 5), (item: any) => `/users/${item.id}`],
+              ].map(([title, items, pathFor]: any) => (
+                <section key={title}>
+                  <p tw="mb-1 px-2 text-[10px] font-black uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">{title}</p>
+                  {items.length ? items.map((item: any) => (
+                    <button
+                      key={`${title}-${item.id}`}
+                      type="button"
+                      onClick={() => go(pathFor(item))}
+                      tw="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left text-[13px] font-semibold text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-accent-muted))]"
+                    >
+                      <span tw="min-w-0 truncate">{item.name || item.nickname || item.email}</span>
+                      {item.brand && <span tw="shrink-0 text-[11px] font-bold text-[rgb(var(--color-text-subtle))]">{item.brand}</span>}
+                    </button>
+                  )) : (
+                    <p tw="px-2 py-1 text-[12px] font-medium text-[rgb(var(--color-text-subtle))]">Нет совпадений.</p>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export const Header = () => {
   const hasToken = useHasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
@@ -54,6 +138,7 @@ export const Header = () => {
   const [logout] = useLogoutMutation()
   const [markNotificationsRead] = useMarkNotificationsReadMutation()
   const [authOpen, setAuthOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const navigate = useNavigate()
   const { t } = useTranslation()
   const isResolvingAuth = hasToken === undefined
@@ -64,6 +149,17 @@ export const Header = () => {
     await logout()
     clearAuthSession()
   }
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   return (
     <>
@@ -80,15 +176,34 @@ export const Header = () => {
                 <span>{t('feed.newSetup')}</span>
               </NewSetupLink>
             )}
+            <Link
+              to="/authors"
+              tw="hidden text-[13px] font-semibold text-[rgb(var(--color-text-subtle))] transition-colors hover:text-[rgb(var(--color-text-inverse))] md:inline-flex"
+            >
+              Авторы
+            </Link>
             {(isResolvingAuth || isResolvingProfile) && <NewSetupPlaceholder aria-hidden="true" />}
           </div>
 
           <div tw="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              tw="hidden h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] font-bold text-[rgb(var(--color-text-subtle))] transition-colors hover:bg-white/10 hover:text-[rgb(var(--color-text-inverse))] sm:inline-flex"
+            >
+              Поиск
+              <span tw="rounded-md bg-white/10 px-1.5 py-0.5 text-[10px]">⌘K</span>
+            </button>
             {profile ? (
               <>
                 <button
                   type="button"
-                  onClick={() => markNotificationsRead()}
+                  onClick={async () => {
+                    const target = notifications?.items?.find((item) => item.bowl_setup_id || item.actor_id)
+                    await markNotificationsRead()
+                    if (target?.bowl_setup_id) navigate(`/setups/${target.bowl_setup_id}`)
+                    else if (target?.actor_id) navigate(`/users/${target.actor_id}`)
+                  }}
                   aria-label={unreadCount ? `Непрочитанные отзывы: ${unreadCount}` : 'Нет непрочитанных отзывов'}
                   title={unreadCount ? `Непрочитанные отзывы: ${unreadCount}` : 'Нет непрочитанных отзывов'}
                   tw="relative flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[13px] font-black text-[rgb(var(--color-text-inverse))] transition-colors hover:bg-white/10"
@@ -135,6 +250,7 @@ export const Header = () => {
           </div>
         </Inner>
       </HeaderBar>
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </>
   )

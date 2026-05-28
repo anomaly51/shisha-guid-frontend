@@ -1,10 +1,11 @@
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import 'twin.macro'
 import {
   useFollowUserMutation,
   useGetProfileQuery,
   useGetPublicProfileQuery,
-  useGetSetupsQuery,
+  useGetUserSetupsQuery,
   useUnfollowUserMutation,
 } from '../shared/api'
 import { Button } from '../shared/ui/Button'
@@ -16,17 +17,61 @@ import { UserBadges } from '../shared/ui/UserBadges'
 import { hasAuthToken } from '../shared/authToken'
 
 const normalizePage = (page: any) => Array.isArray(page) ? page : page?.items || []
+const PROFILE_SETUP_PAGE_SIZE = 24
 
 export const PublicProfile = () => {
   const { id } = useParams<{ id: string }>()
+  const [offset, setOffset] = useState(0)
+  const [loadedSetups, setLoadedSetups] = useState<any[]>([])
   const hasToken = hasAuthToken()
   const { data: viewer } = useGetProfileQuery(undefined, { skip: !hasToken })
   const { data: user, isLoading } = useGetPublicProfileQuery(id!, { skip: !id })
-  const { data: setupsPage } = useGetSetupsQuery({ creator_id: id, limit: 24 }, { skip: !id })
+  const { data: setupsPage, isFetching: setupsFetching } = useGetUserSetupsQuery(
+    { userId: id!, limit: PROFILE_SETUP_PAGE_SIZE, offset },
+    { skip: !id },
+  )
+  const { data: viewerSetupsPage } = useGetUserSetupsQuery(
+    { userId: viewer?.id || '', limit: 50, offset: 0 },
+    { skip: !viewer?.id || viewer?.id === id },
+  )
   const [followUser, { isLoading: following }] = useFollowUserMutation()
   const [unfollowUser, { isLoading: unfollowing }] = useUnfollowUserMutation()
-  const setups = normalizePage(setupsPage)
+  const pageSetups = normalizePage(setupsPage)
+  const setups = loadedSetups.length ? loadedSetups : pageSetups
   const isSelf = viewer?.id && user?.id && String(viewer.id) === String(user.id)
+  const commonTobaccos = (() => {
+    const viewerTobaccos = new Map<string, string>()
+    ;(viewerSetupsPage?.items || []).forEach((setup: any) => {
+      ;(setup.tobaccos || []).forEach((item: any) => {
+        if (item.tobacco_id) viewerTobaccos.set(item.tobacco_id, item.tobacco?.name || 'Табак')
+      })
+    })
+    const common = new Map<string, string>()
+    setups.forEach((setup: any) => {
+      ;(setup.tobaccos || []).forEach((item: any) => {
+        if (viewerTobaccos.has(item.tobacco_id)) common.set(item.tobacco_id, viewerTobaccos.get(item.tobacco_id)!)
+      })
+    })
+    return [...common.values()].slice(0, 5)
+  })()
+  const recentlyActive = user?.last_seen_at && Date.now() - new Date(user.last_seen_at).getTime() < 1000 * 60 * 60 * 24 * 7
+
+  useEffect(() => {
+    setOffset(0)
+    setLoadedSetups([])
+  }, [id])
+
+  useEffect(() => {
+    if (!setupsPage) return
+    setLoadedSetups((current) => {
+      if (setupsPage.offset === 0) return setupsPage.items
+      const seen = new Set(current.map((setup) => setup.id))
+      return [
+        ...current,
+        ...setupsPage.items.filter((setup: any) => !seen.has(setup.id)),
+      ]
+    })
+  }, [setupsPage])
 
   if (isLoading) {
     return (
@@ -55,7 +100,25 @@ export const PublicProfile = () => {
             <div tw="mt-3 flex flex-wrap items-center gap-2">
               <RoleBadge role={user.role || 'user'} size="sm" />
               <UserBadges badges={user.badges} />
+              {recentlyActive && (
+                <span tw="rounded-md bg-[rgb(var(--color-success-surface))] px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-success))]">
+                  был недавно
+                </span>
+              )}
+              {user.is_followed_by && !isSelf && (
+                <span tw="rounded-md bg-[rgb(var(--color-accent-muted))] px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))]">
+                  подписан на тебя
+                </span>
+              )}
             </div>
+            {commonTobaccos.length > 0 && (
+              <div tw="mt-3 flex flex-wrap gap-1.5">
+                <span tw="text-[11px] font-bold text-[rgb(var(--color-text-subtle))]">Общие табаки:</span>
+                {commonTobaccos.map((name) => (
+                  <span key={name} tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[11px] font-bold text-[rgb(var(--color-text-muted))]">{name}</span>
+                ))}
+              </div>
+            )}
           </div>
           <div tw="grid grid-cols-3 gap-2 text-center">
             <div tw="rounded-lg bg-[rgb(var(--color-surface-muted))] px-3 py-2">
@@ -89,6 +152,23 @@ export const PublicProfile = () => {
             </Link>
           ))}
         </div>
+        {setupsPage?.has_more && (
+          <div tw="flex justify-center pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setOffset((current) => current + PROFILE_SETUP_PAGE_SIZE)}
+              disabled={setupsFetching}
+            >
+              {setupsFetching ? 'Загрузка...' : 'Показать ещё'}
+            </Button>
+          </div>
+        )}
+        {!setups.length && !setupsFetching && (
+          <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface-muted))] px-4 py-8 text-center text-[13px] font-semibold text-[rgb(var(--color-text-subtle))]">
+            У автора пока нет забивок.
+          </div>
+        )}
       </section>
     </div>
   )

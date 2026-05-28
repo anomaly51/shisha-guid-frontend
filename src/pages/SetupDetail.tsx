@@ -4,8 +4,10 @@ import tw from 'twin.macro'
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useCreateSetupReviewMutation,
+  useCreateSetupCommentMutation,
   useBookmarkSetupMutation,
   useCloneSetupMutation,
+  useDeleteSetupCommentMutation,
   useDeleteSetupReviewMutation,
   useGetBowlSetupTypesQuery,
   useGetBowlsQuery,
@@ -14,10 +16,16 @@ import {
   useGetKaloudsQuery,
   useGetProfileQuery,
   useGetSetupReviewsQuery,
+  useGetSetupCommentsQuery,
   useGetSetupQuery,
+  useGetSetupsQuery,
+  useGetSetupVersionsQuery,
   useDeleteSetupMutation,
   useRecordSetupViewMutation,
+  useLikeSetupMutation,
+  useSetSetupFeaturedMutation,
   useUnbookmarkSetupMutation,
+  useUnlikeSetupMutation,
   useUpdateSetupReviewMutation,
 } from '../shared/api'
 import { Button } from '../shared/ui/Button'
@@ -25,7 +33,7 @@ import { Card } from '../shared/ui/Card'
 import { Textarea } from '../shared/ui/Input'
 import { Modal } from '../shared/ui/Modal'
 import { Skeleton } from '../shared/ui/Skeleton'
-import { AlertIcon, BackIcon, CatalogIcon, EyeIcon, type CatalogIconName } from '../shared/ui/Icons'
+import { AlertIcon, BackIcon, CatalogIcon, CommentIcon, EyeIcon, HeartIcon, ShareIcon, type CatalogIconName } from '../shared/ui/Icons'
 import { MIX_COLORS, detectBowlModel, detectSetupKind, type MixBowlItem } from '../shared/ui/mixBowlModel'
 import { MixBowlPreview } from '../shared/ui/MixBowlPreview'
 import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
@@ -205,6 +213,107 @@ const StepHeader = ({ number, title, caption }: { number: number; title: string;
   </div>
 )
 
+const getSnapshotLabel = (snapshot: any, key: string) => {
+  const value = snapshot?.[key]
+  if (Array.isArray(value)) {
+    if (key === 'tobaccos') return `${value.length} табаков`
+    return value.length ? value.join(', ') : '-'
+  }
+  if (value === undefined || value === null || value === '') return '-'
+  return String(value)
+}
+
+const VersionHistory = ({ current, setupId }: { current: any; setupId: string }) => {
+  const hasToken = hasAuthToken()
+  const { data: versions = [] } = useGetSetupVersionsQuery(setupId, { skip: !hasToken })
+  const rows = useMemo(() => {
+    const currentSnapshot = {
+      name: current.name,
+      description: current.description,
+      photo_urls: current.photo_urls || [],
+      tags: current.tags || [],
+      tobaccos: current.tobaccos || [],
+    }
+    const all = [
+      ...versions.map((version: any) => ({ ...version, label: `v${version.version}`, snapshot: version.snapshot || {} })),
+      { id: 'current', label: `v${current.version || versions.length + 1}`, snapshot: currentSnapshot },
+    ].sort((left: any, right: any) => Number(left.version || 999999) - Number(right.version || 999999))
+
+    return all.map((entry: any, index: number) => {
+      const previous = all[index - 1]?.snapshot
+      const changed = ['name', 'description', 'tags', 'photo_urls', 'tobaccos'].filter((key) => (
+        previous ? JSON.stringify(previous[key] ?? null) !== JSON.stringify(entry.snapshot?.[key] ?? null) : true
+      ))
+      return { ...entry, changed }
+    }).reverse()
+  }, [current, versions])
+
+  if (!hasToken) return null
+
+  return (
+    <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-4 sm:p-5">
+      <div tw="flex items-center justify-between gap-3">
+        <div>
+          <Label>История</Label>
+          <SectionTitle tw="mt-1">Изменения забивки</SectionTitle>
+        </div>
+        <span tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] px-3 py-1.5 text-[12px] font-black text-[rgb(var(--color-text-muted))] tabular-nums">
+          {rows.length}
+        </span>
+      </div>
+      <div tw="mt-4 grid gap-3">
+        {rows.map((row: any) => (
+          <article key={row.id} tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-3">
+            <div tw="flex flex-wrap items-center justify-between gap-2">
+              <p tw="text-[13px] font-black text-[rgb(var(--color-text))]">{row.label}</p>
+              <div tw="flex flex-wrap gap-1">
+                {row.changed.map((key: string) => (
+                  <span key={key} tw="rounded-md bg-[rgb(var(--color-accent-muted))] px-2 py-1 text-[10px] font-black text-[rgb(var(--color-accent))]">
+                    {key}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div tw="mt-3 grid gap-2 sm:grid-cols-2">
+              {row.changed.slice(0, 4).map((key: string) => (
+                <div key={key} tw="min-w-0 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2.5 py-2">
+                  <p tw="text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">{key}</p>
+                  <p tw="mt-0.5 truncate text-[12px] font-semibold text-[rgb(var(--color-text-muted))]">{getSnapshotLabel(row.snapshot, key)}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+const SimilarSetups = ({ currentId, tobaccoIds }: { currentId: string; tobaccoIds: string[] }) => {
+  const { data } = useGetSetupsQuery({ tobacco_ids: tobaccoIds, limit: 6 }, { skip: tobaccoIds.length === 0 })
+  const items = useMemo(() => normalizeSetups(data).filter((setup: any) => setup.id !== currentId).slice(0, 4), [currentId, data])
+  if (!items.length) return null
+
+  return (
+    <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-4 sm:p-5">
+      <div>
+        <Label>Рекомендации</Label>
+        <SectionTitle tw="mt-1">Похожие забивки</SectionTitle>
+      </div>
+      <div tw="mt-4 grid gap-3 sm:grid-cols-2">
+        {items.map((setup: any) => (
+          <Link key={setup.id} to={`/setups/${setup.id}`} tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-3 transition-colors hover:bg-[rgb(var(--color-accent-muted))]">
+            <p tw="truncate text-[13px] font-black text-[rgb(var(--color-text))]">{setup.name}</p>
+            <p tw="mt-1 text-[11px] font-semibold text-[rgb(var(--color-text-subtle))]">{Number(setup.views_count || 0)} просмотров</p>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+const normalizeSetups = (data: any) => (Array.isArray(data) ? data : data?.items || [])
+
 const EquipmentCard = ({ item, icon, label }: { item: any; icon: CatalogIconName; label: string }) => {
   const { t } = useTranslation()
 
@@ -323,6 +432,11 @@ const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreat
 
   const average = getReviewAverage(reviews)
   const ownReview = profile ? reviews.find((review: SetupReview) => isReviewAuthor(review, profile)) : undefined
+  const sortedReviews = useMemo(() => (
+    profile
+      ? [...reviews].sort((left: SetupReview, right: SetupReview) => Number(isReviewAuthor(right, profile)) - Number(isReviewAuthor(left, profile)))
+      : reviews
+  ), [profile, reviews])
   const isSetupOwner = Boolean(profile?.id && setupCreatorId && String(profile.id) === String(setupCreatorId))
   const isSaving = saving || updating || deletingReview
   const formTitle = ownReview ? t('reviews.editTitle') : t('reviews.writeTitle')
@@ -410,7 +524,7 @@ const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreat
             {t('reviews.empty')}
           </div>
         )}
-        {reviews.map((review: SetupReview) => {
+        {sortedReviews.map((review: SetupReview) => {
           const isOwnReview = isReviewAuthor(review, profile)
 
           return (
@@ -497,6 +611,92 @@ const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreat
   )
 }
 
+const SetupComments = ({ setupId }: { setupId: string }) => {
+  const { t } = useTranslation()
+  const hasToken = hasAuthToken()
+  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
+  const { data: comments = [], isLoading } = useGetSetupCommentsQuery(setupId)
+  const [createComment, { isLoading: creating }] = useCreateSetupCommentMutation()
+  const [deleteComment, { isLoading: deleting }] = useDeleteSetupCommentMutation()
+  const [body, setBody] = useState('')
+  const [error, setError] = useState('')
+
+  const submitComment = async (event: FormEvent) => {
+    event.preventDefault()
+    const text = body.trim()
+    setError('')
+    if (text.length < 1) return
+    try {
+      await createComment({ setupId, body: text }).unwrap()
+      setBody('')
+    } catch {
+      setError(t('common.failedSave'))
+    }
+  }
+
+  return (
+    <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-4 sm:p-5">
+      <div tw="flex items-center justify-between gap-3">
+        <div>
+          <Label>Обсуждение</Label>
+          <SectionTitle tw="mt-1">Комментарии</SectionTitle>
+        </div>
+        <span tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] px-3 py-1.5 text-[12px] font-black text-[rgb(var(--color-text-muted))] tabular-nums">
+          {comments.length}
+        </span>
+      </div>
+
+      <form onSubmit={submitComment} tw="mt-4 grid gap-2">
+        <Textarea
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          placeholder={profile ? 'Написать короткий комментарий' : 'Войдите, чтобы комментировать'}
+          rows={3}
+          maxLength={500}
+          disabled={!profile || creating}
+        />
+        <div tw="flex items-center justify-between gap-3">
+          <span tw="text-[11px] font-medium text-[rgb(var(--color-text-subtle))]">{body.length}/500</span>
+          <Button type="submit" size="sm" disabled={!profile || creating || !body.trim()}>
+            {creating ? t('common.saving') : 'Отправить'}
+          </Button>
+        </div>
+        {error && <p tw="rounded-lg border border-[rgb(var(--color-danger-border))] bg-[rgb(var(--color-danger-surface))] px-3 py-2 text-[13px] font-medium text-[rgb(var(--color-danger))]">{error}</p>}
+      </form>
+
+      <div tw="mt-4 grid gap-3">
+        {isLoading && <div tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-4 text-[13px] font-medium text-[rgb(var(--color-text-muted))]">{t('common.loading')}</div>}
+        {!isLoading && !comments.length && (
+          <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface-muted))] p-4 text-[13px] font-medium text-[rgb(var(--color-text-muted))]">
+            Пока нет комментариев.
+          </div>
+        )}
+        {comments.map((comment: any) => {
+          const ownComment = profile?.id && String(profile.id) === String(comment.creator_id)
+          return (
+            <article key={comment.id} tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-3">
+              <div tw="flex items-start justify-between gap-3">
+                <AuthorChip author={comment.creator} compact />
+                {ownComment && (
+                  <button
+                    type="button"
+                    onClick={() => deleteComment({ setupId, commentId: comment.id })}
+                    disabled={deleting}
+                    tw="text-[11px] font-bold text-[rgb(var(--color-danger))] underline-offset-2 hover:underline disabled:opacity-50"
+                  >
+                    {t('common.delete')}
+                  </button>
+                )}
+              </div>
+              <p tw="mt-3 whitespace-pre-wrap text-[13px] font-medium leading-relaxed text-[rgb(var(--color-text-muted))]">{comment.body}</p>
+            </article>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 export const SetupDetail = () => {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
@@ -506,9 +706,12 @@ export const SetupDetail = () => {
   const hasToken = hasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
   const [deleteSetup, { isLoading: deleting }] = useDeleteSetupMutation()
+  const [setSetupFeatured, { isLoading: featuring }] = useSetSetupFeaturedMutation()
   const [cloneSetup, { isLoading: cloning }] = useCloneSetupMutation()
   const [bookmarkSetup, { isLoading: bookmarking }] = useBookmarkSetupMutation()
   const [unbookmarkSetup, { isLoading: unbookmarking }] = useUnbookmarkSetupMutation()
+  const [likeSetup, { isLoading: liking }] = useLikeSetupMutation()
+  const [unlikeSetup, { isLoading: unliking }] = useUnlikeSetupMutation()
   const [recordSetupView] = useRecordSetupViewMutation()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -527,6 +730,9 @@ export const SetupDetail = () => {
   const kind = detectSetupKind(typeName)
   const bowlModel = detectBowlModel(bowl)
   const mixItems = useMemo(() => (item ? buildMixItems(item, undefined, (index) => t('common.tobaccoFallback', { number: index + 1 })) : []), [item, t])
+  const tobaccoIds = useMemo(() => (
+    item?.tobaccos?.map((entry: any) => entry.tobacco_id).filter(Boolean) || []
+  ), [item?.tobaccos])
   const heaviness = useMemo(() => (item ? getSetupHeaviness(item, undefined) : null), [item])
   const setupCost = useMemo(() => calculateSetupCost({
     bowl,
@@ -540,9 +746,24 @@ export const SetupDetail = () => {
   const feedPath = `/${feedSearch}`
 
   useEffect(() => {
-    if (!id) return
+    if (!id || !item) return
+    if (hasToken && !profile) return
+    if (isSetupAuthor(item, profile)) return
     recordSetupView(id).catch(() => undefined)
-  }, [id, recordSetupView])
+  }, [hasToken, id, item, profile, recordSetupView])
+
+  useEffect(() => {
+    if (!item?.id || typeof window === 'undefined') return
+    const key = 'shisha-guid:viewed-setups'
+    const entry = { id: item.id, name: item.name, viewed_at: new Date().toISOString() }
+    try {
+      const current = JSON.parse(window.localStorage.getItem(key) || '[]')
+      const next = [entry, ...current.filter((stored: any) => stored.id !== item.id)].slice(0, 10)
+      window.localStorage.setItem(key, JSON.stringify(next))
+    } catch {
+      window.localStorage.setItem(key, JSON.stringify([entry]))
+    }
+  }, [item?.id, item?.name])
 
   const handleDelete = async () => {
     if (!item?.id) return
@@ -566,6 +787,31 @@ export const SetupDetail = () => {
     if (!item?.id) return
     if (item.is_bookmarked) await unbookmarkSetup(item.id).unwrap()
     else await bookmarkSetup(item.id).unwrap()
+  }
+
+  const handleLike = async () => {
+    if (!item?.id || !profile) return
+    if (item.is_liked) await unlikeSetup(item.id).unwrap()
+    else await likeSetup(item.id).unwrap()
+  }
+
+  const handleFeatured = async () => {
+    if (!item?.id) return
+    await setSetupFeatured({ id: item.id, featured: !item.is_featured }).unwrap()
+  }
+
+  const handleShare = async () => {
+    const url = window.location.href
+    const shareData = { title: item?.name || 'ShishaGuid', text: item?.description || item?.name || 'ShishaGuid setup', url }
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData)
+        return
+      }
+      await navigator.clipboard.writeText(url)
+    } catch {
+      // Sharing is optional; keep the page state unchanged if the user cancels.
+    }
   }
 
   if (isLoading) {
@@ -595,6 +841,11 @@ export const SetupDetail = () => {
     <>
       <div tw="relative mx-auto w-full max-w-5xl">
         <div tw="flex min-w-0 flex-col gap-4">
+          <nav tw="flex min-w-0 items-center gap-1.5 text-[12px] font-bold text-[rgb(var(--color-text-subtle))]">
+            <Link to="/" tw="hover:text-[rgb(var(--color-text))]">Лента</Link>
+            <span>/</span>
+            <span tw="truncate text-[rgb(var(--color-text-muted))]">{item.name}</span>
+          </nav>
           <button
             onClick={() => navigate(feedPath)}
             tw="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[rgb(var(--color-text-muted))] transition-colors hover:text-[rgb(var(--color-text))]"
@@ -621,13 +872,52 @@ export const SetupDetail = () => {
             <div tw="mt-2">
               <AuthorChip author={item.creator} />
             </div>
+            {item.is_featured && (
+              <span tw="mt-3 inline-flex w-fit rounded-lg bg-[rgb(var(--color-accent))] px-2.5 py-1 text-[11px] font-black text-white">
+                В подборке
+              </span>
+            )}
+            {item.tags?.length > 0 && (
+              <div tw="mt-3 flex flex-wrap gap-1.5">
+                {item.tags.map((tag: string) => (
+                  <Link key={tag} to={`/?tag=${encodeURIComponent(tag)}`} tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[11px] font-black text-[rgb(var(--color-text-subtle))] hover:bg-[rgb(var(--color-accent-muted))]">
+                    #{tag}
+                  </Link>
+                ))}
+              </div>
+            )}
             <div tw="mt-3 inline-flex w-fit items-center gap-1.5 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2.5 py-1.5 text-[12px] font-black text-[rgb(var(--color-text-muted))]">
               <EyeIcon size={14} />
               <span tw="tabular-nums">{Number(item.views_count || 0)}</span>
               <span tw="font-semibold text-[rgb(var(--color-text-subtle))]">{t('setupDetail.views')}</span>
             </div>
+            <div tw="mt-2 flex flex-wrap gap-2">
+              <span tw="inline-flex w-fit items-center gap-1.5 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2.5 py-1.5 text-[12px] font-black text-[rgb(var(--color-text-muted))]">
+                <HeartIcon size={14} />
+                <span tw="tabular-nums">{Number(item.likes_count || 0)}</span>
+              </span>
+              <span tw="inline-flex w-fit items-center gap-1.5 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2.5 py-1.5 text-[12px] font-black text-[rgb(var(--color-text-muted))]">
+                <CommentIcon size={14} />
+                <span tw="tabular-nums">{Number(item.comments_count || 0)}</span>
+              </span>
+              <span tw="inline-flex w-fit items-center gap-1.5 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-2.5 py-1.5 text-[12px] font-black text-[rgb(var(--color-text-muted))]">
+                <CatalogIcon name="setupType" size={14} />
+                <span tw="tabular-nums">{Number(item.clones_count || 0)}</span>
+                <span tw="font-semibold text-[rgb(var(--color-text-subtle))]">клонов</span>
+              </span>
+            </div>
             {profile && (
               <div tw="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={item.is_liked ? 'danger' : 'secondary'}
+                  size="sm"
+                  onClick={handleLike}
+                  disabled={liking || unliking}
+                >
+                  <HeartIcon />
+                  {item.is_liked ? 'Нравится' : 'Лайк'}
+                </Button>
                 <Button
                   type="button"
                   variant="secondary"
@@ -644,8 +934,19 @@ export const SetupDetail = () => {
                 )}
               </div>
             )}
+            <div tw="mt-3">
+              <Button type="button" variant="outline" size="sm" onClick={handleShare}>
+                <ShareIcon />
+                Поделиться
+              </Button>
+            </div>
             {canManageSetup && (
               <div tw="mt-3 flex flex-wrap gap-2">
+                {isAdmin && (
+                  <Button type="button" variant="outline" size="sm" onClick={handleFeatured} disabled={featuring}>
+                    {item.is_featured ? 'Убрать из подборки' : 'В подборку'}
+                  </Button>
+                )}
                 <Link to={`/setups/${item.id}/edit`}>
                   <Button variant="secondary" size="sm">{t('setupDetail.editSetup')}</Button>
                 </Link>
@@ -694,6 +995,9 @@ export const SetupDetail = () => {
       </Card>
 
       <SetupReviews setupId={item.id} setupCreatorId={item.creator_id || item.creator?.id} />
+      <SetupComments setupId={item.id} />
+      <SimilarSetups currentId={item.id} tobaccoIds={tobaccoIds} />
+      <VersionHistory current={item} setupId={item.id} />
 
       <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-4 sm:p-5">
         <StepHeader

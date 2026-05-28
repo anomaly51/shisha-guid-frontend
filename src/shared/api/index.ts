@@ -2,7 +2,8 @@ export { api } from './base'
 export { useGoogleLoginMutation, useLogoutMutation } from './auth'
 export {
   useGetProfileQuery, useUpdateProfileMutation,
-  useGetPublicProfileQuery, useFollowUserMutation, useUnfollowUserMutation,
+  useGetPublicProfileQuery, useGetProfileActivityQuery, useSearchUsersQuery, useGetTopAuthorsQuery,
+  useFollowUserMutation, useUnfollowUserMutation,
   useGetNotificationsQuery, useMarkNotificationsReadMutation,
 } from './profile'
 export { useGetAdminUsersQuery, useUpdateAdminUserMutation } from './admin'
@@ -16,9 +17,10 @@ export {
   useGetBowlSetupTypesQuery, useGetBowlSetupTypeQuery, useCreateBowlSetupTypeMutation, useUpdateBowlSetupTypeMutation, useDeleteBowlSetupTypeMutation,
 } from './catalog'
 export {
-  useGetSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
-  useCloneSetupMutation, useBookmarkSetupMutation, useUnbookmarkSetupMutation, useGetSetupVersionsQuery,
+  useGetSetupsQuery, useGetUserSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
+  useSetSetupFeaturedMutation, useCloneSetupMutation, useBookmarkSetupMutation, useUnbookmarkSetupMutation, useLikeSetupMutation, useUnlikeSetupMutation, useGetSetupVersionsQuery,
   useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation, useDeleteSetupReviewMutation,
+  useGetSetupCommentsQuery, useCreateSetupCommentMutation, useDeleteSetupCommentMutation,
 } from './setups'
 export { useGetUploadPolicyMutation, useUploadMediaMutation } from './upload'
 export {

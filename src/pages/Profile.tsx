@@ -9,6 +9,7 @@ import {
   type AdminUser,
   type BadgeEffect,
   useGetAdminUsersQuery,
+  useGetProfileActivityQuery,
   useGetProfileQuery,
   useUpdateAdminUserMutation,
   useUpdateProfileMutation,
@@ -236,6 +237,78 @@ const AdminPanel = () => {
   )
 }
 
+const ActivityFeed = () => {
+  const { data: activity = [], isLoading } = useGetProfileActivityQuery({ limit: 30 })
+
+  return (
+    <Card>
+      <div tw="p-4 sm:p-5">
+        <div tw="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">Активность</h2>
+            <p tw="mt-0.5 text-[12px] text-[rgb(var(--color-text-subtle))]">Создания, клоны и отзывы.</p>
+          </div>
+          <span tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] tabular-nums">{activity.length}</span>
+        </div>
+        <div tw="grid gap-2">
+          {isLoading && <div tw="rounded-lg bg-[rgb(var(--color-surface-muted))] px-3 py-3 text-[12px] font-semibold text-[rgb(var(--color-text-subtle))]">loading...</div>}
+          {!isLoading && !activity.length && (
+            <div tw="rounded-lg border border-dashed border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface-muted))] px-3 py-4 text-[12px] font-semibold text-[rgb(var(--color-text-subtle))]">
+              Активности пока нет.
+            </div>
+          )}
+          {activity.map((item: any) => (
+            <Link
+              key={item.id}
+              to={item.setup_id ? `/setups/${item.setup_id}` : '/profile'}
+              tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-3 py-3 text-[13px] font-semibold text-[rgb(var(--color-text))] transition-colors hover:border-[rgb(var(--color-accent-border))]"
+            >
+              <span tw="block">{item.title}</span>
+              <span tw="mt-1 block text-[11px] text-[rgb(var(--color-text-subtle))]">{new Date(item.created_at).toLocaleDateString()}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+const RecentlyViewed = () => {
+  const [items, setItems] = useState<Array<{ id: string; name: string; viewed_at: string }>>([])
+
+  useEffect(() => {
+    try {
+      setItems(JSON.parse(window.localStorage.getItem('shisha-guid:viewed-setups') || '[]'))
+    } catch {
+      setItems([])
+    }
+  }, [])
+
+  if (!items.length) return null
+
+  return (
+    <Card>
+      <div tw="p-4 sm:p-5">
+        <div tw="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">Недавно смотрели</h2>
+            <p tw="mt-0.5 text-[12px] text-[rgb(var(--color-text-subtle))]">Последние забивки из этого браузера.</p>
+          </div>
+          <span tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] tabular-nums">{items.length}</span>
+        </div>
+        <div tw="grid gap-2 sm:grid-cols-2">
+          {items.map((item) => (
+            <Link key={item.id} to={`/setups/${item.id}`} tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-3 py-3 transition-colors hover:border-[rgb(var(--color-accent-border))]">
+              <span tw="block truncate text-[13px] font-semibold text-[rgb(var(--color-text))]">{item.name}</span>
+              <span tw="mt-1 block text-[11px] text-[rgb(var(--color-text-subtle))]">{new Date(item.viewed_at).toLocaleDateString()}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 export const Profile = () => {
   const hasToken = hasAuthToken()
   const { data: profile, isLoading } = useGetProfileQuery(undefined, { skip: !hasToken })
@@ -344,8 +417,8 @@ export const Profile = () => {
       setSavedNickname(nextNickname)
       setSavedAvatarUrl(nextAvatarUrl)
       setMessage(t('profile.updated'))
-    } catch {
-      setError(t('profile.updateFailed'))
+    } catch (requestError: any) {
+      setError(requestError?.status === 409 ? 'Имя уже занято, выберите другое.' : t('profile.updateFailed'))
     }
   }
 
@@ -437,6 +510,12 @@ export const Profile = () => {
             </div>
 
             <div tw="flex flex-col gap-3">
+              {!savedNickname && (
+                <div tw="rounded-lg border border-[rgb(var(--color-accent-border))] bg-[rgb(var(--color-accent-muted))] px-3 py-2.5 text-[13px] font-semibold leading-relaxed text-[rgb(var(--color-text))]">
+                  Имя из Google уже занято или не подошло. Выберите никнейм, чтобы вас было проще найти.
+                </div>
+              )}
+
               <Input
                 label={t('profile.nickname')}
                 value={nickname}
@@ -535,6 +614,14 @@ export const Profile = () => {
             </div>
           </div>
         </Card>
+      </div>
+
+      <div tw="mt-4">
+        <ActivityFeed />
+      </div>
+
+      <div tw="mt-4">
+        <RecentlyViewed />
       </div>
 
       {isAdmin && (

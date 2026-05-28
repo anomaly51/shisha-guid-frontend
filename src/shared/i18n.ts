@@ -104,6 +104,9 @@ export const resources = {
         uploadFailed: 'Не удалось загрузить медиа профиля.',
         logout: 'Выйти',
       },
+      authors: {
+        title: 'Авторы',
+      },
       catalog: {
         count_one: '{{count}} элемент',
         count_few: '{{count}} элемента',
@@ -574,6 +577,9 @@ export const resources = {
         uploadFailed: 'Не вдалося завантажити медіа профілю.',
         logout: 'Вийти',
       },
+      authors: {
+        title: 'Автори',
+      },
       catalog: {
         count_one: '{{count}} елемент',
         count_few: '{{count}} елементи',
@@ -1043,6 +1049,9 @@ export const resources = {
         mediaTypeError: 'Only {{label}} files are supported.',
         uploadFailed: 'Failed to upload profile media.',
         logout: 'Log out',
+      },
+      authors: {
+        title: 'Authors',
       },
       catalog: {
         count_one: '{{count}} item',

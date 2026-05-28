@@ -16,14 +16,27 @@ const getSetupTitleFromState = (state: RootState, pathname: string) => {
   return query?.data?.name ? `${query.data.name} | ShishaGuid` : null
 }
 
+const getUserTitleFromState = (state: RootState, pathname: string) => {
+  const match = pathname.match(/^\/users\/([^/]+)$/)
+  if (!match) return null
+  const query = Object.values(state.api.queries).find((entry: any) => (
+    entry?.endpointName === 'getPublicProfile' &&
+    entry?.originalArgs === match[1] &&
+    entry?.status === 'fulfilled'
+  )) as { data?: { display_name?: string; nickname?: string } } | undefined
+  const name = query?.data?.display_name || query?.data?.nickname
+  return name ? `${name} | ShishaGuid` : null
+}
+
 export const PageTitle = () => {
   const { pathname } = useLocation()
   const { t, i18n } = useTranslation()
   const setupTitle = useSelector((state: RootState) => getSetupTitleFromState(state, pathname))
+  const userTitle = useSelector((state: RootState) => getUserTitleFromState(state, pathname))
 
   useEffect(() => {
-    document.title = setupTitle || getPageTitle(pathname, t)
-  }, [pathname, setupTitle, t, i18n.language])
+    document.title = setupTitle || userTitle || getPageTitle(pathname, t)
+  }, [pathname, setupTitle, t, userTitle, i18n.language])
 
   return null
 }

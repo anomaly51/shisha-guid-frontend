@@ -97,6 +97,11 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
 
   return (
     <div tw="flex flex-col gap-6 max-w-3xl">
+      <nav tw="flex min-w-0 items-center gap-1.5 text-[12px] font-bold text-[rgb(var(--color-text-subtle))]">
+        <Link to={listPath} tw="hover:text-[rgb(var(--color-text))]">{title}</Link>
+        <span>/</span>
+        <span tw="truncate text-[rgb(var(--color-text-muted))]">{displayName}</span>
+      </nav>
       <button
         onClick={() => navigate(listPath)}
         tw="flex items-center gap-1.5 text-sm text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text))] transition-colors font-medium w-fit"

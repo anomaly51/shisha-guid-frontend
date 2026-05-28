@@ -71,12 +71,11 @@ export const PhotoUploader = ({ label = 'Photos', value, onChange, max = 10 }: P
       if (largeGif && !window.confirm(t('uploader.largeGifWarning'))) return
 
       setUploadProgress({ done: 0, total: selected.length })
-      const uploaded: string[] = []
-      for (const file of selected) {
+      const uploaded = await Promise.all(selected.map(async (file) => {
         const response = await uploadMedia(file).unwrap()
-        uploaded.push(response.url)
         setUploadProgress((current) => ({ done: (current?.done || 0) + 1, total: current?.total || selected.length }))
-      }
+        return response.url
+      }))
 
       onChange([...value, ...uploaded])
     } catch {

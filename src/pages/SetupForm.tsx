@@ -6,10 +6,11 @@ import tw from 'twin.macro'
 import { Card } from '../shared/ui/Card'
 import { Input, Select, Textarea } from '../shared/ui/Input'
 import { Button } from '../shared/ui/Button'
+import { Modal } from '../shared/ui/Modal'
 import {
   useGetBowlsQuery, useGetTobaccosQuery, useGetCoalsQuery, useGetKaloudsQuery,
   useGetCoalPlacementsQuery, useGetBowlSetupTypesQuery,
-  useCreateSetupMutation, useUpdateSetupMutation, useGetProfileQuery,
+  useCreateSetupMutation, useUpdateSetupMutation, useGetProfileQuery, useGetSetupsQuery,
 } from '../shared/api'
 import { BackIcon, CatalogIcon, type CatalogIconName, LockIcon, VoteDownIcon, VoteUpIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
@@ -113,6 +114,7 @@ type SetupFormDraft = {
   placementId?: string
   typeId?: string
   tobaccoMix?: TobaccoMixRow[]
+  tags?: string[]
 }
 
 const readSetupDraft = (): SetupFormDraft | null => {
@@ -460,6 +462,9 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const [nameEdited, setNameEdited] = useState(Boolean(initialValues?.name || savedDraft?.name))
   const [description, setDescription] = useState(initialValues?.description || savedDraft?.description || '')
   const [photoUrls, setPhotoUrls] = useState<string[]>(initialValues?.photo_urls || savedDraft?.photoUrls || [])
+  const [tags, setTags] = useState<string[]>(initialValues?.tags || savedDraft?.tags || [])
+  const [tagDraft, setTagDraft] = useState('')
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [bowlId, setBowlId] = useState(initialValues?.bowl_id || savedDraft?.bowlId || '')
   const [coalId, setCoalId] = useState(initialValues?.coal_id || savedDraft?.coalId || '')
   const [kaloudId, setKaloudId] = useState(initialValues?.kaloud_id || savedDraft?.kaloudId || '')
@@ -467,6 +472,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const [typeId, setTypeId] = useState(initialValues?.bowl_setup_type_id || savedDraft?.typeId || '')
   const [activeEquipmentIndex, setActiveEquipmentIndex] = useState(0)
   const [error, setError] = useState('')
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [tobaccoSearch, setTobaccoSearch] = useState('')
   const [tobaccoBrand, setTobaccoBrand] = useState('')
   const [tobaccoMix, setTobaccoMix] = useState<TobaccoMixRow[]>(
@@ -534,6 +540,16 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
     tobaccos,
   }), [coalId, coals, placementId, placements, selectedBowl, tobaccoMix, tobaccos])
   const selectedTobaccoIds = useMemo(() => new Set(tobaccoMix.map((item) => item.tobacco_id)), [tobaccoMix])
+  const duplicateQueryIds = useMemo(() => tobaccoMix.map((item) => item.tobacco_id).filter(Boolean), [tobaccoMix])
+  const { data: duplicateSetupsPage } = useGetSetupsQuery(
+    { tobacco_ids: duplicateQueryIds, limit: 3 },
+    { skip: duplicateQueryIds.length === 0 },
+  )
+  const duplicateSetups = useMemo(() => (
+    Array.isArray(duplicateSetupsPage)
+      ? duplicateSetupsPage
+      : duplicateSetupsPage?.items || []
+  ).filter((setup: any) => setup.id !== initialValues?.id), [duplicateSetupsPage, initialValues?.id])
   const tobaccoBrandOptions = useMemo(() => getBrandOptions(tobaccos), [tobaccos])
   const matchingTobaccos = useMemo(() => (
     filterCatalogItems(tobaccos, tobaccoSearch, tobaccoBrand)
@@ -569,8 +585,8 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
     if (isEdit) {
       return Boolean(name.trim() || description.trim() || photoUrls.length || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId)
     }
-    return Boolean(name.trim() || description.trim() || photoUrls.length || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId)
-  }, [bowlId, coalId, description, isEdit, kaloudId, name, photoUrls.length, placementId, tobaccoMix.length, typeId])
+    return Boolean(name.trim() || description.trim() || photoUrls.length || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId || tags.length)
+  }, [bowlId, coalId, description, isEdit, kaloudId, name, photoUrls.length, placementId, tags.length, tobaccoMix.length, typeId])
   const confirmLeave = () => !isDirty || window.confirm('Несохраненные изменения будут потеряны. Уйти со страницы?')
 
   useEffect(() => {
@@ -592,10 +608,25 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
         placementId,
         typeId,
         tobaccoMix,
+        tags,
       }))
+      setDraftSavedAt(Date.now())
     }, 350)
     return () => window.clearTimeout(timeout)
-  }, [bowlId, coalId, description, isDirty, isEdit, kaloudId, name, photoUrls, placementId, tobaccoMix, typeId])
+  }, [bowlId, coalId, description, isDirty, isEdit, kaloudId, name, photoUrls, placementId, tags, tobaccoMix, typeId])
+
+  const addTag = () => {
+    const clean = tagDraft.trim().toLowerCase()
+    if (!clean || tags.includes(clean) || tags.length >= 8) return
+    setTags((current) => [...current, clean])
+    setTagDraft('')
+  }
+
+  useEffect(() => {
+    if (!draftSavedAt) return undefined
+    const timeout = window.setTimeout(() => setDraftSavedAt(null), 2200)
+    return () => window.clearTimeout(timeout)
+  }, [draftSavedAt])
 
   useEffect(() => {
     if (!isDirty) return undefined
@@ -737,10 +768,12 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
       coal_placement_id: placementId,
       bowl_setup_type_id: typeId,
       photo_urls: photoUrls,
+      tags,
       tobaccos: preparedTobaccos,
     }
 
     try {
+      setPreviewOpen(false)
       if (isEdit && initialValues?.id) {
         await updateSetup({ id: initialValues.id, ...body }).unwrap()
       } else {
@@ -805,6 +838,12 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                 </span>
               </div>
             </div>
+
+            {!isEdit && draftSavedAt && (
+              <div tw="rounded-lg border border-[rgb(var(--color-success-border))] bg-[rgb(var(--color-success-surface))] px-3 py-2 text-[12px] font-bold text-[rgb(var(--color-success))]">
+                Черновик сохранён
+              </div>
+            )}
 
             <div tw="grid grid-cols-3 gap-2">
               <StepButton
@@ -919,6 +958,12 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                 </div>
 
                 <MixPreview bowlModel={selectedBowlModel} kind={selectedSetupKind} items={previewItems} />
+
+                {duplicateSetups.length > 0 && (
+                  <div tw="rounded-lg border border-[rgb(var(--color-accent-border))] bg-[rgb(var(--color-accent-muted))] px-3 py-2 text-[12px] font-semibold text-[rgb(var(--color-text))]">
+                    Похожие забивки уже есть: {duplicateSetups.slice(0, 3).map((setup: any) => setup.name).join(', ')}
+                  </div>
+                )}
 
                 <div tw="grid gap-2 rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface))] p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <div tw="min-w-0">
@@ -1242,6 +1287,39 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                     placeholder={t('setupForm.notesPlaceholder')}
                   />
 
+                  <div tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-3">
+                    <Label>Теги</Label>
+                    <div tw="mt-2 flex flex-wrap gap-1.5">
+                      {tags.map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => setTags((current) => current.filter((item) => item !== tag))}
+                          tw="rounded-md bg-[rgb(var(--color-surface-inverse))] px-2 py-1 text-[11px] font-bold text-white"
+                        >
+                          #{tag} ×
+                        </button>
+                      ))}
+                    </div>
+                    <div tw="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                      <Input
+                        value={tagDraft}
+                        onChange={(event) => setTagDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            addTag()
+                          }
+                        }}
+                        maxLength={24}
+                        placeholder="фруктовая, летняя, вечер"
+                      />
+                      <Button type="button" variant="secondary" onClick={addTag} disabled={!tagDraft.trim() || tags.length >= 8}>
+                        Добавить
+                      </Button>
+                    </div>
+                  </div>
+
                   <PhotoUploader
                     label="Фото забивки"
                     value={photoUrls}
@@ -1267,7 +1345,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
                     {t('common.next')}
                   </Button>
                 ) : (
-                  <Button variant="primary" type="button" disabled={isSaving || !canSubmit} onClick={handleSave}>
+                  <Button variant="primary" type="button" disabled={isSaving || !canSubmit} onClick={() => setPreviewOpen(true)}>
                     {isSaving ? t('common.saving') : isEdit ? t('setupForm.saveSetup') : t('setupForm.publishSetup')}
                   </Button>
                 )}
@@ -1276,6 +1354,28 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
           </div>
         </Card>
       </form>
+      <Modal open={previewOpen} onClose={() => setPreviewOpen(false)} title="Предпросмотр публикации">
+        <div tw="grid gap-4">
+          <div tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] p-3">
+            <h2 tw="text-[15px] font-bold text-[rgb(var(--color-text))]">{name || generatedName}</h2>
+            {description && <p tw="mt-2 text-[13px] font-medium text-[rgb(var(--color-text-muted))]">{description}</p>}
+            <div tw="mt-3 flex flex-wrap gap-1.5">
+              {tags.map((tag) => <span key={tag} tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[11px] font-bold text-[rgb(var(--color-text-muted))]">#{tag}</span>)}
+            </div>
+            <div tw="mt-3 flex flex-wrap gap-1.5">
+              {previewItems.map((item) => (
+                <span key={item.id} tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[11px] font-bold text-[rgb(var(--color-text-muted))]">
+                  {item.name} {item.percentage}%
+                </span>
+              ))}
+            </div>
+          </div>
+          <div tw="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setPreviewOpen(false)}>{t('common.cancel')}</Button>
+            <Button type="button" onClick={handleSave} disabled={isSaving}>{isSaving ? t('common.saving') : 'Опубликовать'}</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

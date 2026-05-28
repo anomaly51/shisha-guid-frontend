@@ -4,8 +4,10 @@ export type SetupsQueryParams = {
   limit?: number
   offset?: number
   tobacco_ids?: string[]
+  tags?: string[]
   strength?: 'all' | 'light' | 'medium' | 'strong' | 'heavy'
   sort?: 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' | 'name'
+  period?: 'all' | 'week'
   search?: string
   creator_id?: string
   bookmarked?: boolean
@@ -20,6 +22,11 @@ export type SetupsPageResponse = {
   has_more: boolean
 }
 
+type UserSetupsQueryParams = {
+  limit?: number
+  offset?: number
+}
+
 const withParams = (path: string, params: SetupsQueryParams) => {
   if (!params) return path
 
@@ -28,14 +35,24 @@ const withParams = (path: string, params: SetupsQueryParams) => {
   if (typeof params.offset === 'number') searchParams.set('offset', String(params.offset))
   if (params.strength && params.strength !== 'all') searchParams.set('strength', params.strength)
   if (params.sort && params.sort !== 'newest') searchParams.set('sort', params.sort)
+  if (params.period && params.period !== 'all') searchParams.set('period', params.period)
   if (params.search?.trim()) searchParams.set('search', params.search.trim())
   if (params.creator_id) searchParams.set('creator_id', params.creator_id)
   if (params.bookmarked) searchParams.set('bookmarked', 'true')
   if (params.following) searchParams.set('following', 'true')
   params.tobacco_ids?.forEach((id) => searchParams.append('tobacco_ids', id))
+  params.tags?.forEach((tag) => searchParams.append('tags', tag))
 
   const query = searchParams.toString()
   return query ? `${path}?${query}` : path
+}
+
+const withUserSetupsParams = (userId: string, params?: UserSetupsQueryParams) => {
+  const searchParams = new URLSearchParams()
+  if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit))
+  if (typeof params?.offset === 'number') searchParams.set('offset', String(params.offset))
+  const query = searchParams.toString()
+  return query ? `/profile/users/${userId}/setups?${query}` : `/profile/users/${userId}/setups`
 }
 
 export const setupsApi = api.injectEndpoints({
@@ -43,6 +60,10 @@ export const setupsApi = api.injectEndpoints({
     getSetups: builder.query<any[] | SetupsPageResponse, SetupsQueryParams>({
       query: (params) => withParams('/shisha/bowl-setups', params),
       providesTags: ['Setups'],
+    }),
+    getUserSetups: builder.query<SetupsPageResponse, { userId: string; limit?: number; offset?: number }>({
+      query: ({ userId, limit, offset }) => withUserSetupsParams(userId, { limit, offset }),
+      providesTags: (_result, _error, { userId }) => [{ type: 'Setups', id: `user-${userId}` }],
     }),
     getSetup: builder.query<any, string>({
       query: (id) => `/shisha/bowl-setups/${id}`,
@@ -60,6 +81,10 @@ export const setupsApi = api.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/shisha/bowl-setups/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Setups'],
     }),
+    setSetupFeatured: builder.mutation<any, { id: string; featured: boolean }>({
+      query: ({ id, featured }) => ({ url: `/shisha/bowl-setups/${id}/featured?featured=${featured ? 'true' : 'false'}`, method: 'PATCH' }),
+      invalidatesTags: ['Setups'],
+    }),
     deleteSetup: builder.mutation<any, string>({
       query: (id) => ({ url: `/shisha/bowl-setups/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Setups'],
@@ -75,6 +100,33 @@ export const setupsApi = api.injectEndpoints({
     unbookmarkSetup: builder.mutation<any, string>({
       query: (id) => ({ url: `/shisha/bowl-setups/${id}/bookmark`, method: 'DELETE' }),
       invalidatesTags: ['Setups'],
+    }),
+    likeSetup: builder.mutation<any, string>({
+      query: (id) => ({ url: `/shisha/bowl-setups/${id}/like`, method: 'POST' }),
+      invalidatesTags: ['Setups'],
+    }),
+    unlikeSetup: builder.mutation<any, string>({
+      query: (id) => ({ url: `/shisha/bowl-setups/${id}/like`, method: 'DELETE' }),
+      invalidatesTags: ['Setups'],
+    }),
+    getSetupComments: builder.query<any[], string>({
+      query: (id) => `/shisha/bowl-setups/${id}/comments`,
+      providesTags: (_result, _error, id) => [{ type: 'SetupComments', id }],
+    }),
+    createSetupComment: builder.mutation<any, { setupId: string; body: string }>({
+      query: ({ setupId, body }) => ({
+        url: `/shisha/bowl-setups/${setupId}/comments`,
+        method: 'POST',
+        body: { body },
+      }),
+      invalidatesTags: (_result, _error, { setupId }) => [{ type: 'SetupComments', id: setupId }, 'Setups'],
+    }),
+    deleteSetupComment: builder.mutation<any, { setupId: string; commentId: string }>({
+      query: ({ setupId, commentId }) => ({
+        url: `/shisha/bowl-setups/${setupId}/comments/${commentId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, { setupId }) => [{ type: 'SetupComments', id: setupId }, 'Setups'],
     }),
     getSetupVersions: builder.query<any[], string>({
       query: (id) => `/shisha/bowl-setups/${id}/versions`,
@@ -111,7 +163,8 @@ export const setupsApi = api.injectEndpoints({
 })
 
 export const {
-  useGetSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
-  useCloneSetupMutation, useBookmarkSetupMutation, useUnbookmarkSetupMutation, useGetSetupVersionsQuery,
+  useGetSetupsQuery, useGetUserSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
+  useSetSetupFeaturedMutation, useCloneSetupMutation, useBookmarkSetupMutation, useUnbookmarkSetupMutation, useLikeSetupMutation, useUnlikeSetupMutation, useGetSetupVersionsQuery,
   useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation, useDeleteSetupReviewMutation,
+  useGetSetupCommentsQuery, useCreateSetupCommentMutation, useDeleteSetupCommentMutation,
 } = setupsApi

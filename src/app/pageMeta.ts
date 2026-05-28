@@ -18,6 +18,7 @@ const routeTitleKeys: Record<string, string> = {
   '/admin/bowl-setup-types/create': 'routes.createSetupType',
   '/setups/create': 'setupForm.newSetup',
   '/profile': 'profile.title',
+  '/authors': 'authors.title',
 }
 
 const fallbackTitles: Record<string, string> = {
@@ -44,6 +45,7 @@ const fallbackTitles: Record<string, string> = {
   'setupForm.editSetup': 'Edit setup',
   'setupDetail.setup': 'Setup',
   'profile.title': 'Profile',
+  'authors.title': 'Authors',
 }
 
 export const getRouteTitleKey = (pathname: string) => {
@@ -65,6 +67,7 @@ export const getRouteTitleKey = (pathname: string) => {
   if (/^\/admin\/bowl-setup-types\/[^/]+$/.test(normalizedPath)) return 'routes.setupTypes'
   if (/^\/setups\/[^/]+\/edit$/.test(normalizedPath)) return 'setupForm.editSetup'
   if (/^\/setups\/[^/]+$/.test(normalizedPath)) return 'setupDetail.setup'
+  if (/^\/users\/[^/]+$/.test(normalizedPath)) return 'authors.title'
 
   return null
 }

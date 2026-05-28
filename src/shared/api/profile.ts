@@ -6,6 +6,20 @@ export interface ProfileUpdatePayload {
   avatar_url?: string | null
 }
 
+export type UserSearchParams = {
+  nickname?: string
+  limit?: number
+} | void
+
+const withUserSearchParams = (path: string, params: UserSearchParams) => {
+  if (!params) return path
+  const searchParams = new URLSearchParams()
+  if (params.nickname?.trim()) searchParams.set('nickname', params.nickname.trim())
+  if (typeof params.limit === 'number') searchParams.set('limit', String(params.limit))
+  const query = searchParams.toString()
+  return query ? `${path}?${query}` : path
+}
+
 const isUnauthorizedQueryError = (error: unknown) => (
   typeof error === 'object' &&
   error !== null &&
@@ -40,13 +54,35 @@ export const profileApi = api.injectEndpoints({
       query: (id) => `/profile/users/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Profile', id }],
     }),
+    getProfileActivity: builder.query<any[], { limit?: number } | void>({
+      query: (params) => {
+        const searchParams = new URLSearchParams()
+        if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit))
+        const query = searchParams.toString()
+        return query ? `/profile/activity?${query}` : '/profile/activity'
+      },
+      providesTags: ['Profile'],
+    }),
+    searchUsers: builder.query<any[], UserSearchParams>({
+      query: (params) => withUserSearchParams('/profile/users', params),
+      providesTags: ['Profile'],
+    }),
+    getTopAuthors: builder.query<any[], { limit?: number } | void>({
+      query: (params) => {
+        const searchParams = new URLSearchParams()
+        if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit))
+        const query = searchParams.toString()
+        return query ? `/profile/top-authors?${query}` : '/profile/top-authors'
+      },
+      providesTags: ['Profile'],
+    }),
     followUser: builder.mutation<any, string>({
       query: (id) => ({ url: `/profile/users/${id}/follow`, method: 'POST' }),
-      invalidatesTags: (_result, _error, id) => [{ type: 'Profile', id }, 'Profile'],
+      invalidatesTags: (_result, _error, id) => [{ type: 'Profile', id }, 'Profile', 'Setups'],
     }),
     unfollowUser: builder.mutation<any, string>({
       query: (id) => ({ url: `/profile/users/${id}/follow`, method: 'DELETE' }),
-      invalidatesTags: (_result, _error, id) => [{ type: 'Profile', id }, 'Profile'],
+      invalidatesTags: (_result, _error, id) => [{ type: 'Profile', id }, 'Profile', 'Setups'],
     }),
     getNotifications: builder.query<{ items: any[]; unread_count: number }, void>({
       query: () => '/profile/notifications',
@@ -63,6 +99,9 @@ export const {
   useGetProfileQuery,
   useUpdateProfileMutation,
   useGetPublicProfileQuery,
+  useGetProfileActivityQuery,
+  useSearchUsersQuery,
+  useGetTopAuthorsQuery,
   useFollowUserMutation,
   useUnfollowUserMutation,
   useGetNotificationsQuery,

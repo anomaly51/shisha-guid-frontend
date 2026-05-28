@@ -1422,6 +1422,8 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       await typeAssistantText(response.reply)
       if (response.created_setup_id) {
         clearAgentSession()
+        setDraft(null)
+        setMessages(createInitialTimelineMessages(t('agent.initialMessage')))
         navigate(`/setups/${response.created_setup_id}`)
       }
     } catch {
