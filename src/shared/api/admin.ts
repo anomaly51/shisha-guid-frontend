@@ -36,7 +36,15 @@ export const adminApi = api.injectEndpoints({
       query: ({ id, body }) => ({ url: `/admin/users/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['AdminUsers', 'Profile'],
     }),
+    getReports: builder.query<any[], { status?: string } | void>({
+      query: (params) => `/admin/reports?status_filter=${params?.status || 'pending'}`,
+      providesTags: ['Reports'],
+    }),
+    updateReport: builder.mutation<any, { id: string; status: 'resolved' | 'dismissed' }>({
+      query: ({ id, status }) => ({ url: `/admin/reports/${id}?status_value=${status}`, method: 'PATCH' }),
+      invalidatesTags: ['Reports'],
+    }),
   }),
 })
 
-export const { useGetAdminUsersQuery, useUpdateAdminUserMutation } = adminApi
+export const { useGetAdminUsersQuery, useUpdateAdminUserMutation, useGetReportsQuery, useUpdateReportMutation } = adminApi

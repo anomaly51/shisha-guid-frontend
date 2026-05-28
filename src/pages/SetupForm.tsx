@@ -11,6 +11,7 @@ import {
   useGetBowlsQuery, useGetTobaccosQuery, useGetCoalsQuery, useGetKaloudsQuery,
   useGetCoalPlacementsQuery, useGetBowlSetupTypesQuery,
   useCreateSetupMutation, useUpdateSetupMutation, useGetProfileQuery, useGetSetupsQuery,
+  useAddSetupContributorMutation, useRemoveSetupContributorMutation,
 } from '../shared/api'
 import { BackIcon, CatalogIcon, type CatalogIconName, LockIcon, VoteDownIcon, VoteUpIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
@@ -455,6 +456,8 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const { data: types, isFetching: typesLoading } = useGetBowlSetupTypesQuery()
   const [createSetup, { isLoading: creating }] = useCreateSetupMutation()
   const [updateSetup, { isLoading: updating }] = useUpdateSetupMutation()
+  const [addContributor, { isLoading: addingContributor }] = useAddSetupContributorMutation()
+  const [removeContributor] = useRemoveSetupContributorMutation()
   const savedDraft = useMemo(() => (!isEdit && !initialValues ? readSetupDraft() : null), [initialValues, isEdit])
 
   const [step, setStep] = useState(0)
@@ -464,6 +467,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const [photoUrls, setPhotoUrls] = useState<string[]>(initialValues?.photo_urls || savedDraft?.photoUrls || [])
   const [tags, setTags] = useState<string[]>(initialValues?.tags || savedDraft?.tags || [])
   const [tagDraft, setTagDraft] = useState('')
+  const [contributorNick, setContributorNick] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [bowlId, setBowlId] = useState(initialValues?.bowl_id || savedDraft?.bowlId || '')
   const [coalId, setCoalId] = useState(initialValues?.coal_id || savedDraft?.coalId || '')
@@ -842,6 +846,45 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
             {!isEdit && draftSavedAt && (
               <div tw="rounded-lg border border-[rgb(var(--color-success-border))] bg-[rgb(var(--color-success-surface))] px-3 py-2 text-[12px] font-bold text-[rgb(var(--color-success))]">
                 Черновик сохранён
+              </div>
+            )}
+
+            {isEdit && initialValues?.id && (
+              <div tw="rounded-lg border border-[rgb(var(--color-border))] bg-[rgb(var(--color-surface-muted))] p-3">
+                <Label>Соавторы</Label>
+                {initialValues.contributors?.length > 0 && (
+                  <div tw="mt-2 flex flex-wrap gap-2">
+                    {initialValues.contributors.map((contributor: any) => (
+                      <button
+                        key={contributor.id}
+                        type="button"
+                        onClick={() => removeContributor({ setupId: initialValues.id, userId: contributor.id })}
+                        tw="rounded-md bg-[rgb(var(--color-surface))] px-2 py-1 text-[11px] font-bold text-[rgb(var(--color-text-muted))]"
+                      >
+                        {contributor.display_name || contributor.nickname} ×
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div tw="mt-2 flex gap-2">
+                  <input
+                    value={contributorNick}
+                    onChange={(event) => setContributorNick(event.target.value)}
+                    placeholder="Никнейм соавтора"
+                    tw="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-3 text-[12px] font-semibold outline-none"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={async () => {
+                      await addContributor({ setupId: initialValues.id, nickname: contributorNick.trim() }).unwrap()
+                      setContributorNick('')
+                    }}
+                    disabled={addingContributor || !contributorNick.trim()}
+                  >
+                    Добавить
+                  </Button>
+                </div>
               </div>
             )}
 

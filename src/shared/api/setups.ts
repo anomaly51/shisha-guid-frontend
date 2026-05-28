@@ -85,6 +85,14 @@ export const setupsApi = api.injectEndpoints({
       query: ({ id, featured }) => ({ url: `/shisha/bowl-setups/${id}/featured?featured=${featured ? 'true' : 'false'}`, method: 'PATCH' }),
       invalidatesTags: ['Setups'],
     }),
+    addSetupContributor: builder.mutation<any, { setupId: string; nickname: string }>({
+      query: ({ setupId, nickname }) => ({ url: `/shisha/bowl-setups/${setupId}/contributors`, method: 'POST', body: { nickname } }),
+      invalidatesTags: ['Setups'],
+    }),
+    removeSetupContributor: builder.mutation<any, { setupId: string; userId: string }>({
+      query: ({ setupId, userId }) => ({ url: `/shisha/bowl-setups/${setupId}/contributors/${userId}`, method: 'DELETE' }),
+      invalidatesTags: ['Setups'],
+    }),
     deleteSetup: builder.mutation<any, string>({
       query: (id) => ({ url: `/shisha/bowl-setups/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Setups'],
@@ -144,6 +152,29 @@ export const setupsApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { setupId }) => [{ type: 'SetupReviews', id: setupId }, 'Setups'],
     }),
+    getReviewReplies: builder.query<any[], { setupId: string; reviewId: string }>({
+      query: ({ setupId, reviewId }) => `/shisha/bowl-setups/${setupId}/reviews/${reviewId}/replies`,
+      providesTags: (_result, _error, { reviewId }) => [{ type: 'SetupReviewReplies', id: reviewId }],
+    }),
+    createReviewReply: builder.mutation<any, { setupId: string; reviewId: string; body: string }>({
+      query: ({ setupId, reviewId, body }) => ({
+        url: `/shisha/bowl-setups/${setupId}/reviews/${reviewId}/replies`,
+        method: 'POST',
+        body: { body },
+      }),
+      invalidatesTags: (_result, _error, { setupId, reviewId }) => [{ type: 'SetupReviews', id: setupId }, { type: 'SetupReviewReplies', id: reviewId }],
+    }),
+    deleteReviewReply: builder.mutation<any, { setupId: string; reviewId: string; replyId: string }>({
+      query: ({ setupId, reviewId, replyId }) => ({
+        url: `/shisha/bowl-setups/${setupId}/reviews/${reviewId}/replies/${replyId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, { setupId, reviewId }) => [{ type: 'SetupReviews', id: setupId }, { type: 'SetupReviewReplies', id: reviewId }],
+    }),
+    createReport: builder.mutation<any, { target_type: 'setup' | 'review'; target_id: string; reason: string }>({
+      query: (body) => ({ url: '/shisha/reports', method: 'POST', body }),
+      invalidatesTags: ['Reports'],
+    }),
     updateSetupReview: builder.mutation<any, { setupId: string; reviewId: string; rating: number; description: string }>({
       query: ({ setupId, reviewId, rating, description }) => ({
         url: `/shisha/bowl-setups/${setupId}/reviews/${reviewId}`,
@@ -164,7 +195,8 @@ export const setupsApi = api.injectEndpoints({
 
 export const {
   useGetSetupsQuery, useGetUserSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
-  useSetSetupFeaturedMutation, useCloneSetupMutation, useBookmarkSetupMutation, useUnbookmarkSetupMutation, useLikeSetupMutation, useUnlikeSetupMutation, useGetSetupVersionsQuery,
+  useSetSetupFeaturedMutation, useAddSetupContributorMutation, useRemoveSetupContributorMutation, useCloneSetupMutation, useBookmarkSetupMutation, useUnbookmarkSetupMutation, useLikeSetupMutation, useUnlikeSetupMutation, useGetSetupVersionsQuery,
   useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation, useDeleteSetupReviewMutation,
+  useGetReviewRepliesQuery, useCreateReviewReplyMutation, useDeleteReviewReplyMutation, useCreateReportMutation,
   useGetSetupCommentsQuery, useCreateSetupCommentMutation, useDeleteSetupCommentMutation,
 } = setupsApi

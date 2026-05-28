@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import 'twin.macro'
 import { Card } from '../shared/ui/Card'
 import { Button } from '../shared/ui/Button'
-import { useGetBowlSetupTypesQuery, useGetBowlsQuery, useGetProfileQuery, useGetSetupsQuery, useGetTobaccosQuery, useLikeSetupMutation, useUnlikeSetupMutation } from '../shared/api'
+import { useGetBowlSetupTypesQuery, useGetBowlsQuery, useGetProfileQuery, useGetRecommendedUsersQuery, useGetSetupsQuery, useGetTobaccosQuery, useLikeSetupMutation, useUnlikeSetupMutation } from '../shared/api'
 import { CardSkeleton } from '../shared/ui/Skeleton'
 import { CatalogIcon, ChevronDownIcon, CloseIcon, CommentIcon, EyeIcon, HeartIcon, PlusIcon } from '../shared/ui/Icons'
 import { BowlPreviewFallback, MIX_COLORS, detectBowlModel, detectSetupKind, type BowlModel, type MixBowlItem, type SetupKind } from '../shared/ui/mixBowlModel'
@@ -280,6 +280,7 @@ export const Feed = () => {
   const hasToken = hasAuthToken()
   const unauthRestrictedFilter = (bookmarked || following) && !hasToken
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
+  const { data: recommendedUsers = [] } = useGetRecommendedUsersQuery({ limit: 4 }, { skip: !hasToken || !following })
   const [likeSetup] = useLikeSetupMutation()
   const [unlikeSetup] = useUnlikeSetupMutation()
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {
@@ -854,6 +855,15 @@ export const Feed = () => {
           <button type="button" onClick={resetFilters} tw="mt-4 rounded-lg bg-[rgb(var(--color-surface-inverse))] px-4 py-2 text-[13px] font-bold text-white">
             {t('feed.controls.reset')}
           </button>
+          {following && recommendedUsers.length > 0 && (
+            <div tw="mx-auto mt-5 grid max-w-xl gap-2 text-left sm:grid-cols-2">
+              {recommendedUsers.map((user: any) => (
+                <Link key={user.id} to={`/users/${user.id}`} tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] px-3 py-2">
+                  <AuthorChip author={user} compact />
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

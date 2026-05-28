@@ -5,10 +5,17 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useCreateSetupReviewMutation,
   useCreateSetupCommentMutation,
+  useAddSetupContributorMutation,
+  useAddSetupToCollectionMutation,
   useBookmarkSetupMutation,
   useCloneSetupMutation,
+  useCreateCollectionMutation,
+  useCreateReportMutation,
+  useCreateReviewReplyMutation,
   useDeleteSetupCommentMutation,
   useDeleteSetupReviewMutation,
+  useGetCollectionsQuery,
+  useGetReviewRepliesQuery,
   useGetBowlSetupTypesQuery,
   useGetBowlsQuery,
   useGetCoalPlacementsQuery,
@@ -24,6 +31,7 @@ import {
   useRecordSetupViewMutation,
   useLikeSetupMutation,
   useSetSetupFeaturedMutation,
+  useRemoveSetupContributorMutation,
   useUnbookmarkSetupMutation,
   useUnlikeSetupMutation,
   useUpdateSetupReviewMutation,
@@ -417,6 +425,52 @@ const RatingPicker = ({
   </div>
 )
 
+const ReviewReplies = ({ review, setupId, canReply }: { review: any; setupId: string; canReply: boolean }) => {
+  const { data: replies = [] } = useGetReviewRepliesQuery({ setupId, reviewId: review.id })
+  const [createReply, { isLoading }] = useCreateReviewReplyMutation()
+  const [body, setBody] = useState('')
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    const text = body.trim()
+    if (!text) return
+    await createReply({ setupId, reviewId: review.id, body: text }).unwrap()
+    setBody('')
+  }
+
+  return (
+    <div tw="mt-3 border-t border-[rgb(var(--color-border-muted))] pt-3">
+      {replies.length > 0 && (
+        <div tw="grid gap-2">
+          {replies.map((reply: any) => (
+            <div key={reply.id} tw="rounded-lg bg-[rgb(var(--color-surface))] px-3 py-2">
+              <AuthorChip author={reply.creator} compact />
+              <p tw="mt-2 whitespace-pre-wrap text-[12px] font-medium text-[rgb(var(--color-text-muted))]">{reply.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      {canReply && (
+        <form onSubmit={submit} tw="mt-2 grid gap-2">
+          <Textarea
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            placeholder="Ответить на отзыв"
+            rows={2}
+            maxLength={1000}
+            disabled={isLoading}
+          />
+          <div tw="flex justify-end">
+            <Button type="submit" size="sm" disabled={!body.trim() || isLoading}>
+              {isLoading ? 'Отправка...' : 'Ответить'}
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
+
 const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreatorId?: string }) => {
   const { i18n, t } = useTranslation()
   const hasToken = hasAuthToken()
@@ -564,6 +618,7 @@ const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreat
               <RatingPill rating={review.rating} />
             </div>
             <p tw="mt-3 whitespace-pre-wrap text-[13px] font-medium leading-relaxed text-[rgb(var(--color-text-muted))]">{review.description}</p>
+            <ReviewReplies review={review} setupId={setupId} canReply={isSetupOwner} />
           </article>
           )
         })}
@@ -712,9 +767,19 @@ export const SetupDetail = () => {
   const [unbookmarkSetup, { isLoading: unbookmarking }] = useUnbookmarkSetupMutation()
   const [likeSetup, { isLoading: liking }] = useLikeSetupMutation()
   const [unlikeSetup, { isLoading: unliking }] = useUnlikeSetupMutation()
+  const [addContributor, { isLoading: addingContributor }] = useAddSetupContributorMutation()
+  const [removeContributor] = useRemoveSetupContributorMutation()
+  const [createReport, { isLoading: reporting }] = useCreateReportMutation()
+  const [createCollection, { isLoading: creatingCollection }] = useCreateCollectionMutation()
+  const [addToCollection, { isLoading: addingToCollection }] = useAddSetupToCollectionMutation()
   const [recordSetupView] = useRecordSetupViewMutation()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [contributorNick, setContributorNick] = useState('')
+  const [reportReason, setReportReason] = useState('')
+  const [reportOpen, setReportOpen] = useState(false)
+  const [collectionName, setCollectionName] = useState('')
+  const { data: collections = [] } = useGetCollectionsQuery(undefined, { skip: !hasToken })
   const { data: bowls } = useGetBowlsQuery()
   const { data: coals } = useGetCoalsQuery()
   const { data: kalouds } = useGetKaloudsQuery()
@@ -798,6 +863,26 @@ export const SetupDetail = () => {
   const handleFeatured = async () => {
     if (!item?.id) return
     await setSetupFeatured({ id: item.id, featured: !item.is_featured }).unwrap()
+  }
+
+  const handleAddContributor = async () => {
+    if (!item?.id || !contributorNick.trim()) return
+    await addContributor({ setupId: item.id, nickname: contributorNick.trim() }).unwrap()
+    setContributorNick('')
+  }
+
+  const handleReport = async () => {
+    if (!item?.id || !reportReason.trim()) return
+    await createReport({ target_type: 'setup', target_id: item.id, reason: reportReason.trim() }).unwrap()
+    setReportReason('')
+    setReportOpen(false)
+  }
+
+  const handleCreateCollection = async () => {
+    if (!collectionName.trim()) return
+    const collection = await createCollection({ name: collectionName.trim() }).unwrap()
+    if (item?.id) await addToCollection({ collectionId: collection.id, setupId: item.id }).unwrap()
+    setCollectionName('')
   }
 
   const handleShare = async () => {
@@ -932,6 +1017,39 @@ export const SetupDetail = () => {
                     {cloning ? t('common.saving') : 'Копировать'}
                   </Button>
                 )}
+                <Button type="button" variant="outline" size="sm" onClick={() => setReportOpen(true)}>
+                  Пожаловаться
+                </Button>
+              </div>
+            )}
+            {profile && (
+              <div tw="mt-3 grid gap-2 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-3">
+                <Label>Коллекции</Label>
+                <div tw="flex flex-wrap gap-2">
+                  {collections.map((collection: any) => (
+                    <Button
+                      key={collection.id}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => addToCollection({ collectionId: collection.id, setupId: item.id })}
+                      disabled={addingToCollection || collection.setup_ids?.includes(item.id)}
+                    >
+                      {collection.name}
+                    </Button>
+                  ))}
+                </div>
+                <div tw="flex gap-2">
+                  <input
+                    value={collectionName}
+                    onChange={(event) => setCollectionName(event.target.value)}
+                    placeholder="Новая коллекция"
+                    tw="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-3 text-[12px] font-semibold outline-none"
+                  />
+                  <Button type="button" size="sm" onClick={handleCreateCollection} disabled={creatingCollection || addingToCollection || !collectionName.trim()}>
+                    Создать
+                  </Button>
+                </div>
               </div>
             )}
             <div tw="mt-3">
@@ -961,6 +1079,36 @@ export const SetupDetail = () => {
                 >
                   {t('setupDetail.deleteSetup')}
                 </Button>
+              </div>
+            )}
+            {canManageSetup && (
+              <div tw="mt-3 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-3">
+                <Label>Соавторы</Label>
+                {item.contributors?.length > 0 && (
+                  <div tw="mt-2 flex flex-wrap gap-2">
+                    {item.contributors.map((contributor: any) => (
+                      <button
+                        key={contributor.id}
+                        type="button"
+                        onClick={() => removeContributor({ setupId: item.id, userId: contributor.id })}
+                        tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[11px] font-bold text-[rgb(var(--color-text-muted))]"
+                      >
+                        {contributor.display_name || contributor.nickname} ×
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div tw="mt-2 flex gap-2">
+                  <input
+                    value={contributorNick}
+                    onChange={(event) => setContributorNick(event.target.value)}
+                    placeholder="Никнейм соавтора"
+                    tw="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-3 text-[12px] font-semibold outline-none"
+                  />
+                  <Button type="button" size="sm" onClick={handleAddContributor} disabled={addingContributor || !contributorNick.trim()}>
+                    Добавить
+                  </Button>
+                </div>
               </div>
             )}
             {item.description && (
@@ -1095,6 +1243,26 @@ export const SetupDetail = () => {
             </Button>
             <Button type="button" variant="danger" onClick={handleDelete} disabled={deleting}>
               {deleting ? t('common.saving') : t('common.delete')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={reportOpen} onClose={() => setReportOpen(false)} title="Пожаловаться">
+        <div tw="grid gap-3">
+          <Textarea
+            value={reportReason}
+            onChange={(event) => setReportReason(event.target.value)}
+            placeholder="Что не так с этой забивкой?"
+            rows={4}
+            maxLength={1000}
+          />
+          <div tw="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setReportOpen(false)} disabled={reporting}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" variant="danger" onClick={handleReport} disabled={reporting || reportReason.trim().length < 3}>
+              {reporting ? t('common.saving') : 'Отправить'}
             </Button>
           </div>
         </div>

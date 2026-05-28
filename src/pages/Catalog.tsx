@@ -6,7 +6,13 @@ import { Button } from '../shared/ui/Button'
 import { Card } from '../shared/ui/Card'
 import { Modal } from '../shared/ui/Modal'
 import { Skeleton } from '../shared/ui/Skeleton'
-import { useGetProfileQuery, useGetSetupsQuery, useGetTobaccosQuery } from '../shared/api'
+import {
+  useAddFavoriteTobaccoMutation,
+  useGetProfileQuery,
+  useGetSetupsQuery,
+  useGetTobaccosQuery,
+  useRemoveFavoriteTobaccoMutation,
+} from '../shared/api'
 import { CatalogIcon, type CatalogIconName, EditIcon, EmptyIcon, PlusIcon, TrashIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
@@ -251,6 +257,8 @@ export const Catalog = ({
     { skip: itemKind !== 'tobacco' },
   )
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
+  const [addFavoriteTobacco] = useAddFavoriteTobaccoMutation()
+  const [removeFavoriteTobacco] = useRemoveFavoriteTobaccoMutation()
   const [deleteItem, { isLoading: deleting }] = deleteHook()
   const [createItem, { isLoading: restoring }] = createHook()
   const navigate = useNavigate()
@@ -650,6 +658,17 @@ export const Catalog = ({
                               <TrashIcon />
                             </button>
                           </div>
+                        )}
+                        {!isAdmin && itemKind === 'tobacco' && profile && (
+                          <button
+                            type="button"
+                            onClick={() => item.is_favorite ? removeFavoriteTobacco(item.id) : addFavoriteTobacco(item.id)}
+                            aria-pressed={Boolean(item.is_favorite)}
+                            tw="absolute right-2 top-2 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/95 px-2 py-1 text-[12px] font-black shadow-[0_12px_24px_-18px_rgba(83,48,31,0.7)]"
+                            css={item.is_favorite ? { color: 'rgb(var(--color-danger))' } : { color: 'rgb(var(--color-text-muted))' }}
+                          >
+                            ♥
+                          </button>
                         )}
                         {heroMetric && (
                           <div tw="pointer-events-none absolute bottom-2.5 right-2.5 max-w-[calc(100%-1.25rem)] rounded-md border border-white/60 bg-[rgb(var(--color-surface-inverse))]/90 px-2 py-1.5 text-[11px] font-black text-white shadow-[0_14px_30px_-18px_rgba(0,0,0,0.75)] backdrop-blur">

@@ -5,7 +5,12 @@ import 'twin.macro'
 import { Card } from '../shared/ui/Card'
 import { Button } from '../shared/ui/Button'
 import { Skeleton } from '../shared/ui/Skeleton'
-import { useGetProfileQuery } from '../shared/api'
+import {
+  useAddFavoriteTobaccoMutation,
+  useGetProfileQuery,
+  useGetTobaccoUsersQuery,
+  useRemoveFavoriteTobaccoMutation,
+} from '../shared/api'
 import { AlertIcon, BackIcon } from '../shared/ui/Icons'
 import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
@@ -61,6 +66,9 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
   const { id } = useParams<{ id: string }>()
   const { data: item, isLoading } = detailHook(id!)
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
+  const { data: tobaccoUsers = [] } = useGetTobaccoUsersQuery(id!, { skip: itemKind !== 'tobacco' || !id })
+  const [addFavoriteTobacco] = useAddFavoriteTobaccoMutation()
+  const [removeFavoriteTobacco] = useRemoveFavoriteTobaccoMutation()
   const navigate = useNavigate()
   const { t } = useTranslation()
   const isAdmin = profile?.role === 'admin'
@@ -151,6 +159,16 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
           {itemKind === 'tobacco' && (
             <div tw="mt-4">
               <StrengthIndicator value={getTobaccoStrength(item)} showScore />
+              {profile && (
+                <Button
+                  type="button"
+                  variant={item.is_favorite ? 'danger' : 'secondary'}
+                  size="sm"
+                  onClick={() => item.is_favorite ? removeFavoriteTobacco(item.id) : addFavoriteTobacco(item.id)}
+                >
+                  {item.is_favorite ? 'Убрать из любимых' : 'Любимый табак'}
+                </Button>
+              )}
             </div>
           )}
 
@@ -177,6 +195,19 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
               <div tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-3 py-2.5">
                 <p tw="text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">{t('detail.packageGrams')}</p>
                 <p tw="mt-1 text-sm font-semibold text-[rgb(var(--color-text))]">{formatIntegerValue(item.package_grams, t, 'detail.packageGramsValue')}</p>
+              </div>
+            </div>
+          )}
+
+          {itemKind === 'tobacco' && tobaccoUsers.length > 0 && (
+            <div tw="mt-4 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-3 py-2.5">
+              <p tw="text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">Кто курит этот табак</p>
+              <div tw="mt-2 flex flex-wrap gap-2">
+                {tobaccoUsers.map((user: any) => (
+                  <Link key={user.id} to={`/users/${user.id}`} tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[11px] font-bold text-[rgb(var(--color-text-muted))]">
+                    {user.display_name || user.nickname}
+                  </Link>
+                ))}
               </div>
             </div>
           )}

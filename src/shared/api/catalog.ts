@@ -52,6 +52,10 @@ export const catalogApi = api.injectEndpoints({
       query: (id) => `/shisha/tobaccos/${id}`,
       providesTags: ['Tobaccos'],
     }),
+    getTobaccoUsers: builder.query<any[], string>({
+      query: (id) => `/shisha/tobaccos/${id}/users`,
+      providesTags: ['Profile'],
+    }),
     createTobacco: builder.mutation<any, Record<string, unknown>>({
       query: (body) => ({ url: '/shisha/tobaccos', method: 'POST', body }),
       invalidatesTags: ['Tobaccos'],
@@ -159,6 +163,7 @@ export const {
   useDeleteBowlMutation,
   useGetTobaccosQuery,
   useGetTobaccoQuery,
+  useGetTobaccoUsersQuery,
   useCreateTobaccoMutation,
   useUpdateTobaccoMutation,
   useDeleteTobaccoMutation,

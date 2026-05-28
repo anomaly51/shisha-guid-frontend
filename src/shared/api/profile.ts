@@ -76,6 +76,51 @@ export const profileApi = api.injectEndpoints({
       },
       providesTags: ['Profile'],
     }),
+    getRecommendedUsers: builder.query<any[], { limit?: number } | void>({
+      query: (params) => {
+        const searchParams = new URLSearchParams()
+        if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit))
+        const query = searchParams.toString()
+        return query ? `/profile/recommended-users?${query}` : '/profile/recommended-users'
+      },
+      providesTags: ['Profile'],
+    }),
+    getUserFollowers: builder.query<any[], { userId: string; limit?: number }>({
+      query: ({ userId, limit }) => `/profile/users/${userId}/followers${limit ? `?limit=${limit}` : ''}`,
+      providesTags: (_result, _error, { userId }) => [{ type: 'Profile', id: `followers-${userId}` }],
+    }),
+    getUserFollowing: builder.query<any[], { userId: string; limit?: number }>({
+      query: ({ userId, limit }) => `/profile/users/${userId}/following${limit ? `?limit=${limit}` : ''}`,
+      providesTags: (_result, _error, { userId }) => [{ type: 'Profile', id: `following-${userId}` }],
+    }),
+    getCollections: builder.query<any[], void>({
+      query: () => '/profile/collections',
+      providesTags: ['Collections'],
+    }),
+    createCollection: builder.mutation<any, { name: string }>({
+      query: (body) => ({ url: '/profile/collections', method: 'POST', body }),
+      invalidatesTags: ['Collections'],
+    }),
+    addSetupToCollection: builder.mutation<any, { collectionId: string; setupId: string }>({
+      query: ({ collectionId, setupId }) => ({ url: `/profile/collections/${collectionId}/setups/${setupId}`, method: 'POST' }),
+      invalidatesTags: ['Collections'],
+    }),
+    removeSetupFromCollection: builder.mutation<any, { collectionId: string; setupId: string }>({
+      query: ({ collectionId, setupId }) => ({ url: `/profile/collections/${collectionId}/setups/${setupId}`, method: 'DELETE' }),
+      invalidatesTags: ['Collections'],
+    }),
+    getFavoriteTobaccos: builder.query<any[], void>({
+      query: () => '/profile/favorite-tobaccos',
+      providesTags: ['Tobaccos', 'Profile'],
+    }),
+    addFavoriteTobacco: builder.mutation<any[], string>({
+      query: (id) => ({ url: `/profile/favorite-tobaccos/${id}`, method: 'POST' }),
+      invalidatesTags: ['Tobaccos', 'Profile'],
+    }),
+    removeFavoriteTobacco: builder.mutation<any[], string>({
+      query: (id) => ({ url: `/profile/favorite-tobaccos/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Tobaccos', 'Profile'],
+    }),
     followUser: builder.mutation<any, string>({
       query: (id) => ({ url: `/profile/users/${id}/follow`, method: 'POST' }),
       invalidatesTags: (_result, _error, id) => [{ type: 'Profile', id }, 'Profile', 'Setups'],
@@ -102,6 +147,16 @@ export const {
   useGetProfileActivityQuery,
   useSearchUsersQuery,
   useGetTopAuthorsQuery,
+  useGetRecommendedUsersQuery,
+  useGetUserFollowersQuery,
+  useGetUserFollowingQuery,
+  useGetCollectionsQuery,
+  useCreateCollectionMutation,
+  useAddSetupToCollectionMutation,
+  useRemoveSetupFromCollectionMutation,
+  useGetFavoriteTobaccosQuery,
+  useAddFavoriteTobaccoMutation,
+  useRemoveFavoriteTobaccoMutation,
   useFollowUserMutation,
   useUnfollowUserMutation,
   useGetNotificationsQuery,

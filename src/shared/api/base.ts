@@ -51,6 +51,6 @@ export const api = createApi({
     }
     return result
   },
-  tagTypes: ['Setups', 'SetupReviews', 'SetupComments', 'Bowls', 'Tobaccos', 'Coals', 'Kalouds', 'CoalPlacements', 'BowlSetupTypes', 'Profile', 'AdminUsers'],
+  tagTypes: ['Setups', 'SetupReviews', 'SetupComments', 'SetupReviewReplies', 'Bowls', 'Tobaccos', 'Coals', 'Kalouds', 'CoalPlacements', 'BowlSetupTypes', 'Profile', 'Collections', 'AdminUsers', 'Reports'],
   endpoints: () => ({}),
 })

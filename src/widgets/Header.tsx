@@ -18,7 +18,7 @@ import { AuthModal } from './AuthModal'
 import { LogoutIcon, PlusIcon, ShishaGuidLogo } from '../shared/ui/Icons'
 import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
-import { clearAuthSession } from '../shared/authToken'
+import { clearAuthSession, getAuthToken } from '../shared/authToken'
 import { useHasAuthToken } from '../shared/useAuthToken'
 
 const HeaderBar = tw.header`bg-[rgb(var(--color-surface-inverse))]/95 backdrop-blur-xl border-b border-[rgb(var(--color-border))]`
@@ -131,7 +131,7 @@ const GlobalSearch = ({ open, onClose }: { open: boolean; onClose: () => void })
 export const Header = () => {
   const hasToken = useHasAuthToken()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
-  const { data: notifications } = useGetNotificationsQuery(undefined, {
+  const { data: notifications, refetch: refetchNotifications } = useGetNotificationsQuery(undefined, {
     pollingInterval: 60000,
     skip: !hasToken,
   })
@@ -160,6 +160,21 @@ export const Header = () => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  useEffect(() => {
+    if (!hasToken || typeof window === 'undefined') return undefined
+    const token = getAuthToken()
+    if (!token) return undefined
+    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+    const source = new EventSource(`${apiBaseUrl}/profile/notifications/stream?token=${encodeURIComponent(token)}`)
+    source.addEventListener('notification', () => {
+      refetchNotifications()
+    })
+    source.onerror = () => {
+      source.close()
+    }
+    return () => source.close()
+  }, [hasToken, refetchNotifications])
 
   return (
     <>

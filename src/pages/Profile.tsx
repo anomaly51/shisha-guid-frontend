@@ -9,9 +9,14 @@ import {
   type AdminUser,
   type BadgeEffect,
   useGetAdminUsersQuery,
+  useGetCollectionsQuery,
+  useGetFavoriteTobaccosQuery,
   useGetProfileActivityQuery,
   useGetProfileQuery,
+  useGetRecommendedUsersQuery,
+  useGetReportsQuery,
   useUpdateAdminUserMutation,
+  useUpdateReportMutation,
   useUpdateProfileMutation,
   useLogoutMutation,
   useUploadMediaMutation,
@@ -175,6 +180,8 @@ const AdminUserRow = ({ user }: { user: AdminUser }) => {
 
 const AdminPanel = () => {
   const { data: users = [], isLoading } = useGetAdminUsersQuery()
+  const { data: reports = [] } = useGetReportsQuery({ status: 'pending' })
+  const [updateReport] = useUpdateReportMutation()
   const { t } = useTranslation()
 
   return (
@@ -232,8 +239,78 @@ const AdminPanel = () => {
             users.map((user) => <AdminUserRow key={user.id} user={user} />)
           )}
         </div>
+        <div tw="mt-4 rounded-lg border border-[rgb(var(--color-border))]">
+          <div tw="flex items-center justify-between gap-3 bg-[rgb(var(--color-surface-muted))] px-3 py-2">
+            <h3 tw="text-[12px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-muted))]">reports</h3>
+            <span tw="rounded-md bg-[rgb(var(--color-accent-muted))] px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))]">{reports.length}</span>
+          </div>
+          <div tw="grid gap-2 p-3">
+            {!reports.length && <p tw="text-[12px] font-semibold text-[rgb(var(--color-text-subtle))]">pending reports empty</p>}
+            {reports.map((report: any) => (
+              <div key={report.id} tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-3 py-2">
+                <p tw="text-[12px] font-bold text-[rgb(var(--color-text))]">{report.target_type} · {report.target_id}</p>
+                <p tw="mt-1 text-[12px] text-[rgb(var(--color-text-muted))]">{report.reason}</p>
+                <div tw="mt-2 flex gap-2">
+                  <Button type="button" size="sm" variant="secondary" onClick={() => updateReport({ id: report.id, status: 'resolved' })}>resolve</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => updateReport({ id: report.id, status: 'dismissed' })}>dismiss</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </Card>
+  )
+}
+
+const CollectionsPanel = () => {
+  const { data: collections = [] } = useGetCollectionsQuery()
+  const { data: favorites = [] } = useGetFavoriteTobaccosQuery()
+  const { data: recommended = [] } = useGetRecommendedUsersQuery({ limit: 6 })
+
+  return (
+    <div tw="grid gap-4 lg:grid-cols-3">
+      <Card>
+        <div tw="p-4">
+          <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">Мои коллекции</h2>
+          <div tw="mt-3 grid gap-2">
+            {!collections.length && <p tw="text-[12px] font-semibold text-[rgb(var(--color-text-subtle))]">Коллекций пока нет.</p>}
+            {collections.map((collection: any) => (
+              <div key={collection.id} tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-3 py-2">
+                <p tw="text-[13px] font-bold text-[rgb(var(--color-text))]">{collection.name}</p>
+                <p tw="text-[11px] font-semibold text-[rgb(var(--color-text-subtle))]">{collection.items_count} забивок</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+      <Card>
+        <div tw="p-4">
+          <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">Любимые табаки</h2>
+          <div tw="mt-3 flex flex-wrap gap-2">
+            {!favorites.length && <p tw="text-[12px] font-semibold text-[rgb(var(--color-text-subtle))]">Пока не выбраны.</p>}
+            {favorites.map((item: any) => (
+              <Link key={item.id} to={`/tobaccos/${item.id}`} tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[11px] font-bold text-[rgb(var(--color-text-muted))]">
+                {item.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </Card>
+      <Card>
+        <div tw="p-4">
+          <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">Возможно интересно</h2>
+          <div tw="mt-3 grid gap-2">
+            {recommended.map((user: any) => (
+              <Link key={user.id} to={`/users/${user.id}`} tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-3 py-2">
+                <span tw="block truncate text-[13px] font-bold text-[rgb(var(--color-text))]">{user.display_name || user.nickname}</span>
+                <span tw="text-[11px] font-semibold text-[rgb(var(--color-text-subtle))]">{user.score || 0} очков</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </Card>
+    </div>
   )
 }
 
@@ -507,6 +584,10 @@ export const Profile = () => {
                 <UserBadges badges={profile.badges} maxVisible={2} />
               </div>
               <p tw="mt-1 text-[13px] text-[rgb(var(--color-text-muted))] break-all">{profile.email}</p>
+              <div tw="mt-3 flex flex-wrap gap-2">
+                <span tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[11px] font-black text-[rgb(var(--color-text-muted))]">{profile.score || 0} очков</span>
+                <span tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[11px] font-black text-[rgb(var(--color-text-muted))]">{profile.streak_days || 0} дней подряд</span>
+              </div>
             </div>
 
             <div tw="flex flex-col gap-3">
@@ -618,6 +699,10 @@ export const Profile = () => {
 
       <div tw="mt-4">
         <ActivityFeed />
+      </div>
+
+      <div tw="mt-4">
+        <CollectionsPanel />
       </div>
 
       <div tw="mt-4">

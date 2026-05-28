@@ -5,6 +5,8 @@ import {
   useFollowUserMutation,
   useGetProfileQuery,
   useGetPublicProfileQuery,
+  useGetUserFollowersQuery,
+  useGetUserFollowingQuery,
   useGetUserSetupsQuery,
   useUnfollowUserMutation,
 } from '../shared/api'
@@ -22,6 +24,7 @@ const PROFILE_SETUP_PAGE_SIZE = 24
 export const PublicProfile = () => {
   const { id } = useParams<{ id: string }>()
   const [offset, setOffset] = useState(0)
+  const [socialList, setSocialList] = useState<'followers' | 'following' | null>(null)
   const [loadedSetups, setLoadedSetups] = useState<any[]>([])
   const hasToken = hasAuthToken()
   const { data: viewer } = useGetProfileQuery(undefined, { skip: !hasToken })
@@ -34,6 +37,8 @@ export const PublicProfile = () => {
     { userId: viewer?.id || '', limit: 50, offset: 0 },
     { skip: !viewer?.id || viewer?.id === id },
   )
+  const { data: followers = [] } = useGetUserFollowersQuery({ userId: id!, limit: 50 }, { skip: !id || socialList !== 'followers' })
+  const { data: followingUsers = [] } = useGetUserFollowingQuery({ userId: id!, limit: 50 }, { skip: !id || socialList !== 'following' })
   const [followUser, { isLoading: following }] = useFollowUserMutation()
   const [unfollowUser, { isLoading: unfollowing }] = useUnfollowUserMutation()
   const pageSetups = normalizePage(setupsPage)
@@ -125,14 +130,14 @@ export const PublicProfile = () => {
               <p tw="text-[16px] font-black tabular-nums text-[rgb(var(--color-text))]">{user.setups_count || 0}</p>
               <p tw="text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">Забивки</p>
             </div>
-            <div tw="rounded-lg bg-[rgb(var(--color-surface-muted))] px-3 py-2">
+            <button type="button" onClick={() => setSocialList('followers')} tw="rounded-lg bg-[rgb(var(--color-surface-muted))] px-3 py-2">
               <p tw="text-[16px] font-black tabular-nums text-[rgb(var(--color-text))]">{user.followers_count || 0}</p>
               <p tw="text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">Подписчики</p>
-            </div>
-            <div tw="rounded-lg bg-[rgb(var(--color-surface-muted))] px-3 py-2">
+            </button>
+            <button type="button" onClick={() => setSocialList('following')} tw="rounded-lg bg-[rgb(var(--color-surface-muted))] px-3 py-2">
               <p tw="text-[16px] font-black tabular-nums text-[rgb(var(--color-text))]">{user.following_count || 0}</p>
               <p tw="text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">Подписки</p>
-            </div>
+            </button>
           </div>
           {viewer && !isSelf && (
             <Button type="button" onClick={toggleFollow} disabled={following || unfollowing} variant={user.is_following ? 'secondary' : 'primary'}>
@@ -170,6 +175,23 @@ export const PublicProfile = () => {
           </div>
         )}
       </section>
+      {socialList && (
+        <Card>
+          <div tw="p-4">
+            <div tw="mb-3 flex items-center justify-between">
+              <h2 tw="text-[15px] font-semibold text-[rgb(var(--color-text))]">{socialList === 'followers' ? 'Подписчики' : 'Подписки'}</h2>
+              <Button type="button" size="sm" variant="secondary" onClick={() => setSocialList(null)}>Закрыть</Button>
+            </div>
+            <div tw="grid gap-2 sm:grid-cols-2">
+              {(socialList === 'followers' ? followers : followingUsers).map((profile: any) => (
+                <Link key={profile.id} to={`/users/${profile.id}`} tw="rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-raised))] px-3 py-2">
+                  <AuthorChip author={profile} compact />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }
