@@ -24,6 +24,7 @@ type PageMeta = {
   canonicalUrl: string
   description: string
   image?: string
+  jsonLd?: Record<string, unknown>
   title: string
 }
 
@@ -194,6 +195,10 @@ const truncateMeta = (value: string, maxLength: number) => {
   return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1).trim()}…` : normalized
 }
 
+const serializeJsonLd = (value: Record<string, unknown>) => (
+  JSON.stringify(value).replace(/</g, '\\u003c')
+)
+
 const buildPageMeta = (
   url: string,
   state: ReturnType<ReturnType<typeof createAppStore>['getState']>,
@@ -201,6 +206,12 @@ const buildPageMeta = (
   const parsedUrl = new URL(url, getPublicSiteUrl())
   const canonicalUrl = `${getPublicSiteUrl()}${parsedUrl.pathname}`
   const setupMatch = parsedUrl.pathname.match(/^\/setups\/([^/]+)$/)
+  const catalogDescriptions: Record<string, string> = {
+    '/tobaccos': 'Каталог табаков для кальяна: бренды, вкусы, крепость, цены и подборки для миксов ShishaGuid.',
+    '/bowls': 'Каталог чаш для кальяна ShishaGuid: формы, вместимость, цены и подбор под разные забивки.',
+    '/coals': 'Каталог угля для кальяна ShishaGuid: варианты упаковок, цены и подбор для рецептов.',
+    '/kalouds': 'Каталог калаудов и устройств контроля жара для кальянных забивок ShishaGuid.',
+  }
   const defaultDescription = 'ShishaGuid - share and discover shisha setups'
 
   if (setupMatch) {
@@ -214,12 +225,41 @@ const buildPageMeta = (
         (tobaccoNames.length ? `Shisha setup with ${tobaccoNames.join(', ')}.` : defaultDescription),
         180,
       )
+      const ratingValue = Number(setup.average_rating || setup.rating_average || 0)
+      const ratingCount = Number(setup.rating_count || 0)
+      const jsonLd: Record<string, unknown> = {
+        '@context': 'https://schema.org',
+        '@type': 'Recipe',
+        name: setup.name,
+        description,
+        image: setup.photo_urls?.[0] || setup.tobaccos?.find((item: any) => item.tobacco?.photo_urls?.[0])?.tobacco.photo_urls[0],
+        recipeIngredient: tobaccoNames,
+        recipeInstructions: setup.description || `Mix ${tobaccoNames.join(', ')}`,
+      }
+      if (ratingValue > 0 && ratingCount > 0) {
+        jsonLd.aggregateRating = {
+          '@type': 'AggregateRating',
+          ratingValue,
+          ratingCount,
+          bestRating: 10,
+          worstRating: 1,
+        }
+      }
       return {
         canonicalUrl,
         description,
         image: setup.photo_urls?.[0] || setup.tobaccos?.find((item: any) => item.tobacco?.photo_urls?.[0])?.tobacco.photo_urls[0],
+        jsonLd,
         title: `${setup.name} | ShishaGuid`,
       }
+    }
+  }
+
+  if (catalogDescriptions[parsedUrl.pathname]) {
+    return {
+      canonicalUrl,
+      description: catalogDescriptions[parsedUrl.pathname],
+      title: getFallbackPageTitle(parsedUrl.pathname),
     }
   }
 
@@ -272,6 +312,7 @@ export const onRenderHtml = async (pageContext: ServerPageContext) => {
           <meta property="og:description" content="${pageMeta.description}" />
           <meta property="og:url" content="${pageMeta.canonicalUrl}" />
           ${pageMeta.image ? escapeInject`<meta property="og:image" content="${pageMeta.image}" />` : ''}
+          ${pageMeta.jsonLd ? escapeInject`<script type="application/ld+json">${dangerouslySkipEscape(serializeJsonLd(pageMeta.jsonLd))}</script>` : ''}
           <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
           <title>${pageMeta.title}</title>
           <script>${dangerouslySkipEscape(themeScript)}</script>

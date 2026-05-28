@@ -54,12 +54,33 @@ const NewSetupLink = styled(Link)`
 `
 
 const normalizePageItems = (data: any) => (Array.isArray(data) ? data : data?.items || [])
+const searchHistoryKey = 'shisha-guid:global-search-history'
+
+const useDebouncedValue = (value: string, delay: number) => {
+  const [debounced, setDebounced] = useState(value)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebounced(value), delay)
+    return () => window.clearTimeout(timeout)
+  }, [delay, value])
+
+  return debounced
+}
 
 const GlobalSearch = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const [query, setQuery] = useState('')
+  const [history, setHistory] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      return JSON.parse(window.localStorage.getItem(searchHistoryKey) || '[]')
+    } catch {
+      return []
+    }
+  })
   const navigate = useNavigate()
-  const canSearch = open && query.trim().length >= 2
-  const search = query.trim()
+  const debouncedQuery = useDebouncedValue(query, 250)
+  const search = debouncedQuery.trim()
+  const canSearch = open && search.length >= 2
   const { data: setups } = useGetSetupsQuery({ search, limit: 5 }, { skip: !canSearch })
   const { data: tobaccos } = useGetTobaccosQuery({ search, limit: 5 }, { skip: !canSearch })
   const { data: coals } = useGetCoalsQuery({ search, limit: 5 }, { skip: !canSearch })
@@ -75,6 +96,12 @@ const GlobalSearch = ({ open, onClose }: { open: boolean; onClose: () => void })
   if (!open) return null
 
   const go = (path: string) => {
+    const clean = query.trim()
+    if (clean) {
+      const nextHistory = [clean, ...history.filter((item) => item.toLowerCase() !== clean.toLowerCase())].slice(0, 6)
+      setHistory(nextHistory)
+      window.localStorage.setItem(searchHistoryKey, JSON.stringify(nextHistory))
+    }
     onClose()
     navigate(path)
   }
@@ -94,7 +121,26 @@ const GlobalSearch = ({ open, onClose }: { open: boolean; onClose: () => void })
         />
         <div tw="max-h-[70vh] overflow-y-auto p-3">
           {!canSearch ? (
-            <p tw="px-2 py-6 text-center text-[13px] font-medium text-[rgb(var(--color-text-subtle))]">Введите минимум 2 символа.</p>
+            <div tw="px-2 py-4">
+              <p tw="py-2 text-center text-[13px] font-medium text-[rgb(var(--color-text-subtle))]">Введите минимум 2 символа.</p>
+              {history.length > 0 && (
+                <div tw="mt-3">
+                  <p tw="mb-1 text-[10px] font-black uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">Недавние запросы</p>
+                  <div tw="flex flex-wrap gap-1.5">
+                    {history.map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setQuery(item)}
+                        tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-2 py-1 text-[11px] font-bold text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-accent-muted))]"
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <div tw="grid gap-3">
               {[
@@ -163,17 +209,50 @@ export const Header = () => {
 
   useEffect(() => {
     if (!hasToken || typeof window === 'undefined') return undefined
-    const token = getAuthToken()
-    if (!token) return undefined
+    let controller: AbortController | null = null
+    let reconnectTimeout: number | undefined
+    let closed = false
     const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
-    const source = new EventSource(`${apiBaseUrl}/profile/notifications/stream?token=${encodeURIComponent(token)}`)
-    source.addEventListener('notification', () => {
-      refetchNotifications()
-    })
-    source.onerror = () => {
-      source.close()
+
+    const connect = async () => {
+      const token = getAuthToken()
+      if (!token || closed) return
+      controller?.abort()
+      controller = new AbortController()
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/profile/notifications/stream`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        })
+        if (!response.ok || !response.body) throw new Error('notification stream failed')
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        while (!closed) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const chunks = buffer.split('\n\n')
+          buffer = chunks.pop() || ''
+          chunks.forEach((chunk) => {
+            if (chunk.startsWith('event: notification')) refetchNotifications()
+          })
+        }
+        if (!closed) reconnectTimeout = window.setTimeout(connect, 5000)
+      } catch {
+        if (!closed) reconnectTimeout = window.setTimeout(connect, 5000)
+      }
     }
-    return () => source.close()
+
+    void connect()
+    return () => {
+      closed = true
+      if (reconnectTimeout) window.clearTimeout(reconnectTimeout)
+      controller?.abort()
+    }
   }, [hasToken, refetchNotifications])
 
   return (

@@ -47,12 +47,30 @@ app.get('/robots.txt', (_req, res) => {
     .send([
       'User-agent: *',
       'Allow: /',
+      'Disallow: /profile',
+      'Disallow: /setups/create',
+      'Disallow: /ai-chat',
       `Sitemap: ${publicSiteUrl}/sitemap.xml`,
       '',
     ].join('\n'))
 })
 
 app.get('/sitemap.xml', async (_req, res) => {
+  const setupTotal = await fetchSetupSitemapTotal()
+  const pageCount = Math.max(1, Math.ceil(setupTotal / 50))
+  const sitemapUrls = [
+    '/sitemap-static.xml',
+    ...Array.from({ length: pageCount }, (_, index) => `/sitemap-setups-${index + 1}.xml`),
+  ]
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    sitemapUrls.map((urlPath) => `  <sitemap><loc>${escapeXml(`${publicSiteUrl}${urlPath}`)}</loc></sitemap>`).join('\n') +
+    `\n</sitemapindex>\n`
+
+  res.type('application/xml').set('Cache-Control', 'public, max-age=1800').send(xml)
+})
+
+app.get('/sitemap-static.xml', (_req, res) => {
   const staticPaths = [
     '/',
     '/bowls',
@@ -60,15 +78,26 @@ app.get('/sitemap.xml', async (_req, res) => {
     '/coals',
     '/kalouds',
   ]
-  const setupPaths = await fetchSetupSitemapPaths()
-  const urls = [...staticPaths, ...setupPaths]
+  const xml = buildUrlset(staticPaths)
+
+  res.type('application/xml').set('Cache-Control', 'public, max-age=1800').send(xml)
+})
+
+app.get('/sitemap-setups-:page.xml', async (req, res) => {
+  const page = Math.max(1, Number(req.params.page) || 1)
+  const setupPaths = await fetchSetupSitemapPaths((page - 1) * 50)
+  const xml = buildUrlset(setupPaths)
+
+  res.type('application/xml').set('Cache-Control', 'public, max-age=1800').send(xml)
+})
+
+function buildUrlset(urls) {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     urls.map((urlPath) => `  <url><loc>${escapeXml(`${publicSiteUrl}${urlPath}`)}</loc></url>`).join('\n') +
     `\n</urlset>\n`
-
-  res.type('application/xml').set('Cache-Control', 'public, max-age=1800').send(xml)
-})
+  return xml
+}
 
 if (!isProduction) {
   app.use(base, sirv(publicRoot, { dev: true, extensions: [] }))
@@ -160,9 +189,21 @@ function escapeXml(value) {
     .replace(/"/g, '&quot;')
 }
 
-async function fetchSetupSitemapPaths() {
+async function fetchSetupSitemapTotal() {
   try {
-    const response = await fetch(`${apiBaseUrl}/shisha/bowl-setups?limit=50&sort=newest`)
+    const response = await fetch(`${apiBaseUrl}/shisha/bowl-setups?limit=1&sort=newest`)
+    if (!response.ok) return 0
+    const data = await response.json()
+    return Array.isArray(data) ? data.length : Number(data.total || 0)
+  } catch (error) {
+    console.error('sitemap setup total fetch failed:', error)
+    return 0
+  }
+}
+
+async function fetchSetupSitemapPaths(offset = 0) {
+  try {
+    const response = await fetch(`${apiBaseUrl}/shisha/bowl-setups?limit=50&offset=${offset}&sort=newest`)
     if (!response.ok) return []
     const data = await response.json()
     const items = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : []

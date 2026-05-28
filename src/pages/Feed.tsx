@@ -1,19 +1,15 @@
-import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import 'twin.macro'
-import { Card } from '../shared/ui/Card'
 import { Button } from '../shared/ui/Button'
-import { useGetBowlSetupTypesQuery, useGetBowlsQuery, useGetProfileQuery, useGetRecommendedUsersQuery, useGetSetupsQuery, useGetTobaccosQuery, useLikeSetupMutation, useUnlikeSetupMutation } from '../shared/api'
+import { useGetBowlSetupTypesQuery, useGetProfileQuery, useGetRecommendedUsersQuery, useGetSetupsQuery, useGetTobaccosQuery, useLikeSetupMutation, useUnlikeSetupMutation } from '../shared/api'
 import { CardSkeleton } from '../shared/ui/Skeleton'
-import { CatalogIcon, ChevronDownIcon, CloseIcon, CommentIcon, EyeIcon, HeartIcon, PlusIcon } from '../shared/ui/Icons'
-import { BowlPreviewFallback, MIX_COLORS, detectBowlModel, detectSetupKind, type BowlModel, type MixBowlItem, type SetupKind } from '../shared/ui/mixBowlModel'
-import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
+import { CatalogIcon, ChevronDownIcon, CloseIcon, PlusIcon } from '../shared/ui/Icons'
 import { AuthorChip } from '../shared/ui/AuthorChip'
-import { getSetupHeaviness } from '../shared/setupMetrics'
-import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { getSetupAggregateRating } from '../shared/tobaccoRatings'
 import { hasAuthToken } from '../shared/authToken'
+import { SetupCard } from '../widgets/SetupCard'
 
 type SortValue = 'newest' | 'rating' | 'views' | 'strengthDesc' | 'strengthAsc' | 'name'
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
@@ -22,73 +18,6 @@ type PeriodFilter = 'all' | 'week'
 const SETUP_PAGE_SIZE = 12
 const SETUPS_EMPTY_RETRY_LIMIT = 3
 const SEARCH_HISTORY_KEY = 'shisha-guid:setup-searches'
-
-const LazyMixBowlPreview = lazy(() => (
-  import('../shared/ui/MixBowlPreview').then(({ MixBowlPreview }) => ({ default: MixBowlPreview }))
-))
-
-const runWhenIdle = (callback: () => void) => {
-  if (typeof window === 'undefined') return () => undefined
-
-  if ('requestIdleCallback' in window) {
-    const idleWindow = window as Window & {
-      cancelIdleCallback: (id: number) => void
-      requestIdleCallback: (callback: () => void, options?: { timeout: number }) => number
-    }
-    const id = idleWindow.requestIdleCallback(callback, { timeout: 1200 })
-    return () => idleWindow.cancelIdleCallback(id)
-  }
-
-  const id = globalThis.setTimeout(callback, 80)
-  return () => globalThis.clearTimeout(id)
-}
-
-const BowlPreviewPlaceholder = () => (
-  <div tw="relative aspect-square overflow-hidden bg-[rgb(var(--color-surface-muted))]">
-    <div tw="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(255,255,255,0.82),transparent_38%),linear-gradient(180deg,rgba(255,248,241,0.72),rgba(229,218,207,0.42))]" />
-    <BowlPreviewFallback />
-  </div>
-)
-
-const DeferredMixBowlPreview = (props: {
-  autoRotate?: boolean
-  bowlModel?: BowlModel
-  interactive?: boolean
-  kind: SetupKind
-  items: MixBowlItem[]
-  renderMode?: 'live' | 'snapshot'
-  sceneScale?: number
-}) => {
-  const [ready, setReady] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    const cancel = runWhenIdle(() => {
-      if (active) setReady(true)
-    })
-
-    return () => {
-      active = false
-      cancel()
-    }
-  }, [])
-
-  if (!ready) return <BowlPreviewPlaceholder />
-
-  return (
-    <Suspense fallback={<BowlPreviewPlaceholder />}>
-      <LazyMixBowlPreview {...props} />
-    </Suspense>
-  )
-}
-
-const getItem = (items: any[] | undefined, id: string | undefined) => (
-  items?.find((item) => item.id === id)
-)
-
-const getName = (items: any[] | undefined, id: string | undefined, fallback = 'Tobacco') => (
-  items?.find((item) => item.id === id)?.name || fallback
-)
 
 const getSetupRating = (setup: any) => getSetupAggregateRating(setup) ?? 0
 
@@ -104,20 +33,6 @@ const getSearchSort = (value: string | null): SortValue => (
   sortOptions.includes(value as SortValue) ? value as SortValue : 'newest'
 )
 
-const buildMixItems = (setup: any, tobaccos: any[] | undefined, fallbackName: (index: number) => string): MixBowlItem[] => (
-  setup.tobaccos?.map((item: any, index: number) => {
-    const tobacco = item.tobacco || getItem(tobaccos, item.tobacco_id)
-
-    return {
-      id: item.tobacco_id || item.id || `${setup.id}-${index}`,
-      name: tobacco?.name || getName(tobaccos, item.tobacco_id, fallbackName(index)),
-      percentage: Number(item.percentage || 0),
-      color: item.color || MIX_COLORS[index % MIX_COLORS.length],
-      photo_url: tobacco?.photo_urls?.[0],
-    }
-  }) || []
-)
-
 const normalizeSetupsPage = (setupsPage: any): { items: any[]; total: number; offset: number; has_more: boolean } | null => {
   if (!setupsPage) return null
 
@@ -130,131 +45,6 @@ const normalizeSetupsPage = (setupsPage: any): { items: any[]; total: number; of
     }
     : setupsPage
 }
-
-const SetupCard = memo(({
-  setup,
-  bowl,
-  tobaccos,
-  typeName,
-  rating,
-  onOpen,
-  onToggleLike,
-}: {
-  setup: any
-  bowl?: any
-  tobaccos?: any[]
-  typeName: string
-  rating: number
-  onOpen: (setupId: string) => void
-  onToggleLike: (setup: any) => void
-}) => {
-  const { t } = useTranslation()
-  const mixItems = useMemo(
-    () => buildMixItems(setup, tobaccos, (index) => t('common.tobaccoFallback', { number: index + 1 })),
-    [setup, t, tobaccos],
-  )
-  const bowlModel = useMemo(() => detectBowlModel(bowl), [bowl])
-  const kind = useMemo(() => detectSetupKind(typeName), [typeName])
-  const topItems = useMemo(() => mixItems.slice(0, 2), [mixItems])
-  const restCount = Math.max(0, mixItems.length - topItems.length)
-  const heaviness = useMemo(() => getSetupHeaviness(setup, tobaccos), [setup, tobaccos])
-
-  return (
-    <Card variant="hover" onClick={() => onOpen(setup.id)} className="h-full">
-      <div tw="flex h-full flex-col bg-[rgb(var(--color-surface))]">
-        <div tw="relative border-b border-[rgb(var(--color-border))]">
-          <DeferredMixBowlPreview
-            autoRotate={false}
-            bowlModel={bowlModel}
-            interactive={false}
-            kind={kind}
-            items={mixItems}
-            renderMode="snapshot"
-            sceneScale={1.02}
-          />
-          <TobaccoPhotoStack items={mixItems} />
-          <div tw="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur">
-            <CatalogIcon name="placement" size={12} />
-            {t(`feed.kind.${kind}`)}
-          </div>
-          <div tw="pointer-events-none absolute bottom-2.5 right-2.5 flex items-center gap-1.5 rounded-md border border-white/60 bg-[rgb(var(--color-surface-inverse))]/90 px-2 py-1.5 text-white shadow-[0_14px_30px_-18px_rgba(0,0,0,0.75)] backdrop-blur">
-            <span tw="text-[9px] font-bold uppercase tracking-wide text-white/65">{t('feed.rating')}</span>
-            <span tw="text-[13px] font-black leading-none tabular-nums">{rating.toFixed(1)}</span>
-          </div>
-          <div tw="pointer-events-none absolute left-2.5 bottom-2.5 flex items-center gap-1 rounded-md border border-white/60 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[11px] font-black text-[rgb(var(--color-text-muted))] shadow-[0_12px_26px_-20px_rgba(83,48,31,0.7)] backdrop-blur">
-            <EyeIcon size={13} />
-            <span tw="tabular-nums">{Number(setup.views_count || 0)}</span>
-          </div>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              onToggleLike(setup)
-            }}
-            aria-pressed={Boolean(setup.is_liked)}
-            tw="absolute right-2.5 top-2.5 flex items-center gap-1 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[11px] font-black shadow-[0_12px_26px_-20px_rgba(83,48,31,0.7)] backdrop-blur transition-colors hover:bg-[rgb(var(--color-accent-muted))]"
-            css={setup.is_liked ? { color: 'rgb(var(--color-danger))' } : { color: 'rgb(var(--color-text-muted))' }}
-          >
-            <HeartIcon size={13} />
-            <span tw="tabular-nums">{Number(setup.likes_count || 0)}</span>
-          </button>
-        </div>
-
-        <div tw="flex flex-1 flex-col gap-3 px-3.5 py-3.5">
-          <div tw="min-w-0">
-            <h3 tw="text-[13px] font-semibold leading-snug text-[rgb(var(--color-text))] line-clamp-2 sm:text-sm">{setup.name}</h3>
-            <div tw="mt-2">
-              <AuthorChip author={setup.creator} compact quickFollow />
-            </div>
-          </div>
-
-          <div tw="min-w-0">
-            <div tw="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]">{t('feed.composition')}</div>
-            {topItems.length ? (
-              <div tw="flex flex-wrap gap-1.5">
-                {topItems.map((item) => (
-                  <span key={item.id} tw="inline-flex max-w-full items-center gap-1 rounded-md bg-[rgb(var(--color-surface-muted))] px-1.5 py-1 text-[11px] font-semibold text-[rgb(var(--color-text-muted))]">
-                    <span tw="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
-                    <span tw="min-w-0 truncate">{item.name}</span>
-                    <span tw="shrink-0 font-black text-[rgb(var(--color-accent))] tabular-nums">{item.percentage}%</span>
-                  </span>
-                ))}
-                {restCount > 0 && (
-                  <span tw="inline-flex items-center rounded-md bg-[rgb(var(--color-surface-subtle))] px-1.5 py-1 text-[11px] font-bold text-[rgb(var(--color-text-muted))]">
-                    +{restCount}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div tw="flex items-center gap-1.5 text-[11px] font-semibold text-[rgb(var(--color-text-subtle))]">
-                <CatalogIcon name="tobacco" size={12} />
-                {t('feed.noTobacco')}
-              </div>
-            )}
-          </div>
-
-          {setup.tags?.length > 0 && (
-            <div tw="flex flex-wrap gap-1">
-              {setup.tags.slice(0, 3).map((tag: string) => (
-                <span key={tag} tw="rounded-md bg-[rgb(var(--color-surface-muted))] px-1.5 py-1 text-[10px] font-bold text-[rgb(var(--color-text-subtle))]">#{tag}</span>
-              ))}
-            </div>
-          )}
-
-          <div tw="mt-auto border-t border-[rgb(var(--color-border))] pt-3">
-            <div tw="mb-2 flex items-center gap-2 text-[11px] font-black text-[rgb(var(--color-text-muted))]">
-              <CommentIcon size={13} />
-              <span tw="tabular-nums">{Number(setup.comments_count || 0)}</span>
-            </div>
-            <StrengthIndicator label={t('feed.strength')} value={heaviness} compact />
-          </div>
-        </div>
-      </div>
-    </Card>
-  )
-})
-
-SetupCard.displayName = 'SetupCard'
 
 export const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -321,7 +111,6 @@ export const Feed = () => {
   }), [tobaccoSearch])
   const { data: pickerTobaccos = [] } = useGetTobaccosQuery(tobaccoPickerQueryParams, { skip: !tobaccoPickerOpen })
   const { data: types } = useGetBowlSetupTypesQuery()
-  const { data: bowls } = useGetBowlsQuery()
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useTranslation()
@@ -332,7 +121,6 @@ export const Feed = () => {
   const visibleSetups = loadedSetups.length ? loadedSetups : initialSetups
   const visibleTotal = loadedSetups.length ? totalSetups : normalizedSetupsPage?.total || 0
   const canLoadMore = loadedSetups.length ? hasMoreSetups : Boolean(normalizedSetupsPage?.has_more)
-  const bowlsById = useMemo(() => new Map<string, any>((bowls || []).map((bowl: any) => [bowl.id, bowl])), [bowls])
   const typesById = useMemo(() => new Map<string, any>((types || []).map((type: any) => [type.id, type])), [types])
   const tobaccoNamesById = useMemo(() => {
     const entries = new Map<string, string>()
@@ -872,7 +660,6 @@ export const Feed = () => {
           <SetupCard
             key={setup.id}
             setup={setup}
-            bowl={bowlsById.get(setup.bowl_id)}
             tobaccos={tobaccos}
             typeName={typesById.get(setup.bowl_setup_type_id)?.name || ''}
             rating={getSetupRating(setup)}

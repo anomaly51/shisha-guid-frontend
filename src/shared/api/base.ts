@@ -16,6 +16,14 @@ const rawBaseQuery = fetchBaseQuery({
   },
 })
 
+let authRedirectInProgress = false
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pageshow', () => {
+    authRedirectInProgress = false
+  })
+}
+
 export const api = createApi({
   reducerPath: 'api',
   refetchOnMountOrArgChange: true,
@@ -37,16 +45,21 @@ export const api = createApi({
         if (refreshResult.data && typeof refreshResult.data === 'object') {
           const tokenData = refreshResult.data as { access_token?: string; expires_in?: number; refresh_token?: string }
           if (tokenData.access_token) {
+            authRedirectInProgress = false
             setAuthToken(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in)
             return rawBaseQuery(args, baseQueryApi, extraOptions)
           }
         }
       }
 
-      clearAuthSession()
       if (typeof window !== 'undefined') {
+        if (authRedirectInProgress) return result
+        authRedirectInProgress = true
+        clearAuthSession()
         const next = `${window.location.pathname}${window.location.search}`
         window.location.assign(`/profile?next=${encodeURIComponent(next)}`)
+      } else {
+        clearAuthSession()
       }
     }
     return result

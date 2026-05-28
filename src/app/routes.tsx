@@ -12,48 +12,25 @@ import {
   useGetBowlSetupTypesQuery, useCreateBowlSetupTypeMutation, useGetBowlSetupTypeQuery, useUpdateBowlSetupTypeMutation, useDeleteBowlSetupTypeMutation,
 } from '../shared/api'
 import { AdminOnly, LegacyAdminCatalogRedirect } from './RouteGuards'
+import { ErrorBoundary } from '../shared/ui/ErrorBoundary'
 
 const routeComponent = <TModule extends Record<string, ComponentType<any>>, TKey extends keyof TModule>(
   loader: () => Promise<TModule>,
   exportName: TKey,
 ) => lazy(() => loader().then((module) => ({ default: module[exportName] })))
 
-const Feed = import.meta.env.SSR
-  ? (await import('../pages/Feed')).Feed
-  : routeComponent(() => import('../pages/Feed'), 'Feed')
-const Catalog = import.meta.env.SSR
-  ? (await import('../pages/Catalog')).Catalog
-  : routeComponent(() => import('../pages/Catalog'), 'Catalog')
-const Detail = import.meta.env.SSR
-  ? (await import('../pages/Detail')).Detail
-  : routeComponent(() => import('../pages/Detail'), 'Detail')
-const CreateItem = import.meta.env.SSR
-  ? (await import('../pages/CreateItem')).CreateItem
-  : routeComponent(() => import('../pages/CreateItem'), 'CreateItem')
-const EditItem = import.meta.env.SSR
-  ? (await import('../pages/EditItem')).EditItem
-  : routeComponent(() => import('../pages/EditItem'), 'EditItem')
-const SetupDetail = import.meta.env.SSR
-  ? (await import('../pages/SetupDetail')).SetupDetail
-  : routeComponent(() => import('../pages/SetupDetail'), 'SetupDetail')
-const EditSetup = import.meta.env.SSR
-  ? (await import('../pages/EditSetup')).EditSetup
-  : routeComponent(() => import('../pages/EditSetup'), 'EditSetup')
-const SetupForm = import.meta.env.SSR
-  ? (await import('../pages/SetupForm')).SetupForm
-  : routeComponent(() => import('../pages/SetupForm'), 'SetupForm')
-const Profile = import.meta.env.SSR
-  ? (await import('../pages/Profile')).Profile
-  : routeComponent(() => import('../pages/Profile'), 'Profile')
-const PublicProfile = import.meta.env.SSR
-  ? (await import('../pages/PublicProfile')).PublicProfile
-  : routeComponent(() => import('../pages/PublicProfile'), 'PublicProfile')
-const Authors = import.meta.env.SSR
-  ? (await import('../pages/Authors')).Authors
-  : routeComponent(() => import('../pages/Authors'), 'Authors')
-const AgentChat = import.meta.env.SSR
-  ? (await import('../pages/AgentChat')).AgentChat
-  : routeComponent(() => import('../pages/AgentChat'), 'AgentChat')
+const Feed = routeComponent(() => import('../pages/Feed'), 'Feed')
+const Catalog = routeComponent(() => import('../pages/Catalog'), 'Catalog')
+const Detail = routeComponent(() => import('../pages/Detail'), 'Detail')
+const CreateItem = routeComponent(() => import('../pages/CreateItem'), 'CreateItem')
+const EditItem = routeComponent(() => import('../pages/EditItem'), 'EditItem')
+const SetupDetail = routeComponent(() => import('../pages/SetupDetail'), 'SetupDetail')
+const EditSetup = routeComponent(() => import('../pages/EditSetup'), 'EditSetup')
+const SetupForm = routeComponent(() => import('../pages/SetupForm'), 'SetupForm')
+const Profile = routeComponent(() => import('../pages/Profile'), 'Profile')
+const PublicProfile = routeComponent(() => import('../pages/PublicProfile'), 'PublicProfile')
+const Authors = routeComponent(() => import('../pages/Authors'), 'Authors')
+const AgentChat = routeComponent(() => import('../pages/AgentChat'), 'AgentChat')
 
 export const AppRoutes = () => {
   const { t } = useTranslation()
@@ -61,9 +38,10 @@ export const AppRoutes = () => {
   return (
   <>
     <PageTitle />
-    <Suspense fallback={null}>
-      <Routes>
-        <Route path="/" element={<Layout />}>
+    <ErrorBoundary>
+      <Suspense fallback={null}>
+        <Routes>
+          <Route path="/" element={<Layout />}>
           <Route index element={<Feed />} />
 
       <Route path="bowls" element={
@@ -159,9 +137,10 @@ export const AppRoutes = () => {
       <Route path="profile" element={<Profile />} />
       <Route path="authors" element={<Authors />} />
       <Route path="users/:id" element={<PublicProfile />} />
-        </Route>
-      </Routes>
-    </Suspense>
+          </Route>
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   </>
   )
 }

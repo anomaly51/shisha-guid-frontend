@@ -397,6 +397,7 @@ export const Profile = () => {
   const [savedNickname, setSavedNickname] = useState('')
   const [savedAvatarUrl, setSavedAvatarUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [editingProfile, setEditingProfile] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const { i18n, t } = useTranslation()
@@ -404,13 +405,14 @@ export const Profile = () => {
 
   useEffect(() => {
     if (!profile) return
+    if (editingProfile) return
     const nextNickname = (profile.nickname || '').trim()
     const nextAvatarUrl = profile.avatar_url || null
     setNickname(nextNickname)
     setAvatarUrl(nextAvatarUrl)
     setSavedNickname(nextNickname)
     setSavedAvatarUrl(nextAvatarUrl)
-  }, [profile])
+  }, [editingProfile, profile])
 
   const displayName = useMemo(() => {
     if (!profile) return ''
@@ -454,6 +456,7 @@ export const Profile = () => {
   const resetProfileChanges = () => {
     setNickname(savedNickname)
     setAvatarUrl(savedAvatarUrl)
+    setEditingProfile(false)
     setMessage('')
     setError('')
   }
@@ -471,6 +474,7 @@ export const Profile = () => {
     setUploading(true)
     try {
       const response = await uploadMedia(file).unwrap()
+      setEditingProfile(true)
       setAvatarUrl(response.url)
     } catch {
       setError(t('profile.uploadFailed'))
@@ -493,6 +497,7 @@ export const Profile = () => {
       setNickname(nextNickname)
       setSavedNickname(nextNickname)
       setSavedAvatarUrl(nextAvatarUrl)
+      setEditingProfile(false)
       setMessage(t('profile.updated'))
     } catch (requestError: any) {
       setError(requestError?.status === 409 ? 'Имя уже занято, выберите другое.' : t('profile.updateFailed'))
@@ -561,6 +566,7 @@ export const Profile = () => {
                   type="button"
                   variant="outline"
                   onClick={() => {
+                    setEditingProfile(true)
                     setAvatarUrl(null)
                     setMessage('')
                     setError('')
@@ -601,6 +607,7 @@ export const Profile = () => {
                 label={t('profile.nickname')}
                 value={nickname}
                 onChange={(e) => {
+                  setEditingProfile(true)
                   setNickname(e.target.value)
                   setMessage('')
                   setError('')

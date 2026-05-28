@@ -36,7 +36,6 @@ const catalogRoutes: Record<string, { list: EndpointName; detail: EndpointName }
 
 const setupFormPrefetch: PrefetchRequest[] = [
   { endpoint: 'getBowls' },
-  { endpoint: 'getTobaccos', arg: { limit: 60 } },
   { endpoint: 'getCoals', arg: { limit: 60 } },
   { endpoint: 'getKalouds' },
   { endpoint: 'getCoalPlacements' },
@@ -44,7 +43,7 @@ const setupFormPrefetch: PrefetchRequest[] = [
 ]
 
 const feedPageSize = 12
-const PREFETCH_TIMEOUT_MS = 4500
+const PREFETCH_TIMEOUT_MS = 2000
 
 export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
   const { pathname, searchParams } = new URL(url, 'http://localhost')
@@ -128,15 +127,17 @@ export const prefetchRouteData = async (store: AppStore, url: string) => {
     const initiate = (api.endpoints as Record<EndpointName, { initiate: (arg?: unknown) => any }>)[endpoint].initiate
     return store.dispatch(initiate(arg)) as QuerySubscription
   })
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
 
   try {
     await Promise.race([
       Promise.all(subscriptions.map((subscription) => subscription.unwrap())),
       new Promise((resolve) => {
-        setTimeout(resolve, PREFETCH_TIMEOUT_MS)
+        timeoutId = setTimeout(resolve, PREFETCH_TIMEOUT_MS)
       }),
     ])
   } finally {
+    if (timeoutId) clearTimeout(timeoutId)
     subscriptions.forEach((subscription) => subscription.unsubscribe())
   }
 }

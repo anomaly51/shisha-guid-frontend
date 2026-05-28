@@ -1,5 +1,3 @@
-import searchSynonymGroups from './catalogSearchSynonyms.json'
-
 export interface SearchableCatalogItem {
   id?: string
   name?: string | null
@@ -117,7 +115,9 @@ const switchKeyboardLayout = (value: string, dictionary: Record<string, string>)
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)))
 
-const synonymGroups = searchSynonymGroups.map((group) => unique(group.flatMap((value) => {
+let synonymGroups: string[][] = []
+
+const buildSynonymGroups = (groups: string[][]) => groups.map((group) => unique(group.flatMap((value) => {
   const normalized = normalizeSearchText(value)
   return [
     normalized,
@@ -126,6 +126,16 @@ const synonymGroups = searchSynonymGroups.map((group) => unique(group.flatMap((v
     compact(transliterateCyrillic(normalized)),
   ]
 })))
+
+if (typeof window !== 'undefined') {
+  import('./catalogSearchSynonyms.json')
+    .then((module) => {
+      synonymGroups = buildSynonymGroups(module.default as string[][])
+    })
+    .catch(() => {
+      synonymGroups = []
+    })
+}
 
 const makeVariants = (value: string) => {
   const normalized = normalizeSearchText(value)

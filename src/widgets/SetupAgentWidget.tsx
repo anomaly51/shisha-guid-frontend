@@ -1037,6 +1037,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<TimelineMessage[]>(savedSession?.messages?.length ? savedSession.messages : createInitialTimelineMessages(t('agent.initialMessage')))
   const [draft, setDraft] = useState<AgentSetupDraft | null>(initialDraft || savedSession?.draft || null)
+  const sessionLoadedRef = useRef(Boolean(savedSession))
   const [recording, setRecording] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [typing, setTyping] = useState(false)
@@ -1077,6 +1078,15 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     if (!initialDraft) return
     setDraft(initialDraft)
   }, [draftKey, initialDraft])
+
+  useEffect(() => {
+    if (sessionLoadedRef.current || initialDraft) return
+    const nextSession = readAgentSession()
+    if (!nextSession?.messages?.length) return
+    sessionLoadedRef.current = true
+    setMessages(nextSession.messages)
+    setDraft(nextSession.draft || null)
+  }, [initialDraft])
 
   useEffect(() => {
     writeAgentSession(messages, draft)
@@ -1487,6 +1497,14 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     void startRecording()
   }
 
+  const resetChat = () => {
+    if (busy || publishing) return
+    clearAgentSession()
+    setInput('')
+    setDraft(initialDraft || null)
+    setMessages(createInitialTimelineMessages(t('agent.initialMessage')))
+  }
+
   const panel = (
     <ChatPanel aria-label="AI setup chat">
       <PanelBody>
@@ -1504,6 +1522,14 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
             <span tw="h-1.5 w-1.5 rounded-full bg-[rgb(var(--color-accent))]" />
             {usedMessageCount}/{messageLimit}
           </StatusPill>
+          <button
+            type="button"
+            onClick={resetChat}
+            disabled={busy || publishing}
+            tw="hidden h-9 shrink-0 rounded-xl border border-[rgb(var(--color-border-strong))] bg-[rgb(var(--color-surface))] px-3 text-[11px] font-black text-[rgb(var(--color-text-muted))] transition hover:border-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent-muted))] disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex sm:items-center"
+          >
+            Сбросить чат
+          </button>
         </Header>
 
         <ScrollArea ref={scrollRef}>

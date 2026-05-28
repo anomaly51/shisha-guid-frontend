@@ -510,6 +510,7 @@ export const MixBowlPreview = ({
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null)
   const snapshotReleaseRef = useRef<(() => void) | null>(null)
   const scheduleSnapshotRef = useRef(createSnapshotScheduler())
+  const aliveRef = useRef(false)
   const total = items.reduce((sum, item) => sum + item.percentage, 0)
   const isSnapshot = renderMode === 'snapshot'
   const { ref: visibilityRef, visible: isPreviewVisible } = useVisibilityGate(isSnapshot)
@@ -529,7 +530,13 @@ export const MixBowlPreview = ({
   }), [bowlModel, cameraPosition, fov, kind, normalizedItems, renderMode, sceneScale])
 
   useIsomorphicLayoutEffect(() => {
+    aliveRef.current = true
     setMounted(true)
+    return () => {
+      aliveRef.current = false
+      snapshotReleaseRef.current?.()
+      snapshotReleaseRef.current = null
+    }
   }, [])
 
   useEffect(() => {
@@ -548,7 +555,7 @@ export const MixBowlPreview = ({
         return
       }
       snapshotReleaseRef.current = release
-      setSnapshotRenderAllowed(true)
+      if (aliveRef.current) setSnapshotRenderAllowed(true)
     })
 
     return () => {
@@ -560,6 +567,7 @@ export const MixBowlPreview = ({
   }, [isPreviewVisible, isSnapshot, mounted, sceneKey, snapshotUrl])
 
   const releaseSnapshot = () => {
+    if (!aliveRef.current) return
     snapshotReleaseRef.current?.()
     snapshotReleaseRef.current = null
   }
@@ -599,6 +607,7 @@ export const MixBowlPreview = ({
             requestAnimationFrame(() => {
               invalidate()
               requestAnimationFrame(() => {
+                if (!aliveRef.current) return
                 if (isSnapshot) {
                   setSnapshotUrl(gl.domElement.toDataURL('image/webp', 0.88))
                   releaseSnapshot()

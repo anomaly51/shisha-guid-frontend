@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -21,6 +21,7 @@ import { calculateSetupCost, formatMoney } from '../shared/setupCost'
 import { hasAuthToken } from '../shared/authToken'
 import { filterCatalogItems, getBrandOptions, getCatalogBrand } from '../shared/catalogSearch'
 import { PhotoUploader } from '../shared/ui/PhotoUploader'
+import { ErrorBoundary } from '../shared/ui/ErrorBoundary'
 
 const Label = tw.label`text-[10px] font-semibold text-[rgb(var(--color-text-muted))] uppercase tracking-wide`
 const Muted = tw.span`text-[11px] font-medium text-[rgb(var(--color-text-subtle))]`
@@ -241,19 +242,21 @@ const MixPreview = ({ bowlModel, kind, items }: { bowlModel: BowlModel; kind: Se
       <div tw="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_minmax(0,0.8fr)] sm:items-center">
         <div tw="relative h-[250px] overflow-hidden rounded-lg bg-transparent sm:h-[280px]">
           {kind === 'layers' && <LayerStackDiagram items={items} />}
-          <Suspense fallback={<div tw="h-full w-full rounded-lg bg-[rgb(var(--color-surface-muted))]" />}>
-            <LazyMixBowlPreview
-              autoRotate
-              bowlModel={bowlModel}
-              cameraPosition={[0, 2.2, 4.35]}
-              fov={34}
-              kind={kind}
-              items={items}
-              renderMode="live"
-              sceneScale={0.94}
-              style={{ background: 'transparent', height: '100%', width: '100%' }}
-            />
-          </Suspense>
+          <ErrorBoundary fallback={<div tw="h-full w-full rounded-lg bg-[rgb(var(--color-surface-muted))]" />}>
+            <Suspense fallback={<div tw="h-full w-full rounded-lg bg-[rgb(var(--color-surface-muted))]" />}>
+              <LazyMixBowlPreview
+                autoRotate
+                bowlModel={bowlModel}
+                cameraPosition={[0, 2.2, 4.35]}
+                fov={34}
+                kind={kind}
+                items={items}
+                renderMode="live"
+                sceneScale={0.94}
+                style={{ background: 'transparent', height: '100%', width: '100%' }}
+              />
+            </Suspense>
+          </ErrorBoundary>
         </div>
 
         <div tw="grid gap-1.5">
@@ -448,8 +451,9 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
+  const [step, setStep] = useState(0)
   const { data: bowls, isFetching: bowlsLoading } = useGetBowlsQuery()
-  const { data: tobaccos, isFetching: tobaccosLoading } = useGetTobaccosQuery()
+  const { data: tobaccos, isFetching: tobaccosLoading } = useGetTobaccosQuery(undefined, { skip: step === 0 })
   const { data: coals, isFetching: coalsLoading } = useGetCoalsQuery()
   const { data: kalouds, isFetching: kaloudsLoading } = useGetKaloudsQuery()
   const { data: placements, isFetching: placementsLoading } = useGetCoalPlacementsQuery()
@@ -460,7 +464,6 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const [removeContributor] = useRemoveSetupContributorMutation()
   const savedDraft = useMemo(() => (!isEdit && !initialValues ? readSetupDraft() : null), [initialValues, isEdit])
 
-  const [step, setStep] = useState(0)
   const [name, setName] = useState(initialValues?.name || savedDraft?.name || '')
   const [nameEdited, setNameEdited] = useState(Boolean(initialValues?.name || savedDraft?.name))
   const [description, setDescription] = useState(initialValues?.description || savedDraft?.description || '')
@@ -477,6 +480,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const [activeEquipmentIndex, setActiveEquipmentIndex] = useState(0)
   const [error, setError] = useState('')
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
+  const [saved, setSaved] = useState(false)
   const [tobaccoSearch, setTobaccoSearch] = useState('')
   const [tobaccoBrand, setTobaccoBrand] = useState('')
   const [tobaccoMix, setTobaccoMix] = useState<TobaccoMixRow[]>(
@@ -583,15 +587,36 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   const activeEquipment = equipmentItems[activeEquipmentIndex] || equipmentItems[0]
   const selectedEquipmentCount = equipmentItems.filter((item) => item.value).length
   const nextMissingEquipment = equipmentItems.find((item) => !item.value)?.label
-  const savedRef = useRef(false)
+  const draftRef = useRef<SetupFormDraft>({})
   const isDirty = useMemo(() => {
-    if (savedRef.current) return false
+    if (saved) return false
     if (isEdit) {
       return Boolean(name.trim() || description.trim() || photoUrls.length || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId)
     }
     return Boolean(name.trim() || description.trim() || photoUrls.length || tobaccoMix.length || bowlId || coalId || kaloudId || placementId || typeId || tags.length)
-  }, [bowlId, coalId, description, isEdit, kaloudId, name, photoUrls.length, placementId, tags.length, tobaccoMix.length, typeId])
+  }, [bowlId, coalId, description, isEdit, kaloudId, name, photoUrls.length, placementId, saved, tags.length, tobaccoMix.length, typeId])
   const confirmLeave = () => !isDirty || window.confirm('Несохраненные изменения будут потеряны. Уйти со страницы?')
+
+  useEffect(() => {
+    draftRef.current = {
+      name,
+      description,
+      photoUrls,
+      bowlId,
+      coalId,
+      kaloudId,
+      placementId,
+      typeId,
+      tobaccoMix,
+      tags,
+    }
+  }, [bowlId, coalId, description, kaloudId, name, photoUrls, placementId, tags, tobaccoMix, typeId])
+
+  const saveDraftNow = useCallback(() => {
+    if (isEdit || saved) return
+    window.localStorage.setItem(SETUP_DRAFT_STORAGE_KEY, JSON.stringify(draftRef.current))
+    setDraftSavedAt(Date.now())
+  }, [isEdit, saved])
 
   useEffect(() => {
     if (!nameEdited) {
@@ -602,22 +627,10 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
   useEffect(() => {
     if (isEdit || !isDirty) return undefined
     const timeout = window.setTimeout(() => {
-      window.localStorage.setItem(SETUP_DRAFT_STORAGE_KEY, JSON.stringify({
-        name,
-        description,
-        photoUrls,
-        bowlId,
-        coalId,
-        kaloudId,
-        placementId,
-        typeId,
-        tobaccoMix,
-        tags,
-      }))
-      setDraftSavedAt(Date.now())
+      saveDraftNow()
     }, 350)
     return () => window.clearTimeout(timeout)
-  }, [bowlId, coalId, description, isDirty, isEdit, kaloudId, name, photoUrls, placementId, tags, tobaccoMix, typeId])
+  }, [isDirty, isEdit, saveDraftNow])
 
   const addTag = () => {
     const clean = tagDraft.trim().toLowerCase()
@@ -636,13 +649,14 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
     if (!isDirty) return undefined
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      saveDraftNow()
       event.preventDefault()
       event.returnValue = ''
     }
 
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [isDirty])
+  }, [isDirty, saveDraftNow])
 
   const toggleTobacco = (tobaccoId: string) => {
     setTobaccoMix((items) => {
@@ -783,7 +797,7 @@ export const SetupForm = ({ initialValues, isEdit }: SetupFormProps) => {
       } else {
         await createSetup(body).unwrap()
       }
-      savedRef.current = true
+      setSaved(true)
       window.localStorage.removeItem(SETUP_DRAFT_STORAGE_KEY)
       navigate('/')
     } catch {
