@@ -96,6 +96,8 @@ const createSnapshotScheduler = () => {
   }
 }
 
+const scheduleSnapshot = createSnapshotScheduler()
+
 const pseudoRandom = (seed: number) => {
   const value = Math.sin(seed * 12.9898) * 43758.5453
   return value - Math.floor(value)
@@ -509,7 +511,6 @@ export const MixBowlPreview = ({
   const [snapshotRenderAllowed, setSnapshotRenderAllowed] = useState(renderMode === 'live')
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null)
   const snapshotReleaseRef = useRef<(() => void) | null>(null)
-  const scheduleSnapshotRef = useRef(createSnapshotScheduler())
   const aliveRef = useRef(false)
   const total = items.reduce((sum, item) => sum + item.percentage, 0)
   const isSnapshot = renderMode === 'snapshot'
@@ -549,7 +550,7 @@ export const MixBowlPreview = ({
     if (!mounted || !isSnapshot || !isPreviewVisible || snapshotUrl) return undefined
 
     let active = true
-    const cancel = scheduleSnapshotRef.current((release) => {
+    const cancel = scheduleSnapshot((release) => {
       if (!active) {
         release()
         return

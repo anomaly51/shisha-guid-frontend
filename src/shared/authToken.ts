@@ -3,6 +3,7 @@ const refreshTokenStorageKey = 'refresh_token'
 const accessTokenExpiresAtStorageKey = 'access_token_expires_at'
 const profileCacheStorageKey = 'shisha-guid-profile'
 const authSessionChangedEvent = 'shisha-guid-auth-session-changed'
+let refreshInFlight: Promise<string | null> | null = null
 
 const getStorage = () => (typeof window !== 'undefined' ? window.localStorage : null)
 
@@ -50,6 +51,43 @@ export const setAuthToken = (token: string, refreshToken?: string | null, expire
   } finally {
     emitAuthSessionChanged()
   }
+}
+
+export const refreshAuthToken = async (apiBaseUrl: string) => {
+  const refreshToken = getRefreshToken()
+  if (!refreshToken) return null
+  if (refreshInFlight) return refreshInFlight
+
+  refreshInFlight = fetch(`${apiBaseUrl.replace(/\/+$/, '')}/auth/refresh`, {
+    body: JSON.stringify({ refresh_token: refreshToken }),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        clearAuthSession()
+        return null
+      }
+
+      const data = await response.json() as {
+        access_token?: string
+        expires_in?: number
+        refresh_token?: string
+      }
+      if (!data.access_token) {
+        clearAuthSession()
+        return null
+      }
+
+      setAuthToken(data.access_token, data.refresh_token, data.expires_in)
+      return data.access_token
+    })
+    .catch(() => null)
+    .finally(() => {
+      refreshInFlight = null
+    })
+
+  return refreshInFlight
 }
 
 export const hasAuthToken = () => Boolean(getAuthToken())

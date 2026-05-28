@@ -18,7 +18,7 @@ import { AuthModal } from './AuthModal'
 import { LogoutIcon, PlusIcon, ShishaGuidLogo } from '../shared/ui/Icons'
 import { RoleBadge } from '../shared/ui/RoleBadge'
 import { UserBadges } from '../shared/ui/UserBadges'
-import { clearAuthSession, getAuthToken } from '../shared/authToken'
+import { clearAuthSession, getAuthToken, refreshAuthToken } from '../shared/authToken'
 import { useHasAuthToken } from '../shared/useAuthToken'
 
 const HeaderBar = tw.header`bg-[rgb(var(--color-surface-inverse))]/95 backdrop-blur-xl border-b border-[rgb(var(--color-border))]`
@@ -215,7 +215,7 @@ export const Header = () => {
     const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
     const connect = async () => {
-      const token = getAuthToken()
+      const token = getAuthToken() || await refreshAuthToken(apiBaseUrl)
       if (!token || closed) return
       controller?.abort()
       controller = new AbortController()
@@ -225,6 +225,10 @@ export const Header = () => {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         })
+        if (response.status === 401) {
+          await refreshAuthToken(apiBaseUrl)
+          throw new Error('notification stream unauthorized')
+        }
         if (!response.ok || !response.body) throw new Error('notification stream failed')
 
         const reader = response.body.getReader()

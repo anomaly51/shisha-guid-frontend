@@ -489,11 +489,11 @@ export const Profile = () => {
     setError('')
     const nextNickname = nickname.trim()
     const nextAvatarUrl = avatarUrl
+    const payload: { nickname?: string | null; avatar_url?: string | null } = {}
+    if (nicknameChanged) payload.nickname = nextNickname || null
+    if (avatarChanged) payload.avatar_url = nextAvatarUrl
     try {
-      await updateProfile({
-        nickname: nextNickname || null,
-        avatar_url: nextAvatarUrl,
-      }).unwrap()
+      await updateProfile(payload).unwrap()
       setNickname(nextNickname)
       setSavedNickname(nextNickname)
       setSavedAvatarUrl(nextAvatarUrl)
