@@ -1,5 +1,5 @@
 import React from 'react'
-import { renderToString } from 'react-dom/server'
+import { renderToReadableStream } from 'react-dom/server.browser'
 import { StaticRouter } from 'react-router-dom'
 import { dangerouslySkipEscape, escapeInject } from 'vike/server'
 import type { PageContextServer } from 'vike/types'
@@ -199,6 +199,33 @@ const serializeJsonLd = (value: Record<string, unknown>) => (
   JSON.stringify(value).replace(/</g, '\\u003c')
 )
 
+const renderAppToString = async (app: React.ReactElement) => {
+  const abortController = new AbortController()
+  const timeout = setTimeout(() => abortController.abort(), 10000)
+  try {
+    const stream = await renderToReadableStream(app, {
+      signal: abortController.signal,
+      onError(error) {
+        console.error('SSR render error:', error)
+      },
+    })
+    await stream.allReady
+    const reader = stream.getReader()
+    const decoder = new TextDecoder()
+    let html = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      html += decoder.decode(value, { stream: true })
+    }
+
+    return html + decoder.decode()
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 const buildPageMeta = (
   url: string,
   state: ReturnType<ReturnType<typeof createAppStore>['getState']>,
@@ -293,7 +320,7 @@ export const onRenderHtml = async (pageContext: ServerPageContext) => {
         </AppProviders>
       </React.StrictMode>,
     )
-    const pageHtml = renderToString(app)
+    const pageHtml = await renderAppToString(app)
     const styles = sheet.getStyleTags()
     const preloadedState = getSerializableState(store.getState())
     const pageMeta = buildPageMeta(url, store.getState())

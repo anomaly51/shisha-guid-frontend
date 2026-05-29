@@ -30,6 +30,14 @@ const isUnauthorizedQueryError = (error: unknown) => (
   error.error.status === 401
 )
 
+const publicUserSocialTags = (id: string) => [
+  { type: 'Profile' as const, id },
+  { type: 'Profile' as const, id: `followers-${id}` },
+  { type: 'Profile' as const, id: `following-${id}` },
+  'Profile' as const,
+  'Setups' as const,
+]
+
 export const profileApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getProfile: builder.query<any, void>({
@@ -123,11 +131,11 @@ export const profileApi = api.injectEndpoints({
     }),
     followUser: builder.mutation<any, string>({
       query: (id) => ({ url: `/profile/users/${id}/follow`, method: 'POST' }),
-      invalidatesTags: (_result, _error, id) => [{ type: 'Profile', id }, 'Profile', 'Setups'],
+      invalidatesTags: (_result, _error, id) => publicUserSocialTags(id),
     }),
     unfollowUser: builder.mutation<any, string>({
       query: (id) => ({ url: `/profile/users/${id}/follow`, method: 'DELETE' }),
-      invalidatesTags: (_result, _error, id) => [{ type: 'Profile', id }, 'Profile', 'Setups'],
+      invalidatesTags: (_result, _error, id) => publicUserSocialTags(id),
     }),
     getNotifications: builder.query<{ items: any[]; unread_count: number }, void>({
       query: () => '/profile/notifications',
