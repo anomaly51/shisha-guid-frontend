@@ -19,5 +19,6 @@ jobs:
     uses: anomaly51/github-actions-toolkit/.github/workflows/harbor-argocd-app.yml@main
     with:
       app-name: shisha-frontend
+      notification-title: Shishiguid Frontend
       image-repository: harbor.api-api-api.com/shisha/frontend
     secrets: inherit
