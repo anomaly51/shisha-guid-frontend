@@ -82,18 +82,24 @@ jobs:
           platforms: linux/amd64
           push: false
           load: true
-          tags: ${{ steps.meta.outputs.image_ref }}
+          tags: |
+            ${{ steps.meta.outputs.image_ref }}
+            ${{ steps.meta.outputs.cache_ref }}
           cache-from: type=registry,ref=${{ steps.meta.outputs.cache_ref }}
-          cache-to: type=registry,ref=${{ steps.meta.outputs.cache_ref }},mode=max
+          cache-to: type=inline
           build-args: |
+            BUILDKIT_INLINE_CACHE=1
             APP_VERSION=${{ steps.meta.outputs.image_tag }}
             BUILD_DATE=${{ steps.meta.outputs.build_date }}
             VCS_REF=${{ github.sha }}
 
-      - name: Push image to Harbor
+      - name: Push image and cache to Harbor
         if: github.event_name != 'pull_request'
         shell: bash
-        run: docker push "${{ steps.meta.outputs.image_ref }}"
+        run: |
+          set -euo pipefail
+          docker push "${{ steps.meta.outputs.image_ref }}"
+          docker push "${{ steps.meta.outputs.cache_ref }}"
 
   verify-deploy:
     needs: image
