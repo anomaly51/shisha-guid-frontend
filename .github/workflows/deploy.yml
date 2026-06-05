@@ -48,7 +48,25 @@ jobs:
           echo "build_date=${build_date}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
+        id: buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Route BuildKit to internal Harbor
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          registry_ip="$(awk -v host="$REGISTRY" '$1 !~ /^#/ { for (i = 2; i <= NF; i++) if ($i == host) { print $1; exit } }' /etc/hosts)"
+          if [ -z "$registry_ip" ]; then
+            registry_ip="$(getent hosts "$REGISTRY" | awk '{ print $1; exit }')"
+          fi
+          : "${registry_ip:?Unable to resolve ${REGISTRY}}"
+
+          builder_container="$(docker ps --filter "name=buildx_buildkit_${{ steps.buildx.outputs.name }}" --format '{{.ID}}' | head -n1)"
+          : "${builder_container:?Unable to find BuildKit container}"
+
+          docker exec "$builder_container" sh -c "printf '\n%s %s\n' '$registry_ip' '$REGISTRY' >> /etc/hosts"
+          docker exec "$builder_container" sh -c "grep '$REGISTRY' /etc/hosts"
 
       - name: Login to Harbor
         if: github.event_name != 'pull_request'
@@ -82,24 +100,18 @@ jobs:
           platforms: linux/amd64
           push: false
           load: true
-          tags: |
-            ${{ steps.meta.outputs.image_ref }}
-            ${{ steps.meta.outputs.cache_ref }}
+          tags: ${{ steps.meta.outputs.image_ref }}
           cache-from: type=registry,ref=${{ steps.meta.outputs.cache_ref }}
-          cache-to: type=inline
+          cache-to: type=registry,ref=${{ steps.meta.outputs.cache_ref }},mode=max
           build-args: |
-            BUILDKIT_INLINE_CACHE=1
             APP_VERSION=${{ steps.meta.outputs.image_tag }}
             BUILD_DATE=${{ steps.meta.outputs.build_date }}
             VCS_REF=${{ github.sha }}
 
-      - name: Push image and cache to Harbor
+      - name: Push image to Harbor
         if: github.event_name != 'pull_request'
         shell: bash
-        run: |
-          set -euo pipefail
-          docker push "${{ steps.meta.outputs.image_ref }}"
-          docker push "${{ steps.meta.outputs.cache_ref }}"
+        run: docker push "${{ steps.meta.outputs.image_ref }}"
 
   verify-deploy:
     needs: image
