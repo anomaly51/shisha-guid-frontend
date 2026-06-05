@@ -41,7 +41,7 @@ jobs:
         run: |
           short_sha="${GITHUB_SHA::12}"
           image_tag="sha-${short_sha}"
-          build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          build_date="$(git show -s --format=%cI "$GITHUB_SHA")"
           cache_tag="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9_.-]+#-#g')"
           echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
           echo "image_ref=${IMAGE_REPOSITORY}:${image_tag}" >> "$GITHUB_OUTPUT"
@@ -76,6 +76,7 @@ jobs:
           platforms: linux/amd64
           push: false
           load: true
+          provenance: false
           tags: ${{ steps.meta.outputs.image_ref }}
           build-args: |
             APP_VERSION=${{ steps.meta.outputs.image_tag }}
@@ -90,6 +91,7 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: ${{ steps.meta.outputs.image_ref }}
           cache-from: type=registry,ref=${{ steps.meta.outputs.cache_ref }}
           cache-to: type=registry,ref=${{ steps.meta.outputs.cache_ref }},mode=max
