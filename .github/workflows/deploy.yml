@@ -1,4 +1,5 @@
 name: Build and deploy
+# Triggering this workflow updates the frontend image and GitOps application state.
 
 on:
   pull_request:
