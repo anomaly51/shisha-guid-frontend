@@ -1,4 +1,4 @@
-export const appName = 'Shishiguid V3'
+export const appName = 'Shishiguid V3 CI Smoke'
 
 type Translate = (key: string) => string
 
