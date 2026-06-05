@@ -17,9 +17,11 @@ concurrency:
 env:
   REGISTRY: harbor.api-api-api.com
   IMAGE_REPOSITORY: harbor.api-api-api.com/shisha/frontend
+  BUILD_CACHE_REPOSITORY: harbor.api-api-api.com/shisha/ci-build-cache
   ARGOCD_APPLICATION: shisha-frontend
   ARGOCD_CLI_VERSION: v3.4.3
   DEPLOY_TIMEOUT_SECONDS: "1200"
+  DEPLOY_POLL_SECONDS: "5"
 
 jobs:
   image:
@@ -27,6 +29,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
       image_ref: ${{ steps.meta.outputs.image_ref }}
+      cache_ref: ${{ steps.meta.outputs.cache_ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,8 +41,10 @@ jobs:
           short_sha="${GITHUB_SHA::12}"
           image_tag="sha-${short_sha}"
           build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cache_tag="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9_.-]+#-#g')"
           echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
           echo "image_ref=${IMAGE_REPOSITORY}:${image_tag}" >> "$GITHUB_OUTPUT"
+          echo "cache_ref=${BUILD_CACHE_REPOSITORY}:${cache_tag}" >> "$GITHUB_OUTPUT"
           echo "build_date=${build_date}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
@@ -54,6 +59,7 @@ jobs:
           password: ${{ secrets.HARBOR_PASSWORD }}
 
       - name: Build image
+        if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -62,6 +68,23 @@ jobs:
           push: false
           load: true
           tags: ${{ steps.meta.outputs.image_ref }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.image_tag }}
+            BUILD_DATE=${{ steps.meta.outputs.build_date }}
+            VCS_REF=${{ github.sha }}
+
+      - name: Build image with registry cache
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ${{ steps.meta.outputs.image_ref }}
+          cache-from: type=registry,ref=${{ steps.meta.outputs.cache_ref }}
+          cache-to: type=registry,ref=${{ steps.meta.outputs.cache_ref }},mode=max
           build-args: |
             APP_VERSION=${{ steps.meta.outputs.image_tag }}
             BUILD_DATE=${{ steps.meta.outputs.build_date }}
@@ -152,7 +175,7 @@ jobs:
             fi
 
             echo "Waiting for ${ARGOCD_APPLICATION}: sync=${sync_status}, health=${health_status}, target=${IMAGE_REF}"
-            sleep 10
+            sleep "$DEPLOY_POLL_SECONDS"
           done
 
           echo "Timed out waiting for ${ARGOCD_APPLICATION} to deploy ${IMAGE_REF}"
