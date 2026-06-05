@@ -1,4 +1,4 @@
-const appName = 'ShishaGuid'
+const appName = 'ShishaGuid V2'
 
 type Translate = (key: string) => string
 
