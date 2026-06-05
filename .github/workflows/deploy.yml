@@ -53,18 +53,24 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Build and push image
+      - name: Build image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
           platforms: linux/amd64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: false
+          load: true
           tags: ${{ steps.meta.outputs.image_ref }}
           build-args: |
             APP_VERSION=${{ steps.meta.outputs.image_tag }}
             BUILD_DATE=${{ steps.meta.outputs.build_date }}
             VCS_REF=${{ github.sha }}
+
+      - name: Push image to Harbor
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: docker push "${{ steps.meta.outputs.image_ref }}"
 
   verify-deploy:
     needs: image
