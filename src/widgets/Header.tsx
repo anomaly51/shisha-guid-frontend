@@ -266,7 +266,7 @@ export const Header = () => {
           <div tw="flex items-center gap-6 min-w-0">
             <Link to="/" tw="flex items-center gap-2.5 font-semibold text-[15px] text-[rgb(var(--color-text-inverse))] shrink-0">
               <ShishaGuidLogo size={24} tw="text-[rgb(var(--color-accent))]" />
-              <span tw="hidden sm:inline">ShishaGuid</span>
+              <span tw="hidden sm:inline">Shishiguid V3</span>
             </Link>
             {profile && (
               <NewSetupLink to="/setups/create">

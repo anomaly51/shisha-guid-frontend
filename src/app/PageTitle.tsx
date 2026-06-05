@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
-import { getPageTitle } from './pageMeta'
+import { appName, getPageTitle } from './pageMeta'
 import type { RootState } from './store'
 
 const getSetupTitleFromState = (state: RootState, pathname: string) => {
@@ -13,7 +13,7 @@ const getSetupTitleFromState = (state: RootState, pathname: string) => {
     entry?.originalArgs === match[1] &&
     entry?.status === 'fulfilled'
   )) as { data?: { name?: string } } | undefined
-  return query?.data?.name ? `${query.data.name} | ShishaGuid` : null
+  return query?.data?.name ? `${query.data.name} | ${appName}` : null
 }
 
 const getUserTitleFromState = (state: RootState, pathname: string) => {
@@ -25,7 +25,7 @@ const getUserTitleFromState = (state: RootState, pathname: string) => {
     entry?.status === 'fulfilled'
   )) as { data?: { display_name?: string; nickname?: string } } | undefined
   const name = query?.data?.display_name || query?.data?.nickname
-  return name ? `${name} | ShishaGuid` : null
+  return name ? `${name} | ${appName}` : null
 }
 
 export const PageTitle = () => {

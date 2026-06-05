@@ -887,7 +887,7 @@ export const SetupDetail = () => {
 
   const handleShare = async () => {
     const url = window.location.href
-    const shareData = { title: item?.name || 'ShishaGuid', text: item?.description || item?.name || 'ShishaGuid setup', url }
+    const shareData = { title: item?.name || 'Shishiguid V3', text: item?.description || item?.name || 'Shishiguid V3 setup', url }
     try {
       if (navigator.share) {
         await navigator.share(shareData)

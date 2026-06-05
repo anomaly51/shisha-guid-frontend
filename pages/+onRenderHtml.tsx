@@ -7,7 +7,7 @@ import { ServerStyleSheet } from 'styled-components'
 import { AppProviders } from '../src/app/providers'
 import { createAppStore } from '../src/app/store'
 import { prefetchRouteData } from '../src/app/prefetch'
-import { getFallbackPageTitle } from '../src/app/pageMeta'
+import { appName, getFallbackPageTitle } from '../src/app/pageMeta'
 
 type ServerPageContext = PageContextServer & {
   Page: React.ComponentType
@@ -234,12 +234,12 @@ const buildPageMeta = (
   const canonicalUrl = `${getPublicSiteUrl()}${parsedUrl.pathname}`
   const setupMatch = parsedUrl.pathname.match(/^\/setups\/([^/]+)$/)
   const catalogDescriptions: Record<string, string> = {
-    '/tobaccos': 'Каталог табаков для кальяна: бренды, вкусы, крепость, цены и подборки для миксов ShishaGuid.',
-    '/bowls': 'Каталог чаш для кальяна ShishaGuid: формы, вместимость, цены и подбор под разные забивки.',
-    '/coals': 'Каталог угля для кальяна ShishaGuid: варианты упаковок, цены и подбор для рецептов.',
-    '/kalouds': 'Каталог калаудов и устройств контроля жара для кальянных забивок ShishaGuid.',
+    '/tobaccos': 'Каталог табаков для кальяна: бренды, вкусы, крепость, цены и подборки для миксов Shishiguid V3.',
+    '/bowls': 'Каталог чаш для кальяна Shishiguid V3: формы, вместимость, цены и подбор под разные забивки.',
+    '/coals': 'Каталог угля для кальяна Shishiguid V3: варианты упаковок, цены и подбор для рецептов.',
+    '/kalouds': 'Каталог калаудов и устройств контроля жара для кальянных забивок Shishiguid V3.',
   }
-  const defaultDescription = 'ShishaGuid - share and discover shisha setups'
+  const defaultDescription = 'Shishiguid V3 - share and discover shisha setups'
 
   if (setupMatch) {
     const setup = findFulfilledQueryData(state, 'getSetup', setupMatch[1])
@@ -277,7 +277,7 @@ const buildPageMeta = (
         description,
         image: setup.photo_urls?.[0] || setup.tobaccos?.find((item: any) => item.tobacco?.photo_urls?.[0])?.tobacco.photo_urls[0],
         jsonLd,
-        title: `${setup.name} | ShishaGuid`,
+        title: `${setup.name} | ${appName}`,
       }
     }
   }
@@ -334,7 +334,7 @@ export const onRenderHtml = async (pageContext: ServerPageContext) => {
           <meta name="description" content="${pageMeta.description}" />
           <link rel="canonical" href="${pageMeta.canonicalUrl}" />
           <meta property="og:type" content="website" />
-          <meta property="og:site_name" content="ShishaGuid" />
+          <meta property="og:site_name" content="${appName}" />
           <meta property="og:title" content="${pageMeta.title}" />
           <meta property="og:description" content="${pageMeta.description}" />
           <meta property="og:url" content="${pageMeta.canonicalUrl}" />
