@@ -20,7 +20,7 @@ const getInitialLanguage = (): LanguageCode => {
 }
 
 const common = {
-  brand: 'ShishaGuid V2',
+  brand: 'ShishaGuid',
 }
 
 export const resources = {
