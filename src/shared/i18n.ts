@@ -20,7 +20,7 @@ const getInitialLanguage = (): LanguageCode => {
 }
 
 const common = {
-  brand: 'Shishiguid V3',
+  brand: 'Shishiguid',
 }
 
 export const resources = {
@@ -80,7 +80,7 @@ export const resources = {
         signIn: 'Войти',
         signingIn: 'Входим...',
         subtitle: 'Войди через Google, чтобы создавать забивки, голосовать и участвовать в сообществе.',
-        title: 'Добро пожаловать в Shishiguid V3',
+        title: 'Добро пожаловать в Shishiguid',
       },
       profile: {
         title: 'Профиль',
@@ -553,7 +553,7 @@ export const resources = {
         signIn: 'Увійти',
         signingIn: 'Входимо...',
         subtitle: 'Увійди через Google, щоб створювати забивки, голосувати та долучатися до спільноти.',
-        title: 'Вітаємо в Shishiguid V3',
+        title: 'Вітаємо в Shishiguid',
       },
       profile: {
         title: 'Профіль',
@@ -1026,7 +1026,7 @@ export const resources = {
         signIn: 'Sign In',
         signingIn: 'Signing in...',
         subtitle: 'Sign in with your Google account to create setups, vote, and join the community.',
-        title: 'Welcome to Shishiguid V3',
+        title: 'Welcome to Shishiguid',
       },
       profile: {
         title: 'Profile',

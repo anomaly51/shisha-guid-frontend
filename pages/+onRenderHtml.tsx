@@ -234,12 +234,12 @@ const buildPageMeta = (
   const canonicalUrl = `${getPublicSiteUrl()}${parsedUrl.pathname}`
   const setupMatch = parsedUrl.pathname.match(/^\/setups\/([^/]+)$/)
   const catalogDescriptions: Record<string, string> = {
-    '/tobaccos': 'Каталог табаков для кальяна: бренды, вкусы, крепость, цены и подборки для миксов Shishiguid V3.',
-    '/bowls': 'Каталог чаш для кальяна Shishiguid V3: формы, вместимость, цены и подбор под разные забивки.',
-    '/coals': 'Каталог угля для кальяна Shishiguid V3: варианты упаковок, цены и подбор для рецептов.',
-    '/kalouds': 'Каталог калаудов и устройств контроля жара для кальянных забивок Shishiguid V3.',
+    '/tobaccos': 'Каталог табаков для кальяна: бренды, вкусы, крепость, цены и подборки для миксов Shishiguid.',
+    '/bowls': 'Каталог чаш для кальяна Shishiguid: формы, вместимость, цены и подбор под разные забивки.',
+    '/coals': 'Каталог угля для кальяна Shishiguid: варианты упаковок, цены и подбор для рецептов.',
+    '/kalouds': 'Каталог калаудов и устройств контроля жара для кальянных забивок Shishiguid.',
   }
-  const defaultDescription = 'Shishiguid V3 - share and discover shisha setups'
+  const defaultDescription = 'Shishiguid - share and discover shisha setups'
 
   if (setupMatch) {
     const setup = findFulfilledQueryData(state, 'getSetup', setupMatch[1])

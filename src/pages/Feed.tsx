@@ -337,7 +337,7 @@ export const Feed = () => {
         </div>
         <h2 tw="text-lg font-semibold text-[rgb(var(--color-text))] mb-1.5">{t('feed.noSetups')}</h2>
         <p tw="text-sm text-[rgb(var(--color-text-subtle))] mb-6 w-full max-w-xs px-2">
-          Shishiguid V3 собирает рецепты забивок: оборудование, табаки, пропорции, крепость и отзывы. Начни с первой карточки, чтобы лента ожила.
+          Shishiguid собирает рецепты забивок: оборудование, табаки, пропорции, крепость и отзывы. Начни с первой карточки, чтобы лента ожила.
         </p>
         <Link to="/setups/create">
           <Button variant="primary" size="lg">
