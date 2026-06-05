@@ -26,6 +26,7 @@ env:
 
 jobs:
   image:
+    name: Build image
     runs-on: arc-runner-set
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
@@ -112,6 +113,7 @@ jobs:
             VCS_REF=${{ github.sha }}
 
   verify-deploy:
+    name: Verify deploy
     needs: image
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: arc-runner-set
