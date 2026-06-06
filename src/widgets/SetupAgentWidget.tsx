@@ -807,21 +807,24 @@ const getMissingFields = (draft: AgentSetupDraft | null) => {
   ].filter(Boolean) as string[]
 }
 
-const buildAutoDraftName = (draft: AgentSetupDraft | null | undefined) => {
-  const names = draft?.tobaccos?.map((item) => item.tobacco_name).filter(Boolean) || []
+const buildAutoDraftName = (draft: AgentSetupDraft | null | undefined, tobaccoCatalog: any[] = []) => {
+  const names = draft?.tobaccos?.map((item) => (
+    getCatalogItem(tobaccoCatalog, item.tobacco_id, item.tobacco_name)?.name || item.tobacco_name
+  )).filter(Boolean) || []
   return names.length ? names.join(' + ') : null
 }
 
 const withAutoDraftName = (
   nextDraft: AgentSetupDraft | null,
   previousDraft?: AgentSetupDraft | null,
+  tobaccoCatalog: any[] = [],
 ): AgentSetupDraft | null => {
   if (!nextDraft?.tobaccos?.length) return nextDraft
 
-  const autoName = buildAutoDraftName(nextDraft)
+  const autoName = buildAutoDraftName(nextDraft, tobaccoCatalog)
   if (!autoName) return nextDraft
 
-  const previousAutoName = buildAutoDraftName(previousDraft)
+  const previousAutoName = buildAutoDraftName(previousDraft, tobaccoCatalog)
   const currentName = normalizeText(nextDraft.name || '')
   const canReplaceName = !currentName ||
     currentName === normalizeText('Новая забивка') ||
@@ -1043,6 +1046,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   const [typing, setTyping] = useState(false)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
+  const sessionWriteTimeoutRef = useRef<number | undefined>(undefined)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [chatWithAgent, chatState] = useChatWithSetupAgentMutation()
   const [transcribeVoice, transcribeState] = useTranscribeSetupVoiceMutation()
@@ -1089,7 +1093,11 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
   }, [initialDraft])
 
   useEffect(() => {
-    writeAgentSession(messages, draft)
+    window.clearTimeout(sessionWriteTimeoutRef.current)
+    sessionWriteTimeoutRef.current = window.setTimeout(() => {
+      writeAgentSession(messages, draft)
+    }, 250)
+    return () => window.clearTimeout(sessionWriteTimeoutRef.current)
   }, [draft, messages])
 
   useEffect(() => {
@@ -1236,7 +1244,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
       baseDraft,
     ) as AgentSetupDraft
 
-    return withAutoDraftName(nextDraft, baseDraft)
+    return withAutoDraftName(nextDraft, baseDraft, tobaccos)
   }
 
   const buildDraftFromAgentReply = (reply: string, baseDraft: AgentSetupDraft | null) => {
@@ -1248,7 +1256,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     })
 
     return JSON.stringify(nextDraft || null) !== JSON.stringify(baseDraft || null)
-      ? withAutoDraftName(nextDraft, baseDraft)
+      ? withAutoDraftName(nextDraft, baseDraft, tobaccos)
       : null
   }
 
@@ -1363,7 +1371,7 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     const nextMessages = [...messages, selectedMessage]
     setMessages(nextMessages)
 
-    const nextDraft = withAutoDraftName(updateDraftWithChoice(draft, kind, item), draft)!
+    const nextDraft = withAutoDraftName(updateDraftWithChoice(draft, kind, item), draft, tobaccos)!
     setDraft(nextDraft)
     onDraftChange?.(nextDraft)
 
@@ -1392,7 +1400,23 @@ export const SetupAgentWidget = ({ initialDraft = null, onDraftChange }: SetupAg
     setInput('')
 
     const localResolution = resolveLocalUpdate(text)
-    const draftForAgent = localResolution.draft !== undefined ? withAutoDraftName(localResolution.draft, draft) : draft
+    const hasLocalResolution = Object.keys(localResolution).length > 0
+    const draftForAgent = localResolution.draft !== undefined ? withAutoDraftName(localResolution.draft, draft, tobaccos) : draft
+    if (hasLocalResolution) {
+      const nextLocalDraft = localResolution.draft !== undefined ? draftForAgent || null : draft || null
+      if (localResolution.draft !== undefined) {
+        const nextMissing = getMissingFields(nextLocalDraft)
+        const trailingMessages = nextLocalDraft
+          ? makeDraftMessages(nextLocalDraft, nextMissing)
+          : localResolution.trailingMessages || []
+        setDraft(nextLocalDraft)
+        if (nextLocalDraft) onDraftChange?.(nextLocalDraft)
+        await typeAssistantText(localResolution.trailingMessages?.[0]?.content || 'Готово, обновил черновик.', trailingMessages)
+      } else {
+        await typeAssistantText(localResolution.trailingMessages?.[0]?.content || 'Понял.', localResolution.trailingMessages || [])
+      }
+      return
+    }
 
     try {
       const response = await chatWithAgent({ messages: buildAgentMessages(nextMessages, draftForAgent || null), draft: draftForAgent, language: i18n.language as 'ru' | 'uk' | 'en' }).unwrap()

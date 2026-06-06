@@ -292,6 +292,7 @@ const StepButton = ({ index, title, active, complete, disabled, onClick }: StepB
     type="button"
     onClick={onClick}
     disabled={disabled}
+    aria-current={active ? 'step' : undefined}
     css={[
       tw`flex min-w-0 items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-all duration-150`,
       active

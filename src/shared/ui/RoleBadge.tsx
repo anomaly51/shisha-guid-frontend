@@ -18,6 +18,7 @@ export const RoleBadge = ({
 
   return (
     <span
+      aria-label={`Role badge: ${role!.trim()}`}
       css={[
         size === 'xs' ? tw`px-1.5 py-0.5 text-[9px]` : tw`px-2 py-1 text-[10px]`,
         tone === 'dark'

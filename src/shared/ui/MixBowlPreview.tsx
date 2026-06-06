@@ -96,8 +96,6 @@ const createSnapshotScheduler = () => {
   }
 }
 
-const scheduleSnapshot = createSnapshotScheduler()
-
 const pseudoRandom = (seed: number) => {
   const value = Math.sin(seed * 12.9898) * 43758.5453
   return value - Math.floor(value)
@@ -512,6 +510,7 @@ export const MixBowlPreview = ({
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null)
   const snapshotReleaseRef = useRef<(() => void) | null>(null)
   const aliveRef = useRef(false)
+  const scheduleSnapshot = useMemo(() => createSnapshotScheduler(), [])
   const total = items.reduce((sum, item) => sum + item.percentage, 0)
   const isSnapshot = renderMode === 'snapshot'
   const { ref: visibilityRef, visible: isPreviewVisible } = useVisibilityGate(isSnapshot)

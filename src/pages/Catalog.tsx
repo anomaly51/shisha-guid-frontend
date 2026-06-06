@@ -389,6 +389,16 @@ export const Catalog = ({
   }, [itemKind])
 
   useEffect(() => {
+    if (itemKind !== 'tobacco') return
+    if (currentPage <= 1) return
+    updateSearch((next) => {
+      next.delete('page')
+    })
+    setAppendTobaccos(false)
+    setLoadedTobaccos([])
+  }, [brandFilter, currentPage, itemKind, updateSearch])
+
+  useEffect(() => {
     const message = window.sessionStorage.getItem('shisha-guid:catalog-toast')
     if (!message) return
     window.sessionStorage.removeItem('shisha-guid:catalog-toast')

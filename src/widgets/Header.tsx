@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
 import tw from 'twin.macro'
 import { Button } from '../shared/ui/Button'
 import {
-  useGetCoalsQuery,
   useGetNotificationsQuery,
   useGetProfileQuery,
-  useGetSetupsQuery,
-  useGetTobaccosQuery,
+  useLazyGetSetupsQuery,
+  useLazySearchUsersQuery,
+  useLazyGetTobaccosQuery,
+  useLazyGetCoalsQuery,
   useLogoutMutation,
   useMarkNotificationsReadMutation,
-  useSearchUsersQuery,
 } from '../shared/api'
 import { AuthModal } from './AuthModal'
 import { LogoutIcon, PlusIcon, ShishaGuidLogo } from '../shared/ui/Icons'
@@ -81,10 +81,11 @@ const GlobalSearch = ({ open, onClose }: { open: boolean; onClose: () => void })
   const debouncedQuery = useDebouncedValue(query, 250)
   const search = debouncedQuery.trim()
   const canSearch = open && search.length >= 2
-  const { data: setups } = useGetSetupsQuery({ search, limit: 5 }, { skip: !canSearch })
-  const { data: tobaccos } = useGetTobaccosQuery({ search, limit: 5 }, { skip: !canSearch })
-  const { data: coals } = useGetCoalsQuery({ search, limit: 5 }, { skip: !canSearch })
-  const { data: users = [] } = useSearchUsersQuery({ nickname: search, limit: 5 }, { skip: !canSearch })
+  const [triggerSetups, { data: setups }] = useLazyGetSetupsQuery()
+  const [triggerTobaccos, { data: tobaccos }] = useLazyGetTobaccosQuery()
+  const [triggerCoals, { data: coals }] = useLazyGetCoalsQuery()
+  const [triggerUsers, { data: users = [] }] = useLazySearchUsersQuery()
+  const searchAbortersRef = useRef<Array<() => void>>([])
   const setupItems = useMemo(() => normalizePageItems(setups).slice(0, 5), [setups])
   const tobaccoItems = useMemo(() => normalizePageItems(tobaccos).slice(0, 5), [tobaccos])
   const coalItems = useMemo(() => normalizePageItems(coals).slice(0, 5), [coals])
@@ -92,6 +93,24 @@ const GlobalSearch = ({ open, onClose }: { open: boolean; onClose: () => void })
   useEffect(() => {
     if (open) setQuery('')
   }, [open])
+
+  useEffect(() => {
+    searchAbortersRef.current.forEach((abort) => abort())
+    searchAbortersRef.current = []
+    if (!canSearch) return undefined
+
+    const requests = [
+      triggerSetups({ search, limit: 5 }),
+      triggerTobaccos({ search, limit: 5 }),
+      triggerCoals({ search, limit: 5 }),
+      triggerUsers({ nickname: search, limit: 5 }),
+    ]
+    searchAbortersRef.current = requests.map((request) => () => request.abort())
+
+    return () => {
+      requests.forEach((request) => request.abort())
+    }
+  }, [canSearch, search, triggerCoals, triggerSetups, triggerTobaccos, triggerUsers])
 
   if (!open) return null
 
@@ -245,9 +264,9 @@ export const Header = () => {
             if (chunk.startsWith('event: notification')) refetchNotifications()
           })
         }
-        if (!closed) reconnectTimeout = window.setTimeout(connect, 5000)
+        if (!closed && getAuthToken()) reconnectTimeout = window.setTimeout(connect, 5000)
       } catch {
-        if (!closed) reconnectTimeout = window.setTimeout(connect, 5000)
+        if (!closed && getAuthToken()) reconnectTimeout = window.setTimeout(connect, 5000)
       }
     }
 

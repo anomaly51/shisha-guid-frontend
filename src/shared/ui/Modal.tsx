@@ -66,13 +66,16 @@ export const Modal = ({ open, onClose, title, children }: ModalProps) => {
   useEffect(() => {
     if (!open) return
     const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    window.setTimeout(() => {
+    const frame = window.requestAnimationFrame(() => {
       const target = contentRef.current?.querySelector<HTMLElement>(
         'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
       )
       target?.focus()
-    }, 0)
-    return () => previousActive?.focus()
+    })
+    return () => {
+      window.cancelAnimationFrame(frame)
+      previousActive?.focus()
+    }
   }, [open])
 
   if (!open) return null

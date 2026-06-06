@@ -55,6 +55,7 @@ export const Feed = () => {
   const [totalSetups, setTotalSetups] = useState(0)
   const [hasMoreSetups, setHasMoreSetups] = useState(false)
   const [emptyRetryCount, setEmptyRetryCount] = useState(0)
+  const loadMoreLockedRef = useRef(false)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const sort = getSearchSort(searchParams.get('sort'))
   const selectedTobaccos = useMemo(() => searchParams.getAll('tobacco'), [searchParams])
@@ -238,6 +239,16 @@ export const Feed = () => {
   }
 
   useEffect(() => {
+    if (hasToken) return
+    if (!bookmarked && !following) return
+    updateSearch((next) => {
+      next.delete('bookmarked')
+      next.delete('following')
+      next.delete('page')
+    })
+  }, [bookmarked, following, hasToken, updateSearch])
+
+  useEffect(() => {
     setLoadedSetups([])
     setPageOffset(0)
     setTotalSetups(0)
@@ -260,6 +271,7 @@ export const Feed = () => {
         ...page.items.filter((setup) => !seen.has(setup.id)),
       ]
     })
+    loadMoreLockedRef.current = false
   }, [normalizedSetupsPage])
 
   useEffect(() => {
@@ -274,6 +286,10 @@ export const Feed = () => {
   }, [emptyRetryCount, isSetupsError, loadedSetups.length, refetchSetups])
 
   useEffect(() => {
+    if (!isFetching) loadMoreLockedRef.current = false
+  }, [isFetching])
+
+  useEffect(() => {
     if (!canLoadMore) return undefined
     if (isFetching) return undefined
     const node = loadMoreRef.current
@@ -282,6 +298,8 @@ export const Feed = () => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return
+        if (loadMoreLockedRef.current) return
+        loadMoreLockedRef.current = true
         setPageOffset((current) => current + SETUP_PAGE_SIZE)
       },
       { rootMargin: '320px 0px' },
@@ -669,6 +687,7 @@ export const Feed = () => {
               if (targetSetup.is_liked) unlikeSetup(targetSetup.id)
               else likeSetup(targetSetup.id)
             }}
+            canToggleLike={hasToken}
           />
         ))}
         {isFetching && visibleSetups.length > 0 && (

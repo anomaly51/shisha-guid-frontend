@@ -114,7 +114,14 @@ export const subscribeAuthSession = (listener: () => void) => {
 export const getCachedProfile = <T = unknown>() => {
   try {
     const rawProfile = getStorage()?.getItem(profileCacheStorageKey)
-    return rawProfile ? (JSON.parse(rawProfile) as T) : null
+    if (!rawProfile) return null
+    const parsed = JSON.parse(rawProfile) as { token?: string; profile?: T } | T
+    if (parsed && typeof parsed === 'object' && 'profile' in parsed) {
+      const envelope = parsed as { token?: string; profile?: T }
+      if (!envelope.token || envelope.token !== getAuthToken()) return null
+      return envelope.profile ?? null
+    }
+    return parsed as T
   } catch {
     return null
   }
@@ -122,7 +129,9 @@ export const getCachedProfile = <T = unknown>() => {
 
 export const setCachedProfile = (profile: unknown) => {
   try {
-    getStorage()?.setItem(profileCacheStorageKey, JSON.stringify(profile))
+    const token = getAuthToken()
+    if (!token) return
+    getStorage()?.setItem(profileCacheStorageKey, JSON.stringify({ token, profile }))
   } catch {
     // Cache is an optimization only; failed writes should not block auth.
   }

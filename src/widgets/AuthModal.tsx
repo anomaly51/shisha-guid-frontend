@@ -27,8 +27,23 @@ export const AuthModal = ({ open, onClose }: AuthModalProps) => {
   const { t } = useTranslation()
   const handledCodeRef = useRef('')
   const messageHandlerRef = useRef<((event: MessageEvent) => void) | null>(null)
+  const authWindowRef = useRef<Window | null>(null)
+  const authWindowPollRef = useRef<number | null>(null)
 
   const redirectUri = typeof window !== 'undefined' ? window.location.origin : ''
+
+  const clearPopupAuth = useCallback(() => {
+    if (authWindowPollRef.current) {
+      window.clearInterval(authWindowPollRef.current)
+      authWindowPollRef.current = null
+    }
+    if (messageHandlerRef.current) {
+      window.removeEventListener('message', messageHandlerRef.current)
+      messageHandlerRef.current = null
+    }
+    authWindowRef.current = null
+    setAuthPending(false)
+  }, [])
 
   const finishGoogleLogin = useCallback(async (code: string) => {
     if (!code || handledCodeRef.current === code) return
@@ -40,6 +55,7 @@ export const AuthModal = ({ open, onClose }: AuthModalProps) => {
       sessionStorage.removeItem('google_oauth_state')
       window.location.reload()
     } catch (requestError) {
+      handledCodeRef.current = ''
       setError(getLoginErrorMessage(requestError, t('auth.loginFailed')))
       setAuthPending(false)
     }
@@ -68,6 +84,10 @@ export const AuthModal = ({ open, onClose }: AuthModalProps) => {
       window.removeEventListener('message', messageHandlerRef.current)
       messageHandlerRef.current = null
     }
+    if (authWindowPollRef.current) {
+      window.clearInterval(authWindowPollRef.current)
+      authWindowPollRef.current = null
+    }
 
     const shouldUseRedirect = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768
     if (shouldUseRedirect) {
@@ -81,19 +101,23 @@ export const AuthModal = ({ open, onClose }: AuthModalProps) => {
       window.location.assign(authUrl)
       return
     }
+    authWindowRef.current = authWindow
 
     const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return
       const { code, state } = event.data
       if (!code) return
       if (state && state !== sessionStorage.getItem('google_oauth_state')) return
-      window.removeEventListener('message', handleMessage)
-      messageHandlerRef.current = null
-      authWindow?.close()
+      clearPopupAuth()
+      authWindow.close()
       await finishGoogleLogin(code)
     }
     messageHandlerRef.current = handleMessage
     window.addEventListener('message', handleMessage)
+    authWindowPollRef.current = window.setInterval(() => {
+      if (!authWindowRef.current || !authWindowRef.current.closed) return
+      clearPopupAuth()
+    }, 500)
   }
 
   useEffect(() => {
@@ -128,16 +152,14 @@ export const AuthModal = ({ open, onClose }: AuthModalProps) => {
   }, [finishGoogleLogin, t])
 
   useEffect(() => () => {
-    if (messageHandlerRef.current) {
-      window.removeEventListener('message', messageHandlerRef.current)
-    }
-  }, [])
+    clearPopupAuth()
+  }, [clearPopupAuth])
 
   useEffect(() => {
     if (open) return
     handledCodeRef.current = ''
-    setAuthPending(false)
-  }, [open])
+    clearPopupAuth()
+  }, [clearPopupAuth, open])
 
   return (
     <Modal open={open} onClose={onClose} title={t('auth.title')}>

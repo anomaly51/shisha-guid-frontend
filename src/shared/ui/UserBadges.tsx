@@ -230,12 +230,15 @@ export const UserBadges = ({
   badges?: UserBadge[] | null
   maxVisible?: number
 }) => {
-  const visibleBadges = (badges || []).slice(0, maxVisible ? Math.min(maxVisible, 1) : 1)
+  const visibleBadges = (badges || []).slice(0, maxVisible || 1)
 
   if (!visibleBadges.length) return null
 
   return (
-    <span tw="inline-flex min-w-0 flex-wrap items-center gap-1">
+    <span
+      aria-label={`User badges: ${visibleBadges.map((badge) => badge.label).join(', ')}`}
+      tw="inline-flex min-w-0 flex-wrap items-center gap-1"
+    >
       {visibleBadges.map((badge) => (
         <BadgePill
           key={`${badge.label}-${badge.color}-${badge.effect || 'none'}`}

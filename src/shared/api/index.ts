@@ -1,9 +1,9 @@
 export { api } from './base'
 export { useGoogleLoginMutation, useLogoutMutation } from './auth'
 export {
-  useGetProfileQuery, useUpdateProfileMutation,
-  useGetPublicProfileQuery, useGetProfileActivityQuery, useSearchUsersQuery, useGetTopAuthorsQuery,
-  useGetRecommendedUsersQuery, useGetUserFollowersQuery, useGetUserFollowingQuery,
+  useGetProfileQuery, useLazyGetProfileQuery, useUpdateProfileMutation,
+  useGetPublicProfileQuery, useGetProfileActivityQuery, useSearchUsersQuery, useLazySearchUsersQuery, useGetTopAuthorsQuery, useLazyGetTopAuthorsQuery,
+  useGetRecommendedUsersQuery, useLazyGetRecommendedUsersQuery, useGetUserFollowersQuery, useGetUserFollowingQuery,
   useGetCollectionsQuery, useCreateCollectionMutation, useAddSetupToCollectionMutation, useRemoveSetupFromCollectionMutation,
   useGetFavoriteTobaccosQuery, useAddFavoriteTobaccoMutation, useRemoveFavoriteTobaccoMutation,
   useFollowUserMutation, useUnfollowUserMutation,
@@ -12,16 +12,16 @@ export {
 export { useGetAdminUsersQuery, useUpdateAdminUserMutation, useGetReportsQuery, useUpdateReportMutation } from './admin'
 export type { AdminUser, BadgeEffect, UserBadge } from './admin'
 export {
-  useGetBowlsQuery, useGetBowlQuery, useCreateBowlMutation, useUpdateBowlMutation, useDeleteBowlMutation,
-  useGetTobaccosQuery, useGetTobaccoQuery, useCreateTobaccoMutation, useUpdateTobaccoMutation, useDeleteTobaccoMutation,
+  useGetBowlsQuery, useLazyGetBowlsQuery, useGetBowlQuery, useCreateBowlMutation, useUpdateBowlMutation, useDeleteBowlMutation,
+  useGetTobaccosQuery, useLazyGetTobaccosQuery, useGetTobaccoQuery, useCreateTobaccoMutation, useUpdateTobaccoMutation, useDeleteTobaccoMutation,
   useGetTobaccoUsersQuery,
-  useGetCoalsQuery, useGetCoalQuery, useCreateCoalMutation, useUpdateCoalMutation, useDeleteCoalMutation,
-  useGetKaloudsQuery, useGetKaloudQuery, useCreateKaloudMutation, useUpdateKaloudMutation, useDeleteKaloudMutation,
-  useGetCoalPlacementsQuery, useGetCoalPlacementQuery, useCreateCoalPlacementMutation, useUpdateCoalPlacementMutation, useDeleteCoalPlacementMutation,
-  useGetBowlSetupTypesQuery, useGetBowlSetupTypeQuery, useCreateBowlSetupTypeMutation, useUpdateBowlSetupTypeMutation, useDeleteBowlSetupTypeMutation,
+  useGetCoalsQuery, useLazyGetCoalsQuery, useGetCoalQuery, useCreateCoalMutation, useUpdateCoalMutation, useDeleteCoalMutation,
+  useGetKaloudsQuery, useLazyGetKaloudsQuery, useGetKaloudQuery, useCreateKaloudMutation, useUpdateKaloudMutation, useDeleteKaloudMutation,
+  useGetCoalPlacementsQuery, useLazyGetCoalPlacementsQuery, useGetCoalPlacementQuery, useCreateCoalPlacementMutation, useUpdateCoalPlacementMutation, useDeleteCoalPlacementMutation,
+  useGetBowlSetupTypesQuery, useLazyGetBowlSetupTypesQuery, useGetBowlSetupTypeQuery, useCreateBowlSetupTypeMutation, useUpdateBowlSetupTypeMutation, useDeleteBowlSetupTypeMutation,
 } from './catalog'
 export {
-  useGetSetupsQuery, useGetUserSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
+  useGetSetupsQuery, useLazyGetSetupsQuery, useGetUserSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
   useSetSetupFeaturedMutation, useAddSetupContributorMutation, useRemoveSetupContributorMutation, useCloneSetupMutation, useBookmarkSetupMutation, useUnbookmarkSetupMutation, useLikeSetupMutation, useUnlikeSetupMutation, useGetSetupVersionsQuery,
   useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation, useDeleteSetupReviewMutation,
   useGetReviewRepliesQuery, useCreateReviewReplyMutation, useDeleteReviewReplyMutation, useCreateReportMutation,

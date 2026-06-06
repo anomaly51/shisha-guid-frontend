@@ -194,6 +194,7 @@ export const setupsApi = api.injectEndpoints({
 })
 
 export const {
+  useLazyGetSetupsQuery,
   useGetSetupsQuery, useGetUserSetupsQuery, useGetSetupQuery, useRecordSetupViewMutation, useCreateSetupMutation, useUpdateSetupMutation, useDeleteSetupMutation,
   useSetSetupFeaturedMutation, useAddSetupContributorMutation, useRemoveSetupContributorMutation, useCloneSetupMutation, useBookmarkSetupMutation, useUnbookmarkSetupMutation, useLikeSetupMutation, useUnlikeSetupMutation, useGetSetupVersionsQuery,
   useGetSetupReviewsQuery, useCreateSetupReviewMutation, useUpdateSetupReviewMutation, useDeleteSetupReviewMutation,

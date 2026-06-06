@@ -536,7 +536,10 @@ export const Profile = () => {
                   <UserBadges badges={profile.badges} maxVisible={2} />
                 </div>
               </div>
-              <label tw="h-10 px-3 rounded-lg bg-[rgb(var(--color-accent))] text-white flex items-center justify-center text-[13px] font-semibold cursor-pointer hover:bg-[rgb(var(--color-accent-hover))] transition-colors">
+              <label
+                tw="h-10 px-3 rounded-lg bg-[rgb(var(--color-accent))] text-white flex items-center justify-center text-[13px] font-semibold transition-colors"
+                css={uploading ? tw`cursor-not-allowed opacity-60 pointer-events-none` : tw`cursor-pointer hover:bg-[rgb(var(--color-accent-hover))]`}
+              >
                 {uploading ? t('common.uploading') : t('profile.uploadAvatar')}
                 <input
                   type="file"

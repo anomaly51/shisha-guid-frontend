@@ -25,7 +25,7 @@ import {
   useGetSetupReviewsQuery,
   useGetSetupCommentsQuery,
   useGetSetupQuery,
-  useGetSetupsQuery,
+  useLazyGetSetupsQuery,
   useGetSetupVersionsQuery,
   useDeleteSetupMutation,
   useRecordSetupViewMutation,
@@ -298,12 +298,40 @@ const VersionHistory = ({ current, setupId }: { current: any; setupId: string })
 }
 
 const SimilarSetups = ({ currentId, tobaccoIds }: { currentId: string; tobaccoIds: string[] }) => {
-  const { data } = useGetSetupsQuery({ tobacco_ids: tobaccoIds, limit: 6 }, { skip: tobaccoIds.length === 0 })
+  const [sectionRef, setSectionRef] = useState<HTMLElement | null>(null)
+  const [isVisible, setIsVisible] = useState(false)
+  const [triggerSetups, { data }] = useLazyGetSetupsQuery()
+
+  useEffect(() => {
+    if (!sectionRef || isVisible || tobaccoIds.length === 0) return undefined
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true)
+      return undefined
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '200px 0px' },
+    )
+    observer.observe(sectionRef)
+    return () => observer.disconnect()
+  }, [isVisible, sectionRef, tobaccoIds.length])
+
+  useEffect(() => {
+    if (!isVisible || tobaccoIds.length === 0) return
+    const request = triggerSetups({ tobacco_ids: tobaccoIds, limit: 6 })
+    return () => request.abort()
+  }, [isVisible, tobaccoIds, triggerSetups])
+
   const items = useMemo(() => normalizeSetups(data).filter((setup: any) => setup.id !== currentId).slice(0, 4), [currentId, data])
   if (!items.length) return null
 
   return (
-    <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-4 sm:p-5">
+    <section ref={setSectionRef} tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-4 sm:p-5">
       <div>
         <Label>Рекомендации</Label>
         <SectionTitle tw="mt-1">Похожие забивки</SectionTitle>
@@ -779,6 +807,7 @@ export const SetupDetail = () => {
   const [reportReason, setReportReason] = useState('')
   const [reportOpen, setReportOpen] = useState(false)
   const [collectionName, setCollectionName] = useState('')
+  const [shareMessage, setShareMessage] = useState('')
   const { data: collections = [] } = useGetCollectionsQuery(undefined, { skip: !hasToken })
   const { data: bowls } = useGetBowlsQuery()
   const { data: coals } = useGetCoalsQuery()
@@ -845,7 +874,7 @@ export const SetupDetail = () => {
   const handleClone = async () => {
     if (!item?.id) return
     const cloned = await cloneSetup(item.id).unwrap()
-    navigate(`/setups/${cloned.id}/edit`)
+    navigate(`/setups/${cloned.id}/edit`, { state: { prefetchedSetup: cloned } })
   }
 
   const handleBookmark = async () => {
@@ -891,13 +920,21 @@ export const SetupDetail = () => {
     try {
       if (navigator.share) {
         await navigator.share(shareData)
+        setShareMessage('')
         return
       }
       await navigator.clipboard.writeText(url)
+      setShareMessage('Ссылка скопирована.')
     } catch {
-      // Sharing is optional; keep the page state unchanged if the user cancels.
+      setShareMessage('Не удалось поделиться ссылкой.')
     }
   }
+
+  useEffect(() => {
+    if (!shareMessage) return undefined
+    const timeout = window.setTimeout(() => setShareMessage(''), 2200)
+    return () => window.clearTimeout(timeout)
+  }, [shareMessage])
 
   if (isLoading) {
     return (
@@ -1058,6 +1095,7 @@ export const SetupDetail = () => {
                 Поделиться
               </Button>
             </div>
+            {shareMessage && <p tw="mt-2 text-[12px] font-medium text-[rgb(var(--color-text-subtle))]">{shareMessage}</p>}
             {canManageSetup && (
               <div tw="mt-3 flex flex-wrap gap-2">
                 {isAdmin && (

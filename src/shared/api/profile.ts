@@ -150,12 +150,16 @@ export const profileApi = api.injectEndpoints({
 
 export const {
   useGetProfileQuery,
+  useLazyGetProfileQuery,
   useUpdateProfileMutation,
   useGetPublicProfileQuery,
   useGetProfileActivityQuery,
   useSearchUsersQuery,
+  useLazySearchUsersQuery,
   useGetTopAuthorsQuery,
+  useLazyGetTopAuthorsQuery,
   useGetRecommendedUsersQuery,
+  useLazyGetRecommendedUsersQuery,
   useGetUserFollowersQuery,
   useGetUserFollowingQuery,
   useGetCollectionsQuery,

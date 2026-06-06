@@ -38,6 +38,7 @@ export const SetupCard = memo(({
   rating,
   onOpen,
   onToggleLike,
+  canToggleLike = true,
 }: {
   setup: any
   tobaccos?: any[]
@@ -45,6 +46,7 @@ export const SetupCard = memo(({
   rating: number
   onOpen: (setupId: string) => void
   onToggleLike: (setup: any) => void
+  canToggleLike?: boolean
 }) => {
   const { t } = useTranslation()
   const mixItems = useMemo(
@@ -78,11 +80,16 @@ export const SetupCard = memo(({
             type="button"
             onClick={(event) => {
               event.stopPropagation()
+              if (!canToggleLike) return
               onToggleLike(setup)
             }}
             aria-pressed={Boolean(setup.is_liked)}
+            disabled={!canToggleLike}
             tw="absolute right-2.5 top-2.5 flex items-center gap-1 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[11px] font-black shadow-[0_12px_26px_-20px_rgba(83,48,31,0.7)] backdrop-blur transition-colors hover:bg-[rgb(var(--color-accent-muted))]"
-            css={setup.is_liked ? { color: 'rgb(var(--color-danger))' } : { color: 'rgb(var(--color-text-muted))' }}
+            css={[
+              setup.is_liked ? { color: 'rgb(var(--color-danger))' } : { color: 'rgb(var(--color-text-muted))' },
+              !canToggleLike ? { cursor: 'not-allowed', opacity: 0.55 } : null,
+            ]}
           >
             <HeartIcon size={13} />
             <span tw="tabular-nums">{Number(setup.likes_count || 0)}</span>

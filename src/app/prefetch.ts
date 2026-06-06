@@ -85,7 +85,6 @@ export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
     return [
       { endpoint: 'getSetup', arg: segments[1] },
       { endpoint: 'getSetupReviews', arg: segments[1] },
-      ...setupFormPrefetch,
     ]
   }
 
@@ -93,11 +92,6 @@ export const getPrefetchRequests = (url: string): PrefetchRequest[] => {
     return [
       { endpoint: 'getSetup', arg: segments[1] },
       { endpoint: 'getSetupReviews', arg: segments[1] },
-      { endpoint: 'getBowls' },
-      { endpoint: 'getCoals', arg: { limit: 60 } },
-      { endpoint: 'getKalouds' },
-      { endpoint: 'getCoalPlacements' },
-      { endpoint: 'getBowlSetupTypes' },
     ]
   }
 
