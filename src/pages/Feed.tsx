@@ -19,7 +19,7 @@ const SETUP_PAGE_SIZE = 12
 const SETUPS_EMPTY_RETRY_LIMIT = 3
 const SEARCH_HISTORY_KEY = 'shisha-guid:setup-searches'
 
-const getSetupRating = (setup: any) => getSetupAggregateRating(setup) ?? 0
+const getSetupRating = (setup: any) => getSetupAggregateRating(setup)
 
 const strengthOptions: StrengthFilter[] = ['all', 'light', 'medium', 'strong', 'heavy']
 

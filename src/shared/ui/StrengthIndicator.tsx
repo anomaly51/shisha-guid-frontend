@@ -8,6 +8,7 @@ type StrengthIndicatorProps = {
   compact?: boolean
   label?: ReactNode
   showScore?: boolean
+  activeColor?: string
 }
 
 const toneStyles = {
@@ -29,12 +30,13 @@ const toneStyles = {
   },
 } as const
 
-export const StrengthIndicator = ({ value, compact = false, label, showScore = false }: StrengthIndicatorProps) => {
+export const StrengthIndicator = ({ value, compact = false, label, showScore = false, activeColor }: StrengthIndicatorProps) => {
   const { t } = useTranslation()
   const hasValue = typeof value === 'number' && Number.isFinite(value)
   const normalized = Math.min(10, Math.max(0, hasValue ? value : 0))
   const tone = getHeavinessToneKey(normalized)
   const styles = toneStyles[tone]
+  const accentColor = activeColor || styles.fill
   const filled = Math.round(normalized)
 
   return (
@@ -51,15 +53,15 @@ export const StrengthIndicator = ({ value, compact = false, label, showScore = f
               tw`min-w-0 truncate font-bold leading-none`,
               compact ? tw`text-[11px]` : tw`text-[13px]`,
             ]}
-            style={{ color: styles.text }}
+            style={{ color: accentColor }}
           >
             {hasValue ? t(`metrics.heaviness.${tone}`) : t('common.notSelected')}
           </span>
         </div>
         {showScore && hasValue && (
-          <span tw="shrink-0 text-[11px] font-black leading-none tabular-nums" style={{ color: styles.text }}>
-            {Math.round(normalized)}
-          </span>
+            <span tw="shrink-0 text-[11px] font-black leading-none tabular-nums" style={{ color: accentColor }}>
+              {Math.round(normalized)}
+            </span>
         )}
       </div>
       <div css={[tw`grid grid-cols-10`, compact ? tw`mt-1.5 gap-1` : tw`mt-2 gap-1.5`]}>
@@ -71,7 +73,7 @@ export const StrengthIndicator = ({ value, compact = false, label, showScore = f
               compact ? tw`h-1.5` : tw`h-2`,
             ]}
             style={{
-              backgroundColor: index < filled ? styles.fill : 'rgb(var(--color-surface-subtle))',
+              backgroundColor: index < filled ? accentColor : 'rgb(var(--color-surface-subtle))',
               opacity: index < filled ? 1 : 0.68,
             }}
           />

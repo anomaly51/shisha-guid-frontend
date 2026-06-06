@@ -10,14 +10,15 @@ const inputStyles = `
   min-height: 38px;
   &:focus { border-color: rgb(var(--color-accent)); box-shadow: 0 0 0 2px rgb(var(--color-accent) / 0.12); }
   &:disabled { background: rgb(var(--color-surface-muted)); color: rgb(var(--color-text-subtle)); cursor: not-allowed; }
+  &:disabled { opacity: 0.5; }
 `
 
 const StyledInput = styled.input`
-  ${tw`px-3 py-2 bg-[rgb(var(--color-surface))]/95 border border-[rgb(var(--color-border-strong))] rounded-lg text-[13px] text-[rgb(var(--color-text))] transition-all duration-150 outline-none placeholder:text-[rgb(var(--color-text-subtle))]`}
+  ${tw`px-3 py-2 bg-[rgb(var(--color-surface))]/95 border border-[rgb(var(--color-border-strong))] rounded-lg text-[13px] text-[rgb(var(--color-text))] transition-all duration-150 outline-none placeholder:text-[rgb(var(--color-text-subtle))] disabled:opacity-50 disabled:cursor-not-allowed`}
   ${inputStyles}
 `
 const StyledTextarea = styled.textarea`
-  ${tw`px-3 py-2 bg-[rgb(var(--color-surface))]/95 border border-[rgb(var(--color-border-strong))] rounded-lg text-[13px] text-[rgb(var(--color-text))] transition-all duration-150 outline-none placeholder:text-[rgb(var(--color-text-subtle))] resize-y leading-relaxed`}
+  ${tw`px-3 py-2 bg-[rgb(var(--color-surface))]/95 border border-[rgb(var(--color-border-strong))] rounded-lg text-[13px] text-[rgb(var(--color-text))] transition-all duration-150 outline-none placeholder:text-[rgb(var(--color-text-subtle))] resize-y leading-relaxed disabled:opacity-50 disabled:cursor-not-allowed`}
   ${inputStyles}
 `
 

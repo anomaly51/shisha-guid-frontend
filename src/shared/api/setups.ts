@@ -57,7 +57,7 @@ const withUserSetupsParams = (userId: string, params?: UserSetupsQueryParams) =>
 
 export const setupsApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    getSetups: builder.query<any[] | SetupsPageResponse, SetupsQueryParams>({
+    getSetups: builder.query<SetupsPageResponse, SetupsQueryParams>({
       query: (params) => withParams('/shisha/bowl-setups', params),
       providesTags: ['Setups'],
     }),
@@ -71,7 +71,7 @@ export const setupsApi = api.injectEndpoints({
     }),
     recordSetupView: builder.mutation<any, string>({
       query: (id) => ({ url: `/shisha/bowl-setups/${id}/views`, method: 'POST' }),
-      invalidatesTags: ['Setups'],
+      invalidatesTags: (_result, _error, id) => [{ type: 'Setups', id }],
     }),
     createSetup: builder.mutation<any, any>({
       query: (body) => ({ url: '/shisha/bowl-setups', method: 'POST', body }),

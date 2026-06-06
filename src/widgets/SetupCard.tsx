@@ -3,11 +3,12 @@ import { useTranslation } from 'react-i18next'
 import 'twin.macro'
 import { Card } from '../shared/ui/Card'
 import { CatalogIcon, CommentIcon, EyeIcon, HeartIcon } from '../shared/ui/Icons'
-import { MIX_COLORS, StaticMixBowlPreview, detectSetupKind, type MixBowlItem } from '../shared/ui/mixBowlModel'
+import { MIX_COLORS, detectSetupKind, type MixBowlItem } from '../shared/ui/mixBowlModel'
 import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
 import { AuthorChip } from '../shared/ui/AuthorChip'
 import { getSetupHeaviness } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
+import { MixBowlPreview } from '../shared/ui/MixBowlPreview'
 
 const getItem = (items: any[] | undefined, id: string | undefined) => (
   items?.find((item) => item.id === id)
@@ -43,12 +44,14 @@ export const SetupCard = memo(({
   setup: any
   tobaccos?: any[]
   typeName: string
-  rating: number
+  rating: number | null | undefined
   onOpen: (setupId: string) => void
   onToggleLike: (setup: any) => void
   canToggleLike?: boolean
 }) => {
   const { t } = useTranslation()
+  const ratingValue = (setup?.avg_rating ?? rating) as number | null | undefined
+  const ratingText = typeof ratingValue === 'number' && ratingValue > 0 ? ratingValue.toFixed(1) : '—'
   const mixItems = useMemo(
     () => buildMixItems(setup, tobaccos, (index) => t('common.tobaccoFallback', { number: index + 1 })),
     [setup, t, tobaccos],
@@ -62,7 +65,14 @@ export const SetupCard = memo(({
     <Card variant="hover" onClick={() => onOpen(setup.id)} className="h-full">
       <div tw="flex h-full flex-col bg-[rgb(var(--color-surface))]">
         <div tw="relative border-b border-[rgb(var(--color-border))]">
-          <StaticMixBowlPreview kind={kind} items={mixItems} />
+          <MixBowlPreview
+            kind={kind}
+            items={mixItems}
+            renderMode="snapshot"
+            autoRotate={false}
+            interactive={false}
+            ariaLabel={`${typeName} ${setup.name}`}
+          />
           <TobaccoPhotoStack items={mixItems} />
           <div tw="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-md border border-white/75 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[10px] font-bold text-[rgb(var(--color-text-muted))] shadow-[0_10px_24px_-18px_rgba(83,48,31,0.55)] backdrop-blur">
             <CatalogIcon name="placement" size={12} />
@@ -70,7 +80,7 @@ export const SetupCard = memo(({
           </div>
           <div tw="pointer-events-none absolute bottom-2.5 right-2.5 flex items-center gap-1.5 rounded-md border border-white/60 bg-[rgb(var(--color-surface-inverse))]/90 px-2 py-1.5 text-white shadow-[0_14px_30px_-18px_rgba(0,0,0,0.75)] backdrop-blur">
             <span tw="text-[9px] font-bold uppercase tracking-wide text-white/65">{t('feed.rating')}</span>
-            <span tw="text-[13px] font-black leading-none tabular-nums">{rating.toFixed(1)}</span>
+            <span tw="text-[13px] font-black leading-none tabular-nums">{ratingText}</span>
           </div>
           <div tw="pointer-events-none absolute left-2.5 bottom-2.5 flex items-center gap-1 rounded-md border border-white/60 bg-[rgb(var(--color-surface))]/90 px-2 py-1 text-[11px] font-black text-[rgb(var(--color-text-muted))] shadow-[0_12px_26px_-20px_rgba(83,48,31,0.7)] backdrop-blur">
             <EyeIcon size={13} />

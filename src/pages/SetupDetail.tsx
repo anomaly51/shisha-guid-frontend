@@ -41,7 +41,7 @@ import { Card } from '../shared/ui/Card'
 import { Textarea } from '../shared/ui/Input'
 import { Modal } from '../shared/ui/Modal'
 import { Skeleton } from '../shared/ui/Skeleton'
-import { AlertIcon, BackIcon, CatalogIcon, CommentIcon, EyeIcon, HeartIcon, ShareIcon, type CatalogIconName } from '../shared/ui/Icons'
+import { AlertIcon, CatalogIcon, CommentIcon, EyeIcon, HeartIcon, ShareIcon, type CatalogIconName } from '../shared/ui/Icons'
 import { MIX_COLORS, detectBowlModel, detectSetupKind, type MixBowlItem } from '../shared/ui/mixBowlModel'
 import { MixBowlPreview } from '../shared/ui/MixBowlPreview'
 import { TobaccoPhotoStack } from '../shared/ui/TobaccoPhotoStack'
@@ -63,9 +63,14 @@ const Label = tw.p`text-[10px] font-semibold uppercase tracking-wide text-[rgb(v
 const SectionTitle = tw.h2`text-[18px] font-semibold leading-tight text-[rgb(var(--color-text))]`
 const MutedText = tw.p`text-[13px] font-medium leading-relaxed text-[rgb(var(--color-text-muted))]`
 
-const getItem = (items: any[] | undefined, id: string | undefined) => (
-  items?.find((item) => item.id === id)
-)
+const getItem = (items: any[] | undefined, id: string | undefined | null) => {
+  if (!items || !id) return undefined
+  const needle = String(id)
+  return items.find((item) => {
+    const candidate = item?.id
+    return candidate != null && String(candidate) === needle
+  })
+}
 
 const buildMixItems = (setup: any, tobaccos: any[] | undefined, fallbackName: (index: number) => string): MixBowlItem[] => (
   setup.tobaccos?.map((item: any, index: number) => {
@@ -132,7 +137,7 @@ const CostSummary = ({ cost }: { cost: ReturnType<typeof calculateSetupCost> }) 
         <div>
           <Label tw="text-[rgb(var(--color-text-subtle))]">{t('setupDetail.costTitle')}</Label>
           <p tw="mt-1 text-[22px] font-black leading-none tabular-nums">
-            {totalValue}
+            {cost.isComplete ? totalValue : '—'}
           </p>
         </div>
         <span tw="rounded-md bg-[rgb(var(--color-surface))]/10 px-2 py-1 text-[10px] font-bold text-white/85">
@@ -178,15 +183,13 @@ const CompactSetupSummary = ({ kind, typeName, heaviness }: { kind: ReturnType<t
           <p tw="mt-1 truncate text-[13px] font-bold text-[rgb(var(--color-text))]">{t(`setupDetail.kind.${kind}`)}</p>
           <p tw="mt-0.5 truncate text-[11px] font-semibold text-[rgb(var(--color-text-subtle))]">{typeName}</p>
         </div>
-        <div tw="shrink-0 text-right">
+        <div tw="shrink-0 min-w-0 flex flex-col gap-2 text-right">
           <Label>{t('setupDetail.heaviness')}</Label>
-          <p tw="mt-1 rounded-lg bg-[rgb(var(--color-surface-inverse))] px-2.5 py-1.5 text-[14px] font-black text-white tabular-nums">
+          <p tw="rounded-lg bg-[rgb(var(--color-surface-inverse))] px-2.5 py-1.5 text-[14px] font-black text-white tabular-nums">
             {heaviness === null ? '-' : `${heaviness.toFixed(1)}/10`}
           </p>
+          <StrengthIndicator value={heaviness} compact activeColor="rgb(var(--color-accent))" />
         </div>
-      </div>
-      <div tw="mt-3">
-        <StrengthIndicator value={heaviness} compact />
       </div>
     </div>
   )
@@ -233,6 +236,8 @@ const getSnapshotLabel = (snapshot: any, key: string) => {
 
 const VersionHistory = ({ current, setupId }: { current: any; setupId: string }) => {
   const hasToken = hasAuthToken()
+  if (!hasToken) return null
+
   const { data: versions = [] } = useGetSetupVersionsQuery(setupId, { skip: !hasToken })
   const rows = useMemo(() => {
     const currentSnapshot = {
@@ -255,8 +260,6 @@ const VersionHistory = ({ current, setupId }: { current: any; setupId: string })
       return { ...entry, changed }
     }).reverse()
   }, [current, versions])
-
-  if (!hasToken) return null
 
   return (
     <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-4 sm:p-5">
@@ -327,7 +330,7 @@ const SimilarSetups = ({ currentId, tobaccoIds }: { currentId: string; tobaccoId
     return () => request.abort()
   }, [isVisible, tobaccoIds, triggerSetups])
 
-  const items = useMemo(() => normalizeSetups(data).filter((setup: any) => setup.id !== currentId).slice(0, 4), [currentId, data])
+  const items = useMemo(() => (data?.items || []).filter((setup: any) => setup.id !== currentId).slice(0, 4), [currentId, data])
   if (!items.length) return null
 
   return (
@@ -348,10 +351,30 @@ const SimilarSetups = ({ currentId, tobaccoIds }: { currentId: string; tobaccoId
   )
 }
 
-const normalizeSetups = (data: any) => (Array.isArray(data) ? data : data?.items || [])
-
-const EquipmentCard = ({ item, icon, label }: { item: any; icon: CatalogIconName; label: string }) => {
+const EquipmentCard = ({
+  item,
+  icon,
+  label,
+  loading = false,
+}: {
+  item: any
+  icon: CatalogIconName
+  label: string
+  loading?: boolean
+}) => {
   const { t } = useTranslation()
+
+  if (loading) {
+    return (
+      <div tw="grid h-full grid-rows-[auto_minmax(0,1fr)] gap-3 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-3 shadow-[0_1px_2px_rgba(24,24,27,0.03)]">
+        <Skeleton w="100%" h="112px" />
+        <div tw="min-w-0 grid gap-1">
+          <Skeleton w="44%" h="10px" />
+          <Skeleton w="70%" h="16px" />
+        </div>
+      </div>
+    )
+  }
 
   return (
   <div tw="grid h-full grid-rows-[auto_minmax(0,1fr)] gap-3 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-3 shadow-[0_1px_2px_rgba(24,24,27,0.03)]">
@@ -397,12 +420,13 @@ const TobaccoMeasureCard = ({ count, kind, mix, index }: { count: number; kind: 
   )
 }
 
-const RatingPill = ({ rating }: { rating: number | null }) => (
+const RatingPill = ({ rating, large = false }: { rating: number | null; large?: boolean }) => (
   <span
     tw="inline-flex min-w-[54px] items-baseline justify-center rounded-lg bg-[rgb(var(--color-surface-inverse))] px-2.5 py-1.5 text-[15px] font-black text-white tabular-nums"
+    css={large ? tw`min-w-[74px] gap-0.5 px-3 py-2 text-[22px]` : undefined}
   >
     {rating === null ? '-' : Number(rating).toFixed(1)}
-    {rating !== null && <span tw="ml-0.5 text-[9px] font-bold text-white/65">/10</span>}
+    {rating !== null && <span tw="ml-0.5 text-[9px] font-bold text-white/65" css={large ? tw`text-[11px]` : undefined}>/10</span>}
   </span>
 )
 
@@ -588,14 +612,14 @@ const SetupReviews = ({ setupId, setupCreatorId }: { setupId: string; setupCreat
 
   return (
     <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-4 sm:p-5">
-      <div tw="flex flex-wrap items-start justify-between gap-3">
+      <div tw="flex flex-wrap items-start justify-between gap-2">
         <div tw="min-w-0">
           <Label>{t('reviews.titleLabel')}</Label>
           <SectionTitle tw="mt-1">{t('reviews.title')}</SectionTitle>
-        </div>
-        <div tw="flex items-center gap-2 rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] px-3 py-2">
-          <Label>{t('reviews.average')}</Label>
-          <RatingPill rating={average} />
+          <div tw="mt-2 inline-flex items-center gap-2">
+            <Label>{t('reviews.average')}</Label>
+            <RatingPill rating={average} large />
+          </div>
         </div>
       </div>
 
@@ -820,6 +844,7 @@ export const SetupDetail = () => {
   const coal = getItem(coals, item?.coal_id)
   const placement = getItem(placements, item?.coal_placement_id)
   const setupType = getItem(types, item?.bowl_setup_type_id)
+  const shouldShowEquipmentSkeleton = !item || !bowls || !coals || !kalouds || !placements
   const typeName = setupType?.name || 'Compot'
   const kind = detectSetupKind(typeName)
   const bowlModel = detectBowlModel(bowl)
@@ -968,13 +993,6 @@ export const SetupDetail = () => {
             <span>/</span>
             <span tw="truncate text-[rgb(var(--color-text-muted))]">{item.name}</span>
           </nav>
-          <button
-            onClick={() => navigate(feedPath)}
-            tw="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[rgb(var(--color-text-muted))] transition-colors hover:text-[rgb(var(--color-text))]"
-          >
-            <BackIcon />
-            {t('common.backToFeed')}
-          </button>
 
       <Card>
         <div tw="grid overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(430px,480px)]">
@@ -1180,11 +1198,6 @@ export const SetupDetail = () => {
         </div>
       </Card>
 
-      <SetupReviews setupId={item.id} setupCreatorId={item.creator_id || item.creator?.id} />
-      <SetupComments setupId={item.id} />
-      <SimilarSetups currentId={item.id} tobaccoIds={tobaccoIds} />
-      <VersionHistory current={item} setupId={item.id} />
-
       <section tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))] p-4 sm:p-5">
         <StepHeader
           number={1}
@@ -1192,10 +1205,10 @@ export const SetupDetail = () => {
           caption={t('setupDetail.prepareEquipmentHint')}
         />
         <div tw="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <EquipmentCard item={bowl} icon="bowl" label={t('setupDetail.bowl')} />
-          <EquipmentCard item={kaloud} icon="kaloud" label={t('setupDetail.kaloud')} />
-          <EquipmentCard item={coal} icon="coal" label={t('setupDetail.coal')} />
-          <EquipmentCard item={placement} icon="placement" label={t('setupDetail.coalPlacement')} />
+          <EquipmentCard item={bowl} icon="bowl" label={t('setupDetail.bowl')} loading={shouldShowEquipmentSkeleton} />
+          <EquipmentCard item={kaloud} icon="kaloud" label={t('setupDetail.kaloud')} loading={shouldShowEquipmentSkeleton} />
+          <EquipmentCard item={coal} icon="coal" label={t('setupDetail.coal')} loading={shouldShowEquipmentSkeleton} />
+          <EquipmentCard item={placement} icon="placement" label={t('setupDetail.coalPlacement')} loading={shouldShowEquipmentSkeleton} />
         </div>
       </section>
 
@@ -1255,11 +1268,16 @@ export const SetupDetail = () => {
           caption={t('setupDetail.heatAndCoalsHint')}
         />
         <div tw="grid gap-4 lg:grid-cols-3">
-          <EquipmentCard item={kaloud} icon="kaloud" label={t('setupDetail.kaloud')} />
-          <EquipmentCard item={coal} icon="coal" label={t('setupDetail.coal')} />
-          <EquipmentCard item={placement} icon="placement" label={t('setupDetail.coalPlacement')} />
+          <EquipmentCard item={kaloud} icon="kaloud" label={t('setupDetail.kaloud')} loading={shouldShowEquipmentSkeleton} />
+          <EquipmentCard item={coal} icon="coal" label={t('setupDetail.coal')} loading={shouldShowEquipmentSkeleton} />
+          <EquipmentCard item={placement} icon="placement" label={t('setupDetail.coalPlacement')} loading={shouldShowEquipmentSkeleton} />
         </div>
       </section>
+
+      <SetupReviews setupId={item.id} setupCreatorId={item.creator_id || item.creator?.id} />
+      <SetupComments setupId={item.id} />
+      <VersionHistory current={item} setupId={item.id} />
+      <SimilarSetups currentId={item.id} tobaccoIds={tobaccoIds} />
 
         </div>
       </div>
