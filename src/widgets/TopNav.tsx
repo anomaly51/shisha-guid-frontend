@@ -27,7 +27,7 @@ export const TopNav = () => {
 
   return (
     <div tw="sticky top-0 z-40 h-[var(--sticky-nav-height)] w-full overflow-hidden border-b border-[rgb(var(--color-border))] bg-[rgb(var(--color-accent-muted))]/95 backdrop-blur-lg">
-      <div tw="mx-auto grid h-full w-full max-w-[1160px] min-w-0 grid-cols-5 items-center gap-0.5 overflow-hidden px-2 sm:flex sm:overflow-x-auto sm:px-5">
+      <div tw="mx-auto flex h-full w-full max-w-[1160px] min-w-0 items-center gap-0.5 overflow-x-auto px-2 sm:px-5">
         {categories.map((cat) => {
           const isRoot = cat.path === '/'
           return (
@@ -36,7 +36,7 @@ export const TopNav = () => {
               to={cat.path}
               end={isRoot}
               className={({ isActive }) => [
-                'flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-2.5 text-[11px] font-medium transition-colors sm:shrink-0 sm:justify-start sm:gap-1.5 sm:px-3 sm:text-[13px]',
+                'flex flex-row items-center justify-center gap-1.5 min-w-max whitespace-nowrap rounded-lg px-2 py-2.5 text-[11px] font-medium transition-colors sm:flex-shrink-0 sm:justify-start sm:gap-1.5 sm:px-3 sm:text-[13px]',
                 isActive
                   ? 'text-[rgb(var(--color-text))] bg-[rgb(var(--color-surface-subtle))]'
                   : 'text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-accent-muted))]',

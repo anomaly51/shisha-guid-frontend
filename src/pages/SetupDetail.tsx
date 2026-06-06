@@ -137,7 +137,7 @@ const CostSummary = ({ cost }: { cost: ReturnType<typeof calculateSetupCost> }) 
         <div>
           <Label tw="text-[rgb(var(--color-text-subtle))]">{t('setupDetail.costTitle')}</Label>
           <p tw="mt-1 text-[22px] font-black leading-none tabular-nums">
-            {cost.isComplete ? totalValue : '—'}
+            {cost.isComplete ? totalValue : null}
           </p>
         </div>
         <span tw="rounded-md bg-[rgb(var(--color-surface))]/10 px-2 py-1 text-[10px] font-bold text-white/85">
@@ -176,7 +176,7 @@ const CompactSetupSummary = ({ kind, typeName, heaviness }: { kind: ReturnType<t
   const { t } = useTranslation()
 
   return (
-    <div tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-3">
+    <div tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-3 overflow-visible">
       <div tw="flex items-center justify-between gap-3">
         <div tw="min-w-0">
           <Label>{t('setupDetail.mix')}</Label>
@@ -236,9 +236,8 @@ const getSnapshotLabel = (snapshot: any, key: string) => {
 
 const VersionHistory = ({ current, setupId }: { current: any; setupId: string }) => {
   const hasToken = hasAuthToken()
-  if (!hasToken) return null
-
   const { data: versions = [] } = useGetSetupVersionsQuery(setupId, { skip: !hasToken })
+  if (!hasToken || !versions.length) return null
   const rows = useMemo(() => {
     const currentSnapshot = {
       name: current.name,
@@ -838,13 +837,14 @@ export const SetupDetail = () => {
   const { data: kalouds } = useGetKaloudsQuery()
   const { data: placements } = useGetCoalPlacementsQuery()
   const { data: types } = useGetBowlSetupTypesQuery()
+  const catalogReady = !!(bowls && coals && kalouds && placements)
 
   const bowl = getItem(bowls, item?.bowl_id)
   const kaloud = getItem(kalouds, item?.kaloud_id)
   const coal = getItem(coals, item?.coal_id)
   const placement = getItem(placements, item?.coal_placement_id)
   const setupType = getItem(types, item?.bowl_setup_type_id)
-  const shouldShowEquipmentSkeleton = !item || !bowls || !coals || !kalouds || !placements
+  const shouldShowEquipmentSkeleton = !catalogReady
   const typeName = setupType?.name || 'Compot'
   const kind = detectSetupKind(typeName)
   const bowlModel = detectBowlModel(bowl)
@@ -995,7 +995,7 @@ export const SetupDetail = () => {
           </nav>
 
       <Card>
-        <div tw="grid overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(430px,480px)]">
+        <div tw="grid overflow-visible lg:grid-cols-[minmax(0,1fr)_minmax(430px,480px)]">
           <div tw="relative h-[220px] bg-[rgb(var(--color-surface-muted))] sm:h-[260px] lg:h-auto lg:min-h-[340px]">
             <MixBowlPreview
               bowlModel={bowlModel}
@@ -1191,7 +1191,7 @@ export const SetupDetail = () => {
               <CostSummary cost={setupCost} />
             </div>
 
-            <div tw="mt-3">
+            <div tw="mt-3 overflow-visible">
               <CompactSetupSummary kind={kind} typeName={typeName} heaviness={heaviness} />
             </div>
           </div>
@@ -1233,7 +1233,7 @@ export const SetupDetail = () => {
           caption={t('setupDetail.packBowlHint')}
         />
         <div tw="grid gap-4 lg:grid-cols-[400px_minmax(0,1fr)] lg:items-center">
-          <div tw="overflow-hidden rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))]">
+          <div tw="overflow-visible rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))]">
             <MixBowlPreview
               bowlModel={bowlModel}
               cameraPosition={[0, 2.08, 3.85]}
@@ -1241,7 +1241,7 @@ export const SetupDetail = () => {
               kind={kind}
               items={mixItems}
               sceneScale={1.08}
-              style={{ aspectRatio: 'auto', height: 400 }}
+              style={{ aspectRatio: 'auto', height: 400, overflow: 'visible' }}
             />
           </div>
           <div tw="rounded-xl border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] p-4">

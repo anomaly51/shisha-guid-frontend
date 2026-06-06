@@ -31,7 +31,7 @@ const StyledButton = styled.button<StyledButtonProps>(({ $variant = 'primary', $
     width: var(--button-icon-size);
     height: var(--button-icon-size);
   }`,
-  `&:disabled { ${tw`opacity-40 cursor-not-allowed pointer-events-none`} }`,
+  `&:disabled, [disabled] { ${tw`opacity-40 cursor-not-allowed pointer-events-none`} }`,
 ])
 
 export const Button = ({ variant = 'primary', size = 'md', ...props }: ButtonProps) => (

@@ -68,6 +68,7 @@ export const SetupCard = memo(({
           <MixBowlPreview
             kind={kind}
             items={mixItems}
+            bowlModel={detectBowlModel(setup.bowl)}
             renderMode="snapshot"
             autoRotate={false}
             interactive={false}
