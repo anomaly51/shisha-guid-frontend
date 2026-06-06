@@ -19,7 +19,7 @@ jobs:
     uses: anomaly51/github-actions-toolkit/.github/workflows/harbor-argocd-app.yml@main
     with:
       app-name: shisha-frontend
-      # Human-readable app title for live Telegram deploy status updates.
+      # Human-readable title for compact Telegram deploy status updates.
       notification-title: Shishiguid Frontend
       image-repository: harbor.api-api-api.com/shisha/frontend
     secrets: inherit
