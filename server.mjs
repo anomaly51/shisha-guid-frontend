@@ -15,7 +15,7 @@ const publicRoot = path.resolve(__dirname, 'public')
 const buildVersion = process.env.APP_VERSION || process.env.VCS_REF || 'unknown'
 const buildCommit = process.env.VCS_REF || ''
 const buildDate = process.env.BUILD_DATE || ''
-const publicSiteUrl = normalizePublicUrl(process.env.PUBLIC_SITE_URL || process.env.SITE_URL || `http://localhost:${port}`)
+const configuredPublicSiteUrl = process.env.PUBLIC_SITE_URL || process.env.SITE_URL || ''
 const apiBaseUrl = (process.env.SSR_API_URL || process.env.VITE_SSR_API_URL || process.env.VITE_API_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '')
 const ssrRateWindowMs = Number(process.env.SSR_RATE_WINDOW_MS || 60000)
 const ssrRateLimit = Number(process.env.SSR_RATE_LIMIT || 180)
@@ -40,7 +40,8 @@ app.use('/.well-known/appspecific', (_req, res) => {
   res.status(204).end()
 })
 
-app.get('/robots.txt', (_req, res) => {
+app.get('/robots.txt', (req, res) => {
+  const publicSiteUrl = getPublicSiteUrl(req)
   res
     .type('text/plain')
     .set('Cache-Control', 'public, max-age=3600')
@@ -55,7 +56,8 @@ app.get('/robots.txt', (_req, res) => {
     ].join('\n'))
 })
 
-app.get('/sitemap.xml', async (_req, res) => {
+app.get('/sitemap.xml', async (req, res) => {
+  const publicSiteUrl = getPublicSiteUrl(req)
   const setupTotal = await fetchSetupSitemapTotal()
   const pageCount = Math.max(1, Math.ceil(setupTotal / 50))
   const sitemapUrls = [
@@ -70,7 +72,7 @@ app.get('/sitemap.xml', async (_req, res) => {
   res.type('application/xml').set('Cache-Control', 'public, max-age=1800').send(xml)
 })
 
-app.get('/sitemap-static.xml', (_req, res) => {
+app.get('/sitemap-static.xml', (req, res) => {
   const staticPaths = [
     '/',
     '/bowls',
@@ -78,7 +80,7 @@ app.get('/sitemap-static.xml', (_req, res) => {
     '/coals',
     '/kalouds',
   ]
-  const xml = buildUrlset(staticPaths)
+  const xml = buildUrlset(staticPaths, getPublicSiteUrl(req))
 
   res.type('application/xml').set('Cache-Control', 'public, max-age=1800').send(xml)
 })
@@ -86,12 +88,12 @@ app.get('/sitemap-static.xml', (_req, res) => {
 app.get('/sitemap-setups-:page.xml', async (req, res) => {
   const page = Math.max(1, Number(req.params.page) || 1)
   const setupPaths = await fetchSetupSitemapPaths((page - 1) * 50)
-  const xml = buildUrlset(setupPaths)
+  const xml = buildUrlset(setupPaths, getPublicSiteUrl(req))
 
   res.type('application/xml').set('Cache-Control', 'public, max-age=1800').send(xml)
 })
 
-function buildUrlset(urls) {
+function buildUrlset(urls, publicSiteUrl) {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     urls.map((urlPath) => `  <url><loc>${escapeXml(`${publicSiteUrl}${urlPath}`)}</loc></url>`).join('\n') +
@@ -179,6 +181,16 @@ function normalizeBase(value) {
 
 function normalizePublicUrl(value) {
   return value.replace(/\/+$/, '')
+}
+
+function getPublicSiteUrl(req) {
+  if (configuredPublicSiteUrl) return normalizePublicUrl(configuredPublicSiteUrl)
+
+  const forwardedHost = req.headers['x-forwarded-host']?.toString().split(',')[0]?.trim()
+  const host = forwardedHost || req.headers.host || `localhost:${port}`
+  const forwardedProto = req.headers['x-forwarded-proto']?.toString().split(',')[0]?.trim()
+  const protocol = forwardedProto || (host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https')
+  return normalizePublicUrl(`${protocol}://${host}`)
 }
 
 function escapeXml(value) {

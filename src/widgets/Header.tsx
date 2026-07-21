@@ -195,7 +195,7 @@ const GlobalSearch = ({ open, onClose }: { open: boolean; onClose: () => void })
 
 export const Header = () => {
   const hasToken = useHasAuthToken()
-  const { data: profile } = useGetProfileQuery(undefined, { skip: !hasToken })
+  const { data: profile, isLoading: isProfileLoading, isError: isProfileError } = useGetProfileQuery(undefined, { skip: !hasToken })
   const { data: notifications, refetch: refetchNotifications } = useGetNotificationsQuery(undefined, {
     pollingInterval: 60000,
     skip: !hasToken,
@@ -207,7 +207,7 @@ export const Header = () => {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const isResolvingAuth = hasToken === undefined
-  const isResolvingProfile = hasToken === true && !profile
+  const isResolvingProfile = hasToken === true && isProfileLoading && !isProfileError
   const unreadCount = notifications?.unread_count || 0
 
   const handleLogout = async () => {

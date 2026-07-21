@@ -16,6 +16,7 @@ import { getTobaccoStrength } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { hasAuthToken } from '../shared/authToken'
 import { formatCatalogDisplayName } from '../shared/catalogNames'
+import { getSafeImageUrl } from '../shared/imageUrl'
 
 interface DetailProps {
   title: string
@@ -73,6 +74,9 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
   const { t } = useTranslation()
   const isAdmin = profile?.role === 'admin'
   const displayName = formatCatalogDisplayName(item, itemKind)
+  const photoUrls: string[] = (item?.photo_urls || [])
+    .map(getSafeImageUrl)
+    .filter((url: string | null): url is string => Boolean(url))
 
   if (isLoading) {
     return (
@@ -119,7 +123,7 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
       </button>
 
       <Card>
-        {item.photo_urls?.length > 0 && (
+        {photoUrls.length > 0 && (
           <div tw="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-muted))]">
             <div
               tw="mx-auto aspect-square w-full max-w-[520px] overflow-hidden bg-[rgb(var(--color-surface-muted))]"
@@ -127,11 +131,11 @@ export const Detail = ({ title, detailHook, listPath, editPath, renderExtra, ite
                 ? coalImageSurfaceStyle
                 : undefined}
             >
-              <img src={item.photo_urls[0]} alt={displayName} loading="eager" decoding="async" style={getImageStyle(itemKind)} tw="h-full w-full object-cover" />
+              <img src={photoUrls[0]} alt={displayName} loading="eager" decoding="async" style={getImageStyle(itemKind)} tw="h-full w-full object-cover" />
             </div>
-            {item.photo_urls.length > 1 && (
+            {photoUrls.length > 1 && (
               <div tw="grid grid-cols-4 sm:grid-cols-6 gap-2 p-3 bg-[rgb(var(--color-surface))]">
-                {item.photo_urls.slice(1).map((url: string, index: number) => (
+                {photoUrls.slice(1).map((url, index) => (
                   <div
                     key={`${url}-${index}`}
                     tw="aspect-square rounded-lg overflow-hidden bg-[rgb(var(--color-surface-muted))]"

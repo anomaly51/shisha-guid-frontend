@@ -34,6 +34,6 @@ const StyledButton = styled.button<StyledButtonProps>(({ $variant = 'primary', $
   `&:disabled, [disabled] { ${tw`opacity-40 cursor-not-allowed pointer-events-none`} }`,
 ])
 
-export const Button = ({ variant = 'primary', size = 'md', ...props }: ButtonProps) => (
-  <StyledButton $variant={variant} $size={size} {...props} />
+export const Button = ({ variant = 'primary', size = 'md', type = 'button', ...props }: ButtonProps) => (
+  <StyledButton $variant={variant} $size={size} type={type} {...props} />
 )

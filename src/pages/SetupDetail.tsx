@@ -58,6 +58,7 @@ import { getSetupHeaviness } from '../shared/setupMetrics'
 import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { calculateSetupCost, formatMoney } from '../shared/setupCost'
 import { hasAuthToken } from '../shared/authToken'
+import { getSafeImageUrl } from '../shared/imageUrl'
 
 const Label = tw.p`text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-text-subtle))]`
 const SectionTitle = tw.h2`text-[18px] font-semibold leading-tight text-[rgb(var(--color-text))]`
@@ -108,7 +109,7 @@ const isSetupAuthor = (setup: any, profile: any) => {
 }
 
 const Visual = ({ item, icon }: { item: any; icon: CatalogIconName }) => {
-  const photo = item?.photo_urls?.[0]
+  const photo = getSafeImageUrl(item?.photo_urls?.[0])
 
   return (
     <div tw="relative aspect-square overflow-hidden rounded-lg border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-muted))]">

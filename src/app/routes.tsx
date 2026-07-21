@@ -31,6 +31,7 @@ const Profile = routeComponent(() => import('../pages/Profile'), 'Profile')
 const PublicProfile = routeComponent(() => import('../pages/PublicProfile'), 'PublicProfile')
 const Authors = routeComponent(() => import('../pages/Authors'), 'Authors')
 const AgentChat = routeComponent(() => import('../pages/AgentChat'), 'AgentChat')
+const NotFound = routeComponent(() => import('../pages/NotFound'), 'NotFound')
 
 export const AppRoutes = () => {
   const { t } = useTranslation()
@@ -137,6 +138,7 @@ export const AppRoutes = () => {
       <Route path="profile" element={<Profile />} />
       <Route path="authors" element={<Authors />} />
       <Route path="users/:id" element={<PublicProfile />} />
+      <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
       </Suspense>

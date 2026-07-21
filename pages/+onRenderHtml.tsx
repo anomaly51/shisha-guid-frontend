@@ -10,7 +10,7 @@ import { prefetchRouteData } from '../src/app/prefetch'
 import { appName, getFallbackPageTitle } from '../src/app/pageMeta'
 
 type ServerPageContext = PageContextServer & {
-  Page: React.ComponentType
+  Page: React.ComponentType<{ is404?: boolean }>
 }
 
 type QueryState = {
@@ -173,12 +173,21 @@ const getSerializableState = (state: ReturnType<ReturnType<typeof createAppStore
   }
 }
 
-const getPublicSiteUrl = () => (
-  import.meta.env.VITE_PUBLIC_SITE_URL ||
-  ((globalThis as any).process?.env?.PUBLIC_SITE_URL as string | undefined) ||
-  ((globalThis as any).process?.env?.SITE_URL as string | undefined) ||
-  'http://localhost:5173'
-).replace(/\/+$/, '')
+const getHeaderValue = (headers: PageContextServer['headersOriginal'], name: string) => {
+  const value = (headers as Record<string, string | string[] | undefined> | null)?.[name]
+  return Array.isArray(value) ? value[0] : value?.toString().split(',')[0]?.trim()
+}
+
+const getPublicSiteUrl = (headers: PageContextServer['headersOriginal']) => {
+  const configuredUrl = import.meta.env.VITE_PUBLIC_SITE_URL ||
+    ((globalThis as any).process?.env?.PUBLIC_SITE_URL as string | undefined) ||
+    ((globalThis as any).process?.env?.SITE_URL as string | undefined)
+  if (configuredUrl) return configuredUrl.replace(/\/+$/, '')
+
+  const host = getHeaderValue(headers, 'x-forwarded-host') || getHeaderValue(headers, 'host') || 'localhost:5173'
+  const protocol = getHeaderValue(headers, 'x-forwarded-proto') || (host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https')
+  return `${protocol}://${host}`.replace(/\/+$/, '')
+}
 
 const findFulfilledQueryData = (
   state: ReturnType<ReturnType<typeof createAppStore>['getState']>,
@@ -229,9 +238,10 @@ const renderAppToString = async (app: React.ReactElement) => {
 const buildPageMeta = (
   url: string,
   state: ReturnType<ReturnType<typeof createAppStore>['getState']>,
+  publicSiteUrl: string,
 ): PageMeta => {
-  const parsedUrl = new URL(url, getPublicSiteUrl())
-  const canonicalUrl = `${getPublicSiteUrl()}${parsedUrl.pathname}`
+  const parsedUrl = new URL(url, publicSiteUrl)
+  const canonicalUrl = `${publicSiteUrl}${parsedUrl.pathname}`
   const setupMatch = parsedUrl.pathname.match(/^\/setups\/([^/]+)$/)
   const catalogDescriptions: Record<string, string> = {
     '/tobaccos': 'Каталог табаков для кальяна: бренды, вкусы, крепость, цены и подборки для миксов Shishiguid.',
@@ -239,7 +249,7 @@ const buildPageMeta = (
     '/coals': 'Каталог угля для кальяна Shishiguid: варианты упаковок, цены и подбор для рецептов.',
     '/kalouds': 'Каталог калаудов и устройств контроля жара для кальянных забивок Shishiguid.',
   }
-  const defaultDescription = 'Shishiguid - share and discover shisha setups'
+  const defaultDescription = 'Shishiguid — создавайте и находите рецепты кальянных забивок.'
 
   if (setupMatch) {
     const setup = findFulfilledQueryData(state, 'getSetup', setupMatch[1])
@@ -249,7 +259,7 @@ const buildPageMeta = (
         .filter(Boolean)
       const description = truncateMeta(
         setup.description ||
-        (tobaccoNames.length ? `Shisha setup with ${tobaccoNames.join(', ')}.` : defaultDescription),
+        (tobaccoNames.length ? `Кальянная забивка с табаками: ${tobaccoNames.join(', ')}.` : defaultDescription),
         180,
       )
       const ratingValue = Number(setup.average_rating || setup.rating_average || 0)
@@ -261,7 +271,7 @@ const buildPageMeta = (
         description,
         image: setup.photo_urls?.[0] || setup.tobaccos?.find((item: any) => item.tobacco?.photo_urls?.[0])?.tobacco.photo_urls[0],
         recipeIngredient: tobaccoNames,
-        recipeInstructions: setup.description || `Mix ${tobaccoNames.join(', ')}`,
+        recipeInstructions: setup.description || `Смешайте: ${tobaccoNames.join(', ')}`,
       }
       if (ratingValue > 0 && ratingCount > 0) {
         jsonLd.aggregateRating = {
@@ -315,7 +325,7 @@ export const onRenderHtml = async (pageContext: ServerPageContext) => {
       <React.StrictMode>
         <AppProviders store={store}>
           <StaticRouter location={url}>
-            <Page />
+            <Page is404={Boolean(pageContext.is404)} />
           </StaticRouter>
         </AppProviders>
       </React.StrictMode>,
@@ -323,10 +333,10 @@ export const onRenderHtml = async (pageContext: ServerPageContext) => {
     const pageHtml = await renderAppToString(app)
     const styles = sheet.getStyleTags()
     const preloadedState = getSerializableState(store.getState())
-    const pageMeta = buildPageMeta(url, store.getState())
+    const pageMeta = buildPageMeta(url, store.getState(), getPublicSiteUrl(pageContext.headersOriginal))
 
     const documentHtml = escapeInject`<!doctype html>
-      <html lang="en">
+      <html lang="ru">
         <head>
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />

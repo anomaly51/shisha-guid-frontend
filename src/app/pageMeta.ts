@@ -17,35 +17,37 @@ const routeTitleKeys: Record<string, string> = {
   '/admin/bowl-setup-types': 'routes.setupTypes',
   '/admin/bowl-setup-types/create': 'routes.createSetupType',
   '/setups/create': 'setupForm.newSetup',
+  '/ai-chat': 'agent.title',
   '/profile': 'profile.title',
   '/authors': 'authors.title',
 }
 
 const fallbackTitles: Record<string, string> = {
-  'feed.title': 'Feed',
-  'routes.bowls': 'Bowls',
-  'routes.createBowl': 'Create bowl',
-  'routes.editBowl': 'Edit bowl',
-  'routes.tobaccos': 'Tobaccos',
-  'routes.createTobacco': 'Create tobacco',
-  'routes.editTobacco': 'Edit tobacco',
-  'routes.coals': 'Coals',
-  'routes.createCoal': 'Create coal',
-  'routes.editCoal': 'Edit coal',
-  'routes.kalouds': 'Kalouds',
-  'routes.createKaloud': 'Create kaloud',
-  'routes.editKaloud': 'Edit kaloud',
-  'routes.coalPlacements': 'Coal placements',
-  'routes.createCoalPlacement': 'Create coal placement',
-  'routes.editCoalPlacement': 'Edit coal placement',
-  'routes.setupTypes': 'Setup types',
-  'routes.createSetupType': 'Create setup type',
-  'routes.editSetupType': 'Edit setup type',
-  'setupForm.newSetup': 'New setup',
-  'setupForm.editSetup': 'Edit setup',
-  'setupDetail.setup': 'Setup',
-  'profile.title': 'Profile',
-  'authors.title': 'Authors',
+  'feed.title': 'Лента',
+  'routes.bowls': 'Чаши',
+  'routes.createBowl': 'Создать чашу',
+  'routes.editBowl': 'Редактировать чашу',
+  'routes.tobaccos': 'Табаки',
+  'routes.createTobacco': 'Создать табак',
+  'routes.editTobacco': 'Редактировать табак',
+  'routes.coals': 'Угли',
+  'routes.createCoal': 'Создать уголь',
+  'routes.editCoal': 'Редактировать уголь',
+  'routes.kalouds': 'Калауды',
+  'routes.createKaloud': 'Создать калауд',
+  'routes.editKaloud': 'Редактировать калауд',
+  'routes.coalPlacements': 'Размещение угля',
+  'routes.createCoalPlacement': 'Создать размещение угля',
+  'routes.editCoalPlacement': 'Редактировать размещение угля',
+  'routes.setupTypes': 'Типы забивок',
+  'routes.createSetupType': 'Создать тип забивки',
+  'routes.editSetupType': 'Редактировать тип забивки',
+  'setupForm.newSetup': 'Новая забивка',
+  'setupForm.editSetup': 'Редактировать забивку',
+  'setupDetail.setup': 'Забивка',
+  'agent.title': 'AI-чат',
+  'profile.title': 'Профиль',
+  'authors.title': 'Авторы',
 }
 
 export const getRouteTitleKey = (pathname: string) => {
@@ -74,7 +76,7 @@ export const getRouteTitleKey = (pathname: string) => {
 
 export const getFallbackPageTitle = (pathname: string) => {
   const titleKey = getRouteTitleKey(pathname)
-  const pageTitle = titleKey ? fallbackTitles[titleKey] : 'Not found'
+  const pageTitle = titleKey ? fallbackTitles[titleKey] : 'Не найдено'
   return pageTitle && pageTitle !== appName ? `${pageTitle} | ${appName}` : appName
 }
 

@@ -19,6 +19,7 @@ import { StrengthIndicator } from '../shared/ui/StrengthIndicator'
 import { hasAuthToken } from '../shared/authToken'
 import { getTobaccoRatingMap } from '../shared/tobaccoRatings'
 import { formatCatalogDisplayName } from '../shared/catalogNames'
+import { getSafeImageUrl } from '../shared/imageUrl'
 
 type CatalogItemKind = 'default' | 'bowl' | 'tobacco' | 'coal' | 'kaloud' | 'placement' | 'setupType'
 type StrengthFilter = 'all' | 'light' | 'medium' | 'strong' | 'heavy'
@@ -37,6 +38,7 @@ const strengthOptions: StrengthFilter[] = ['all', 'light', 'medium', 'strong', '
 const TOBACCO_PAGE_SIZE = 24
 const COAL_PAGE_SIZE = 24
 const CATALOG_SEARCH_HISTORY_KEY = 'shisha-guid:catalog-searches'
+const getCatalogPhotoUrl = (item: any) => getSafeImageUrl(item.photo_urls?.[0])
 
 const getSearchStrength = (value: string | null): StrengthFilter => (
   strengthOptions.includes(value as StrengthFilter) ? value as StrengthFilter : 'all'
@@ -253,7 +255,7 @@ export const Catalog = ({
   const { data: rawData, isFetching, isLoading } = listHook(tobaccoQueryParams || coalQueryParams)
   const { data: allTobaccosForBrands } = useGetTobaccosQuery(undefined, { skip: itemKind !== 'tobacco' })
   const { data: setupsForRatings } = useGetSetupsQuery(
-    itemKind === 'tobacco' ? { limit: 1000, sort: 'rating' } : undefined,
+    itemKind === 'tobacco' ? { limit: 50, sort: 'rating' } : undefined,
     { skip: itemKind !== 'tobacco' },
   )
   const { data: profile } = useGetProfileQuery(undefined, { skip: !hasAuthToken() })
@@ -608,6 +610,7 @@ export const Catalog = ({
                 const packageLine = itemKind === 'tobacco' ? formatTobaccoPackageLine(item, t) : null
                 const price = formatPrice(item.price, item.price_currency)
                 const displayName = formatCatalogDisplayName(item, itemKind)
+                const photoUrl = getCatalogPhotoUrl(item)
 
                 return (
                   <Card key={item.id} className="h-full">
@@ -618,9 +621,9 @@ export const Catalog = ({
                           ? coalImageSurfaceStyle
                           : undefined}
                       >
-                        {item.photo_urls?.length > 0 ? (
+                        {photoUrl ? (
                           <img
-                            src={item.photo_urls[0]}
+                            src={photoUrl}
                             alt={displayName}
                             loading="lazy"
                             decoding="async"

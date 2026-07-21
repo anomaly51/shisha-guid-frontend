@@ -8,7 +8,7 @@ import { profileApi } from '../src/shared/api/profile'
 import { getCachedProfile, hasAuthToken } from '../src/shared/authToken'
 
 type ClientPageContext = PageContextClient & {
-  Page: React.ComponentType
+  Page: React.ComponentType<{ is404?: boolean }>
   preloadedState?: Partial<RootState>
 }
 
@@ -31,7 +31,7 @@ export const onRenderClient = (pageContext: ClientPageContext) => {
     <React.StrictMode>
       <AppProviders store={store}>
         <BrowserRouter>
-          <Page />
+          <Page is404={Boolean(pageContext.is404)} />
         </BrowserRouter>
       </AppProviders>
     </React.StrictMode>,

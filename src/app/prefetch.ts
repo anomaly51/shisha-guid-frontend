@@ -36,7 +36,7 @@ const catalogRoutes: Record<string, { list: EndpointName; detail: EndpointName }
 
 const setupFormPrefetch: PrefetchRequest[] = [
   { endpoint: 'getBowls' },
-  { endpoint: 'getCoals', arg: { limit: 60 } },
+  { endpoint: 'getCoals', arg: { limit: 50 } },
   { endpoint: 'getKalouds' },
   { endpoint: 'getCoalPlacements' },
   { endpoint: 'getBowlSetupTypes' },
