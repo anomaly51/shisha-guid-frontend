@@ -1,26 +1,24 @@
-name: Build and deploy
-
-on:
-  pull_request:
+name: CI and environments
+'on':
   push:
     branches:
-      - main
-  workflow_dispatch:
-
+    - main
+    - dev
+  pull_request:
+    branches:
+    - main
+    - dev
+  workflow_dispatch: null
 permissions:
   contents: read
-
+  packages: write
+  id-token: write
 concurrency:
-  group: shisha-frontend-deploy-${{ github.ref }}
+  group: ci-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
-  deploy:
-    # Track the latest shared deploy workflow from github-actions-toolkit.
-    uses: anomaly51/github-actions-toolkit/.github/workflows/harbor-argocd-app.yml@main
+  release:
+    uses: anomaly51/general-1-argocd/.github/workflows/build-and-stage.yaml@main
     with:
-      app-name: shisha-frontend
-      # Human-readable title for compact Telegram deploy status updates.
-      notification-title: Shishiguid Frontend
-      image-repository: harbor.api-api-api.com/shisha/frontend
-    secrets: inherit
+      application: shisha-guid-frontend
+      components: '[{"key":"image","build_args":"VITE_API_URL=/api/v1\nVITE_SSR_API_URL=http://shisha-guid-backend/api/v1\nVITE_PUBLIC_SITE_URL="}]'
