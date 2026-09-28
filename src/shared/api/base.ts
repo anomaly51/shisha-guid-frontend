@@ -1,8 +1,13 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import { clearAuthSession, getAuthToken, refreshAuthToken } from '../authToken'
 
+// Server-side API requests use runtime configuration when an image is promoted.
+const runtimeServerApiUrl = import.meta.env.SSR
+  ? (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process?.env?.SSR_API_URL
+  : undefined
+
 const apiBaseUrl = import.meta.env.SSR
-  ? import.meta.env.VITE_SSR_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+  ? runtimeServerApiUrl || import.meta.env.VITE_SSR_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
   : import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 const rawBaseQuery = fetchBaseQuery({
